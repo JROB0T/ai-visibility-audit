@@ -8,7 +8,8 @@ import type {
 
 const USER_AGENT = 'AIVisibilityAudit/1.0 (+https://aivisibilityaudit.com)';
 const FETCH_TIMEOUT = 10000; // 10 seconds per request
-const MAX_PAGES = 15; // Keep it focused
+const MAX_PAGES = 50;
+const CONCURRENT_SCANS = 5; // Scan 5 pages at a time for speed
 
 // Known AI crawler user agents to check in robots.txt
 const AI_AGENTS = [
@@ -22,6 +23,7 @@ const AI_AGENTS = [
 // ============================================================
 export async function scanSite(inputUrl: string): Promise<ScanResult> {
   const baseUrl = normalizeUrl(inputUrl);
+  const hostname = new URL(baseUrl).hostname;
   const errors: string[] = [];
 
   // 1. Check robots.txt
@@ -30,11 +32,15 @@ export async function scanSite(inputUrl: string): Promise<ScanResult> {
     return null;
   });
 
-  // 2. Check sitemap
-  const sitemap = await checkSitemap(baseUrl, robotsTxt).catch((e) => {
+  // 2. Check sitemap and extract URLs
+  const sitemapData = await checkSitemap(baseUrl, robotsTxt).catch((e) => {
     errors.push(`sitemap check failed: ${e.message}`);
     return null;
   });
+
+  const sitemap: SitemapResult = sitemapData
+    ? { exists: sitemapData.exists, url: sitemapData.url, urlCount: sitemapData.urlCount, isAccessible: sitemapData.isAccessible }
+    : { exists: false, url: null, urlCount: null, isAccessible: false };
 
   // 3. Scan homepage first
   const homepageResult = await scanPage(baseUrl, 'homepage').catch((e) => {
@@ -46,24 +52,65 @@ export async function scanSite(inputUrl: string): Promise<ScanResult> {
     return { robotsTxt, sitemap, pages: [], errors: [...errors, 'Could not scan homepage'] };
   }
 
-  // 4. Discover and categorize key pages from homepage links
-  const keyPages = discoverKeyPages(homepageResult.internalLinks);
-
-  // 5. Scan key pages (limited set)
-  const pageResults: PageScanResult[] = [homepageResult];
+  // 4. Build a prioritized list of URLs to scan from multiple sources
   const scannedUrls = new Set([baseUrl, baseUrl + '/']);
+  const urlsToScan: { url: string; type: PageScanResult['pageType']; priority: number }[] = [];
 
-  for (const { url, type } of keyPages) {
-    if (pageResults.length >= MAX_PAGES) break;
-    if (scannedUrls.has(url)) continue;
-    scannedUrls.add(url);
+  // Source A: Key pages from homepage links (highest priority)
+  const homepageKeyPages = discoverKeyPages(homepageResult.internalLinks);
+  for (const page of homepageKeyPages) {
+    if (!scannedUrls.has(page.url)) {
+      urlsToScan.push({ ...page, priority: page.priority });
+      scannedUrls.add(page.url);
+    }
+  }
 
+  // Source B: Sitemap URLs (categorized and added)
+  if (sitemapData?.pageUrls) {
+    for (const sitemapUrl of sitemapData.pageUrls) {
+      if (scannedUrls.has(sitemapUrl)) continue;
+      // Only include same-hostname URLs
+      try {
+        if (new URL(sitemapUrl).hostname !== hostname) continue;
+      } catch { continue; }
+
+      const categorized = categorizeUrl(sitemapUrl);
+      urlsToScan.push({ url: sitemapUrl, type: categorized.type, priority: categorized.priority + 100 }); // Lower priority than homepage-discovered
+      scannedUrls.add(sitemapUrl);
+    }
+  }
+
+  // Source C: Remaining internal links from homepage (lowest priority)
+  for (const link of homepageResult.internalLinks) {
+    if (scannedUrls.has(link)) continue;
     try {
-      const result = await scanPage(url, type);
-      pageResults.push(result);
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e);
-      errors.push(`Failed to scan ${url}: ${msg}`);
+      if (new URL(link).hostname !== hostname) continue;
+    } catch { continue; }
+    const categorized = categorizeUrl(link);
+    urlsToScan.push({ url: link, type: categorized.type, priority: categorized.priority + 200 });
+    scannedUrls.add(link);
+  }
+
+  // Sort by priority and cap at MAX_PAGES - 1 (homepage already scanned)
+  urlsToScan.sort((a, b) => a.priority - b.priority);
+  const pagesToScan = urlsToScan.slice(0, MAX_PAGES - 1);
+
+  // 5. Scan pages in concurrent batches
+  const pageResults: PageScanResult[] = [homepageResult];
+
+  for (let i = 0; i < pagesToScan.length; i += CONCURRENT_SCANS) {
+    const batch = pagesToScan.slice(i, i + CONCURRENT_SCANS);
+    const batchResults = await Promise.allSettled(
+      batch.map(({ url, type }) => scanPage(url, type))
+    );
+
+    for (let j = 0; j < batchResults.length; j++) {
+      const result = batchResults[j];
+      if (result.status === 'fulfilled') {
+        pageResults.push(result.value);
+      } else {
+        errors.push(`Failed to scan ${batch[j].url}: ${result.reason?.message || 'Unknown error'}`);
+      }
     }
   }
 
@@ -78,7 +125,6 @@ function normalizeUrl(input: string): string {
   if (!url.startsWith('http://') && !url.startsWith('https://')) {
     url = 'https://' + url;
   }
-  // Remove trailing slash for consistency
   return url.replace(/\/+$/, '');
 }
 
@@ -109,36 +155,12 @@ async function checkRobotsTxt(baseUrl: string): Promise<RobotsTxtResult> {
 
   if (!res.ok) {
     return {
-      exists: false,
-      content: null,
-      blocksAI: false,
-      blockedAgents: [],
-      allowsSitemap: false,
-      sitemapUrls: [],
+      exists: false, content: null, blocksAI: false,
+      blockedAgents: [], allowsSitemap: false, sitemapUrls: [],
     };
   }
 
   const content = await res.text();
-
-  const blockedAgents: string[] = [];
-  let currentAgent = '';
-
-  for (const line of content.split('\n')) {
-    const trimmed = line.trim();
-    if (trimmed.toLowerCase().startsWith('user-agent:')) {
-      currentAgent = trimmed.substring(11).trim();
-    }
-    if (trimmed.toLowerCase().startsWith('disallow: /') && trimmed.trim() === 'Disallow: /') {
-      // Full disallow
-      for (const agent of AI_AGENTS) {
-        if (currentAgent === '*' || currentAgent.toLowerCase().includes(agent.toLowerCase())) {
-          if (!blockedAgents.includes(agent === '*' ? 'all agents' : currentAgent)) {
-            blockedAgents.push(currentAgent);
-          }
-        }
-      }
-    }
-  }
 
   // Check specifically for AI agents being blocked
   const aiBlocked: string[] = [];
@@ -163,7 +185,7 @@ async function checkRobotsTxt(baseUrl: string): Promise<RobotsTxtResult> {
 
   return {
     exists: true,
-    content: content.substring(0, 2000), // Keep it manageable
+    content: content.substring(0, 2000),
     blocksAI: aiBlocked.length > 0,
     blockedAgents: aiBlocked,
     allowsSitemap: sitemapUrls.length > 0,
@@ -172,13 +194,16 @@ async function checkRobotsTxt(baseUrl: string): Promise<RobotsTxtResult> {
 }
 
 // ============================================================
-// Sitemap check
+// Sitemap check — now also extracts page URLs
 // ============================================================
+interface SitemapData extends SitemapResult {
+  pageUrls: string[];
+}
+
 async function checkSitemap(
   baseUrl: string,
   robotsTxt: RobotsTxtResult | null
-): Promise<SitemapResult> {
-  // Try sitemap URLs from robots.txt first
+): Promise<SitemapData> {
   const sitemapUrls = [
     ...(robotsTxt?.sitemapUrls || []),
     `${baseUrl}/sitemap.xml`,
@@ -186,25 +211,91 @@ async function checkSitemap(
   ];
 
   const uniqueUrls = Array.from(new Set(sitemapUrls));
+  const allPageUrls: string[] = [];
+
   for (const url of uniqueUrls) {
     try {
       const res = await safeFetch(url);
-      if (res.ok) {
-        const text = await res.text();
-        const urlCount = (text.match(/<loc>/gi) || []).length;
-        return {
-          exists: true,
-          url,
-          urlCount: urlCount || null,
-          isAccessible: true,
-        };
+      if (!res.ok) continue;
+
+      const text = await res.text();
+
+      // Check if this is a sitemap index (contains other sitemaps)
+      if (text.includes('<sitemapindex') || text.includes('<sitemap>')) {
+        const indexUrls = extractLocsFromXml(text);
+        // Fetch up to 5 child sitemaps
+        const childSitemaps = indexUrls.slice(0, 5);
+        for (const childUrl of childSitemaps) {
+          try {
+            const childRes = await safeFetch(childUrl);
+            if (childRes.ok) {
+              const childText = await childRes.text();
+              allPageUrls.push(...extractLocsFromXml(childText));
+            }
+          } catch { /* skip failed child sitemaps */ }
+        }
+      } else {
+        // Regular sitemap — extract URLs directly
+        allPageUrls.push(...extractLocsFromXml(text));
       }
+
+      const totalUrlCount = allPageUrls.length;
+      return {
+        exists: true,
+        url,
+        urlCount: totalUrlCount || null,
+        isAccessible: true,
+        pageUrls: allPageUrls,
+      };
     } catch {
       continue;
     }
   }
 
-  return { exists: false, url: null, urlCount: null, isAccessible: false };
+  return { exists: false, url: null, urlCount: null, isAccessible: false, pageUrls: [] };
+}
+
+// Extract <loc> values from sitemap XML
+function extractLocsFromXml(xml: string): string[] {
+  const urls: string[] = [];
+  const locRegex = /<loc>\s*(.*?)\s*<\/loc>/gi;
+  let match;
+  while ((match = locRegex.exec(xml)) !== null) {
+    const url = match[1].trim();
+    if (url.startsWith('http')) {
+      urls.push(url.replace(/\/+$/, ''));
+    }
+  }
+  return urls;
+}
+
+// ============================================================
+// Categorize a URL by its path pattern
+// ============================================================
+function categorizeUrl(url: string): { type: PageScanResult['pageType']; priority: number } {
+  const patterns: { regex: RegExp; type: PageScanResult['pageType']; priority: number }[] = [
+    { regex: /\/(pricing|plans|packages)/i, type: 'pricing', priority: 1 },
+    { regex: /\/(demo|request-demo|book-demo|get-demo|schedule)/i, type: 'demo', priority: 2 },
+    { regex: /\/(contact|contact-us|get-in-touch|talk-to-us)/i, type: 'contact', priority: 3 },
+    { regex: /\/(product|products|features|platform|solutions?)\/?$/i, type: 'product', priority: 4 },
+    { regex: /\/(product|features|platform|solutions?)\/[^/]+\/?$/i, type: 'product', priority: 5 },
+    { regex: /\/(docs|documentation|api-docs|developers|api)\/?$/i, type: 'docs', priority: 6 },
+    { regex: /\/(blog|articles|news|insights)\/?$/i, type: 'blog', priority: 7 },
+    { regex: /\/(blog|articles|news|insights)\/[^/]+/i, type: 'blog', priority: 8 },
+    { regex: /\/(resources?|library|guides?|whitepapers?|case-studies)\/?$/i, type: 'resource', priority: 9 },
+    { regex: /\/(resources?|library|guides?|whitepapers?|case-studies)\/[^/]+/i, type: 'resource', priority: 10 },
+    { regex: /\/(about|about-us|company|team|careers)\/?$/i, type: 'other', priority: 11 },
+    { regex: /\/(integrations?|partners?|marketplace|customers?|testimonials?)\/?$/i, type: 'other', priority: 12 },
+    { regex: /\/(docs|documentation|api-docs|developers|api)\/[^/]+/i, type: 'docs', priority: 13 },
+    { regex: /\/(security|privacy|terms|legal|compliance)\/?$/i, type: 'other', priority: 14 },
+  ];
+
+  for (const pattern of patterns) {
+    if (pattern.regex.test(url)) {
+      return { type: pattern.type, priority: pattern.priority };
+    }
+  }
+  return { type: 'other', priority: 50 };
 }
 
 // ============================================================
@@ -299,21 +390,9 @@ async function scanPage(
   }
 
   return {
-    url,
-    pageType,
-    statusCode: res.status,
-    title,
-    metaDescription,
-    canonicalUrl,
-    hasSchema,
-    schemaTypes,
-    h1Text,
-    wordCount,
-    loadTimeMs,
-    headings,
-    hasStructuredNav,
-    internalLinks,
-    issues,
+    url, pageType, statusCode: res.status, title, metaDescription,
+    canonicalUrl, hasSchema, schemaTypes, h1Text, wordCount, loadTimeMs,
+    headings, hasStructuredNav, internalLinks, issues,
   };
 }
 
@@ -322,34 +401,19 @@ async function scanPage(
 // ============================================================
 function discoverKeyPages(
   links: string[]
-): { url: string; type: PageScanResult['pageType'] }[] {
+): { url: string; type: PageScanResult['pageType']; priority: number }[] {
   const keyPages: { url: string; type: PageScanResult['pageType']; priority: number }[] = [];
 
-  const patterns: { regex: RegExp; type: PageScanResult['pageType']; priority: number }[] = [
-    { regex: /\/(pricing|plans|packages)/i, type: 'pricing', priority: 1 },
-    { regex: /\/(demo|request-demo|book-demo|get-demo|schedule)/i, type: 'demo', priority: 2 },
-    { regex: /\/(contact|contact-us|get-in-touch|talk-to-us)/i, type: 'contact', priority: 3 },
-    { regex: /\/(product|products|features|platform|solutions?)\/?$/i, type: 'product', priority: 4 },
-    { regex: /\/(product|features|platform|solutions?)\/[^/]+\/?$/i, type: 'product', priority: 5 },
-    { regex: /\/(docs|documentation|api-docs|developers|api)\/?$/i, type: 'docs', priority: 6 },
-    { regex: /\/(blog|articles|news|insights)\/?$/i, type: 'blog', priority: 7 },
-    { regex: /\/(resources?|library|guides?|whitepapers?|case-studies)\/?$/i, type: 'resource', priority: 8 },
-    { regex: /\/(about|about-us|company|team)\/?$/i, type: 'other', priority: 9 },
-    { regex: /\/(integrations?|partners?|marketplace)\/?$/i, type: 'other', priority: 10 },
-  ];
-
   for (const link of links) {
-    for (const pattern of patterns) {
-      if (pattern.regex.test(link)) {
-        // Avoid duplicates of the same type (except product pages, we want a few)
-        const existingOfType = keyPages.filter((p) => p.type === pattern.type);
-        if (pattern.type === 'product' && existingOfType.length >= 3) continue;
-        if (pattern.type !== 'product' && existingOfType.length >= 1) continue;
+    const { type, priority } = categorizeUrl(link);
+    if (type === 'other' && priority >= 50) continue; // Skip uncategorized for homepage discovery
 
-        keyPages.push({ url: link, type: pattern.type, priority: pattern.priority });
-        break;
-      }
-    }
+    // Limit duplicates per type (except blog/docs/product — allow more)
+    const existingOfType = keyPages.filter((p) => p.type === type);
+    const maxPerType = ['product', 'blog', 'docs', 'resource'].includes(type) ? 5 : 2;
+    if (existingOfType.length >= maxPerType) continue;
+
+    keyPages.push({ url: link, type, priority });
   }
 
   return keyPages.sort((a, b) => a.priority - b.priority);
