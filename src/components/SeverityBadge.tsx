@@ -1,33 +1,31 @@
-interface SeverityBadgeProps {
-  severity: 'high' | 'medium' | 'low';
-}
+'use client';
 
-const styles = {
-  high: 'bg-red-50 text-red-700 border-red-200',
-  medium: 'bg-amber-50 text-amber-700 border-amber-200',
-  low: 'bg-blue-50 text-blue-700 border-blue-200',
+const SEVERITY_STYLES: Record<string, { bg: string; text: string; border: string }> = {
+  high: { bg: 'rgba(239,68,68,0.1)', text: '#EF4444', border: 'rgba(239,68,68,0.2)' },
+  medium: { bg: 'rgba(245,158,11,0.1)', text: '#F59E0B', border: 'rgba(245,158,11,0.2)' },
+  low: { bg: 'rgba(99,102,241,0.1)', text: '#6366F1', border: 'rgba(99,102,241,0.2)' },
 };
 
-export default function SeverityBadge({ severity }: SeverityBadgeProps) {
+const EFFORT_STYLES: Record<string, { bg: string; text: string; border: string; label: string }> = {
+  easy: { bg: 'rgba(16,185,129,0.1)', text: '#10B981', border: 'rgba(16,185,129,0.2)', label: 'Quick fix' },
+  medium: { bg: 'rgba(245,158,11,0.1)', text: '#F59E0B', border: 'rgba(245,158,11,0.2)', label: 'Moderate' },
+  harder: { bg: 'rgba(239,68,68,0.1)', text: '#EF4444', border: 'rgba(239,68,68,0.2)', label: 'Larger effort' },
+};
+
+export default function SeverityBadge({ severity }: { severity: string }) {
+  const s = SEVERITY_STYLES[severity] || SEVERITY_STYLES.low;
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 text-xs font-medium rounded border ${styles[severity]}`}>
-      {severity.charAt(0).toUpperCase() + severity.slice(1)}
+    <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold capitalize" style={{ background: s.bg, color: s.text, border: `1px solid ${s.border}` }}>
+      {severity}
     </span>
   );
 }
 
-export function EffortBadge({ effort }: { effort: 'easy' | 'medium' | 'harder' }) {
-  const effortStyles = {
-    easy: 'bg-green-50 text-green-700 border-green-200',
-    medium: 'bg-yellow-50 text-yellow-700 border-yellow-200',
-    harder: 'bg-gray-50 text-gray-600 border-gray-200',
-  };
-
-  const labels = { easy: 'Quick fix', medium: 'Moderate effort', harder: 'Larger effort' };
-
+export function EffortBadge({ effort }: { effort: string }) {
+  const e = EFFORT_STYLES[effort] || EFFORT_STYLES.medium;
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 text-xs font-medium rounded border ${effortStyles[effort]}`}>
-      {labels[effort]}
+    <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium" style={{ background: e.bg, color: e.text, border: `1px solid ${e.border}` }}>
+      {e.label}
     </span>
   );
 }

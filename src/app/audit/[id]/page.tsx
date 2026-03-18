@@ -235,7 +235,7 @@ export default function AuditResultPage() {
       <div key={finding.id} className="bg-white rounded-xl border border-gray-200 p-5">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-start gap-3 min-w-0">
-            {index !== undefined && <span className="flex items-center justify-center w-6 h-6 rounded-full bg-gray-100 text-xs font-semibold text-gray-500 shrink-0 mt-0.5">{index + 1}</span>}
+            {index !== undefined && <span className="flex items-center justify-center w-6 h-6 rounded-full bg-gray-50 text-xs font-semibold text-gray-500 shrink-0 mt-0.5">{index + 1}</span>}
             <div className="min-w-0">
               <h3 className="font-semibold text-gray-900">{finding.title}</h3>
               <div className="mt-2 bg-amber-50 rounded-lg p-3 border border-amber-100">
@@ -298,7 +298,7 @@ export default function AuditResultPage() {
 
       {isAuthenticated && (
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
-          <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-0.5">
+          <div className="flex items-center gap-1 bg-gray-50 rounded-lg p-0.5">
             {(['priority', 'page', 'category'] as ViewMode[]).map((mode) => (
               <button key={mode} onClick={() => setViewMode(mode)} className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${viewMode === mode ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
                 {mode === 'priority' ? 'By Priority' : mode === 'page' ? 'By Page' : 'By Category'}
@@ -382,7 +382,7 @@ export default function AuditResultPage() {
 
         {!isAuthenticated && gatedCount > 0 && (
           <div className="mt-6 relative">
-            <div className="bg-white rounded-xl border border-gray-200 p-5 opacity-40 blur-[2px] pointer-events-none"><div className="flex items-start gap-3"><span className="flex items-center justify-center w-6 h-6 rounded-full bg-gray-100 text-xs font-semibold text-gray-500">{FREE_RECOMMENDATION_LIMIT + 1}</span><div><div className="h-4 w-64 bg-gray-200 rounded" /><div className="h-3 w-96 bg-gray-100 rounded mt-2" /></div></div></div>
+            <div className="bg-white rounded-xl border border-gray-200 p-5 opacity-40 blur-[2px] pointer-events-none"><div className="flex items-start gap-3"><span className="flex items-center justify-center w-6 h-6 rounded-full bg-gray-50 text-xs font-semibold text-gray-500">{FREE_RECOMMENDATION_LIMIT + 1}</span><div><div className="h-4 w-64 bg-gray-200 rounded" /><div className="h-3 w-96 bg-gray-50 rounded mt-2" /></div></div></div>
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="bg-white rounded-xl border-2 border-blue-200 p-6 text-center shadow-lg max-w-sm">
                 <Lock className="w-8 h-8 text-blue-600 mx-auto" />
@@ -406,7 +406,7 @@ export default function AuditResultPage() {
                   {pages.map((page) => (
                     <tr key={page.id} className="border-b border-gray-100 last:border-0">
                       <td className="py-3 px-4"><div className="flex items-center gap-1.5 max-w-xs"><span className="truncate text-gray-900 font-medium" title={page.url}>{page.title || new URL(page.url).pathname}</span><a href={page.url} target="_blank" rel="noopener" className="shrink-0 text-gray-400 hover:text-blue-600"><ExternalLink className="w-3.5 h-3.5" /></a></div></td>
-                      <td className="py-3 px-4"><span className="inline-flex px-2 py-0.5 text-xs rounded bg-gray-100 text-gray-600 capitalize">{page.page_type}</span></td>
+                      <td className="py-3 px-4"><span className="inline-flex px-2 py-0.5 text-xs rounded bg-gray-50 text-gray-600 capitalize">{page.page_type}</span></td>
                       <td className="py-3 px-4 text-center">{page.has_schema ? <CheckCircle className="w-4 h-4 text-green-500 mx-auto" /> : <span className="text-gray-300">—</span>}</td>
                       <td className="py-3 px-4 text-center">{page.issues.length > 0 ? <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-100 text-amber-700 text-xs font-medium">{page.issues.length}</span> : <CheckCircle className="w-4 h-4 text-green-500 mx-auto" />}</td>
                       <td className="py-3 px-4 text-right text-gray-600">{page.load_time_ms ? `${(page.load_time_ms / 1000).toFixed(1)}s` : '—'}</td>
