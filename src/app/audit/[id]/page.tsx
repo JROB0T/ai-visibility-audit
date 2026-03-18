@@ -180,7 +180,7 @@ export default function AuditResultPage() {
     const recTitles = new Set(data.recommendations.map(r => r.title.toLowerCase()));
     const pageIssueMap = new Map<string, string[]>();
     for (const page of data.pages) { for (const issue of page.issues) { if (!pageIssueMap.has(issue)) pageIssueMap.set(issue, []); pageIssueMap.get(issue)!.push(page.url); } }
-    for (const [issue, urls] of pageIssueMap.entries()) {
+    for (const [issue, urls] of Array.from(pageIssueMap.entries())) {
       const alreadyCovered = Array.from(recTitles).some(t => t.includes(issue.toLowerCase().substring(0, 20)));
       if (alreadyCovered) continue;
       const detail = getIssueDetail(issue);
