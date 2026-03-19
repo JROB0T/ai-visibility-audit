@@ -334,3 +334,55 @@ body {
 [data-theme="dark"] table thead tr { background: var(--bg-tertiary) !important; }
 [data-theme="dark"] table th { color: var(--text-tertiary) !important; }
 [data-theme="dark"] table td { color: var(--text-secondary) !important; }
+
+/* ==================== ADDITIONAL DARK MODE FIXES ==================== */
+/* Issue count badges */
+[data-theme="dark"] .bg-amber-100 { background: rgba(245,158,11,0.15) !important; }
+[data-theme="dark"] .text-amber-600 { color: #FCD34D !important; }
+[data-theme="dark"] .bg-green-50 { background: rgba(16,185,129,0.08) !important; }
+[data-theme="dark"] .text-green-500 { color: #34D399 !important; }
+[data-theme="dark"] .text-green-600 { color: #34D399 !important; }
+[data-theme="dark"] .text-red-500 { color: #F87171 !important; }
+[data-theme="dark"] .text-red-600 { color: #F87171 !important; }
+[data-theme="dark"] .text-amber-500 { color: #FBBF24 !important; }
+[data-theme="dark"] .text-emerald-500 { color: #34D399 !important; }
+[data-theme="dark"] .text-emerald-400 { color: #34D399 !important; }
+
+/* Score bar backgrounds */
+[data-theme="dark"] .bg-gray-200 { background: #1E293B !important; }
+
+/* Focus rings */
+[data-theme="dark"] .focus\:ring-blue-500:focus { --tw-ring-color: rgba(99,102,241,0.5) !important; }
+[data-theme="dark"] .focus\:border-blue-500:focus { border-color: #6366F1 !important; }
+
+/* Border colors for cards and sections */
+[data-theme="dark"] .border-gray-150 { border-color: var(--border) !important; }
+[data-theme="dark"] .border-gray-300 { border-color: var(--border) !important; }
+
+/* Input fields in light sections */
+[data-theme="dark"] input[type="text"], [data-theme="dark"] input[type="email"], [data-theme="dark"] input[type="password"] {
+  background: var(--surface) !important;
+  color: var(--text-primary) !important;
+  border-color: var(--border) !important;
+}
+[data-theme="dark"] input::placeholder { color: var(--text-tertiary) !important; }
+
+/* Select dropdowns */
+[data-theme="dark"] select {
+  background: var(--surface) !important;
+  color: var(--text-primary) !important;
+  border-color: var(--border) !important;
+}
+
+/* Table rows */
+[data-theme="dark"] tr { border-color: var(--border) !important; }
+
+/* Score ring track */
+[data-theme="dark"] .bg-gray-100.rounded-full { background: #1E293B !important; }
+
+/* Links in dark mode */
+[data-theme="dark"] .hover\:underline:hover { color: #818CF8 !important; }
+
+/* Specific component fixes */
+[data-theme="dark"] .bg-amber-100.text-amber-700 { background: rgba(245,158,11,0.2) !important; color: #FCD34D !important; }
+[data-theme="dark"] .bg-emerald-100 { background: rgba(16,185,129,0.15) !important; }
