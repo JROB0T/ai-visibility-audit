@@ -3,9 +3,10 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import ScoreRing, { ScoreBar } from '@/components/ScoreRing';
+import ScoreOverview from '@/components/ScoreOverview';
+import FixPackageView from '@/components/FixPackageView';
 import SeverityBadge, { EffortBadge } from '@/components/SeverityBadge';
-import { Lock, ArrowRight, CheckCircle, ExternalLink, FileText, AlertTriangle, RefreshCw, ChevronDown, ChevronRight, Filter } from 'lucide-react';
+import { Lock, ArrowRight, CheckCircle, ExternalLink, FileText, AlertTriangle, RefreshCw, ChevronDown, ChevronRight, Filter, Zap, Sparkles, Download, Code2, Globe, Tag, MessageSquare } from 'lucide-react';
 
 interface AuditData {
   audit: {
@@ -56,6 +57,9 @@ interface AuditData {
     priority_order: number;
   }>;
 }
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type FixPackageData = any;
 
 type ViewMode = 'priority' | 'page' | 'category';
 type SeverityFilter = 'all' | 'high' | 'medium' | 'low';
@@ -152,6 +156,12 @@ export default function AuditResultPage() {
   const [expandedPages, setExpandedPages] = useState<Set<string>>(new Set());
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set(['crawlability', 'machine_readability', 'commercial_clarity', 'trust_clarity']));
 
+  // Fix Package state
+  const [fixPackage, setFixPackage] = useState<FixPackageData | null>(null);
+  const [fixLoading, setFixLoading] = useState(false);
+  const [fixError, setFixError] = useState('');
+  const [showFixPackage, setShowFixPackage] = useState(false);
+
   useEffect(() => {
     async function load() {
       try {
@@ -165,12 +175,46 @@ export default function AuditResultPage() {
         if (user && auditData.audit && !auditData.audit.user_id) {
           await fetch(`/api/audit/${params.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: user.id }) }).catch(() => {});
         }
+        // Check if fix package already exists
+        if (user) {
+          const fpRes = await fetch(`/api/audit/${params.id}/fix-package`);
+          if (fpRes.ok) {
+            const fpData = await fpRes.json();
+            if (fpData.fixPackage) {
+              setFixPackage(fpData.fixPackage);
+              setShowFixPackage(true);
+            }
+          }
+        }
       } catch { setError('Failed to load audit'); }
       finally { setLoading(false); }
     }
     load();
   }, [params.id]);
 
+  async function generateFixPackage() {
+    setFixLoading(true);
+    setFixError('');
+    try {
+      const res = await fetch(`/api/audit/${params.id}/fix-package`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const result = await res.json();
+      if (!res.ok) {
+        setFixError(result.error || 'Failed to generate fix package');
+        return;
+      }
+      setFixPackage(result.fixPackage);
+      setShowFixPackage(true);
+    } catch {
+      setFixError('Could not generate fix package. Please try again.');
+    } finally {
+      setFixLoading(false);
+    }
+  }
+
+  // --- Findings logic (preserved from original) ---
   const allFindings = useMemo(() => {
     if (!data) return [];
     const items: Array<{ id: string; title: string; why: string; fix: string; severity: 'high' | 'medium' | 'low'; effort: 'easy' | 'medium' | 'harder'; category: string; affectedUrls: string[]; priorityOrder: number; }> = [];
@@ -215,6 +259,18 @@ export default function AuditResultPage() {
     return map;
   }, [filteredFindings]);
 
+  // Extract per-pillar findings for ScoreOverview
+  const pillarFindings = useMemo(() => {
+    if (!data) return { crawlability: [], readability: [], commercial: [], trust: [] };
+    const byCat = (cat: string) => data.findings.filter(f => f.category === cat).map(f => f.title);
+    return {
+      crawlability: byCat('crawlability'),
+      readability: byCat('machine_readability'),
+      commercial: byCat('commercial_clarity'),
+      trust: byCat('trust_clarity'),
+    };
+  }, [data]);
+
   function togglePage(url: string) { setExpandedPages(prev => { const n = new Set(prev); if (n.has(url)) n.delete(url); else n.add(url); return n; }); }
   function toggleCategory(cat: string) { setExpandedCategories(prev => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; }); }
 
@@ -250,7 +306,7 @@ export default function AuditResultPage() {
                 <div className="mt-3">
                   <p className="text-xs font-medium text-gray-500 mb-1.5">Affected pages:</p>
                   <div className="flex flex-wrap gap-1.5">
-                    {finding.affectedUrls.slice(0, 5).map((url) => { let p = url; try { p = new URL(url).pathname; } catch {} return (<a key={url} href={url} target="_blank" rel="noopener" className="text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded hover:bg-blue-100 truncate max-w-[220px]" title={url}>{p || '/'}</a>); })}
+                    {finding.affectedUrls.slice(0, 5).map((url) => { let p = url; try { p = new URL(url).pathname; } catch { /* */ } return (<a key={url} href={url} target="_blank" rel="noopener" className="text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded hover:bg-blue-100 truncate max-w-[220px]" title={url}>{p || '/'}</a>); })}
                     {finding.affectedUrls.length > 5 && <span className="text-xs text-gray-400">+{finding.affectedUrls.length - 5} more</span>}
                   </div>
                 </div>
@@ -268,6 +324,7 @@ export default function AuditResultPage() {
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">AI Visibility Report</h1>
@@ -276,19 +333,23 @@ export default function AuditResultPage() {
         <a href="/" className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors"><RefreshCw className="w-4 h-4" />New Audit</a>
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-200 p-6 sm:p-8 mb-6">
-        <div className="flex flex-col sm:flex-row items-center gap-8">
-          <ScoreRing score={audit.overall_score ?? 0} label="Overall Score" size={160} />
-          <div className="flex-1 w-full space-y-3">
-            <ScoreBar score={audit.crawlability_score ?? 0} label="Crawlability" />
-            <ScoreBar score={audit.machine_readability_score ?? 0} label="Readability" />
-            <ScoreBar score={audit.commercial_clarity_score ?? 0} label="Commercial" />
-            <ScoreBar score={audit.trust_clarity_score ?? 0} label="Trust" />
-          </div>
-        </div>
-        {audit.summary && <p className="mt-6 text-sm text-gray-600 bg-gray-50 rounded-lg p-4">{audit.summary}</p>}
-      </div>
+      {/* ===== NEW SCORE OVERVIEW (replaces old ScoreRing + ScoreBar) ===== */}
+      <ScoreOverview
+        overallScore={audit.overall_score ?? 0}
+        crawlability={audit.crawlability_score ?? 0}
+        readability={audit.machine_readability_score ?? 0}
+        commercial={audit.commercial_clarity_score ?? 0}
+        trust={audit.trust_clarity_score ?? 0}
+        pagesScanned={audit.pages_scanned}
+        domain={audit.site?.domain || ''}
+        summary={audit.summary}
+        crawlabilityFindings={pillarFindings.crawlability}
+        readabilityFindings={pillarFindings.readability}
+        commercialFindings={pillarFindings.commercial}
+        trustFindings={pillarFindings.trust}
+      />
 
+      {/* Findings summary badges */}
       <div className="flex items-center gap-3 mb-6 text-sm">
         <span className="text-gray-600 font-medium">{allFindings.length} findings:</span>
         {highCount > 0 && <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-red-50 text-red-700 border border-red-200 text-xs font-medium">{highCount} high</span>}
@@ -296,6 +357,7 @@ export default function AuditResultPage() {
         {lowCount > 0 && <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 text-xs font-medium">{lowCount} low</span>}
       </div>
 
+      {/* View mode toggle (authenticated users) */}
       {isAuthenticated && (
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
           <div className="flex items-center gap-1 bg-gray-50 rounded-lg p-0.5">
@@ -317,6 +379,7 @@ export default function AuditResultPage() {
         </div>
       )}
 
+      {/* Findings views */}
       <div className="mb-6">
         <h2 className="text-xl font-bold text-gray-900 mb-4">{isAuthenticated ? 'Detailed Findings' : 'Top Recommendations'}</h2>
 
@@ -333,7 +396,7 @@ export default function AuditResultPage() {
               const page = pages.find(p => p.url === url);
               const isSW = url === '__site_wide__';
               let name = isSW ? 'Site-wide issues' : url;
-              try { if (!isSW) name = page?.title || new URL(url).pathname || url; } catch {}
+              try { if (!isSW) name = page?.title || new URL(url).pathname || url; } catch { /* */ }
               return (
                 <div key={url} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
                   <button onClick={() => togglePage(url)} className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors text-left">
@@ -380,6 +443,7 @@ export default function AuditResultPage() {
           </div>
         )}
 
+        {/* Signup gate for free users */}
         {!isAuthenticated && gatedCount > 0 && (
           <div className="mt-6 relative">
             <div className="bg-white rounded-xl border border-gray-200 p-5 opacity-40 blur-[2px] pointer-events-none"><div className="flex items-start gap-3"><span className="flex items-center justify-center w-6 h-6 rounded-full bg-gray-50 text-xs font-semibold text-gray-500">{FREE_RECOMMENDATION_LIMIT + 1}</span><div><div className="h-4 w-64 bg-gray-200 rounded" /><div className="h-3 w-96 bg-gray-50 rounded mt-2" /></div></div></div>
@@ -395,6 +459,84 @@ export default function AuditResultPage() {
         )}
       </div>
 
+      {/* ===== FIX PACKAGE SECTION ===== */}
+      {showFixPackage && fixPackage ? (
+        <FixPackageView
+          fixPackage={fixPackage}
+          domain={audit.site?.domain || ''}
+          overallScore={audit.overall_score ?? 0}
+        />
+      ) : (
+        <div className="mb-8">
+          <div className="bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 rounded-2xl border border-blue-200 p-8 text-center">
+            <div className="max-w-lg mx-auto">
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center mx-auto mb-5 shadow-lg shadow-blue-200">
+                <Zap className="w-7 h-7 text-white" />
+              </div>
+              <h2 className="text-2xl font-bold text-gray-900 tracking-tight">Get Your Fix Package</h2>
+              <p className="mt-3 text-gray-600 leading-relaxed">
+                Don&apos;t just know what&apos;s wrong — get the actual code, content, and scripts to fix it.
+                Ready-to-implement fixes customized for {audit.site?.domain || 'your site'}.
+              </p>
+
+              {/* What's included grid */}
+              <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 mt-6 mb-6">
+                {[
+                  { icon: <FileText className="w-4 h-4" />, label: 'Content' },
+                  { icon: <Code2 className="w-4 h-4" />, label: 'Schema' },
+                  { icon: <Globe className="w-4 h-4" />, label: 'Robots.txt' },
+                  { icon: <Tag className="w-4 h-4" />, label: 'Meta Tags' },
+                  { icon: <MessageSquare className="w-4 h-4" />, label: 'Citations' },
+                  { icon: <Zap className="w-4 h-4" />, label: 'Auto-Deploy' },
+                ].map((item) => (
+                  <div key={item.label} className="bg-white/70 rounded-lg border border-blue-100 py-2.5 px-2">
+                    <div className="text-blue-600 flex justify-center mb-1">{item.icon}</div>
+                    <div className="text-[10px] font-semibold text-gray-600">{item.label}</div>
+                  </div>
+                ))}
+              </div>
+
+              {isAuthenticated ? (
+                <>
+                  <button
+                    onClick={generateFixPackage}
+                    disabled={fixLoading}
+                    className="inline-flex items-center gap-2 px-8 py-3.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all shadow-lg shadow-blue-200 disabled:opacity-60 disabled:cursor-not-allowed text-sm"
+                  >
+                    {fixLoading ? (
+                      <>
+                        <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+                        Generating fixes…
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-4 h-4" />
+                        Generate Fix Package
+                      </>
+                    )}
+                  </button>
+                  {fixError && <p className="mt-3 text-sm text-red-600">{fixError}</p>}
+                  {fixLoading && (
+                    <p className="mt-3 text-sm text-gray-500">
+                      Analyzing your audit data and building custom fixes… this takes 30-60 seconds.
+                    </p>
+                  )}
+                </>
+              ) : (
+                <a
+                  href={`/auth/signup?redirect=/audit/${audit.id}`}
+                  className="inline-flex items-center gap-2 px-8 py-3.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all shadow-lg shadow-blue-200 text-sm"
+                >
+                  <Lock className="w-4 h-4" />
+                  Sign Up to Unlock
+                </a>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Pages table */}
       {isAuthenticated && pages.length > 0 && (
         <div className="mb-6">
           <h2 className="text-xl font-bold text-gray-900 mb-4">Pages Analyzed</h2>
@@ -405,7 +547,7 @@ export default function AuditResultPage() {
                 <tbody>
                   {pages.map((page) => (
                     <tr key={page.id} className="border-b border-gray-100 last:border-0">
-                      <td className="py-3 px-4"><div className="flex items-center gap-1.5 max-w-xs"><span className="truncate text-gray-900 font-medium" title={page.url}>{page.title || new URL(page.url).pathname}</span><a href={page.url} target="_blank" rel="noopener" className="shrink-0 text-gray-400 hover:text-blue-600"><ExternalLink className="w-3.5 h-3.5" /></a></div></td>
+                      <td className="py-3 px-4"><div className="flex items-center gap-1.5 max-w-xs"><span className="truncate text-gray-900 font-medium" title={page.url}>{page.title || (() => { try { return new URL(page.url).pathname; } catch { return page.url; } })()}</span><a href={page.url} target="_blank" rel="noopener" className="shrink-0 text-gray-400 hover:text-blue-600"><ExternalLink className="w-3.5 h-3.5" /></a></div></td>
                       <td className="py-3 px-4"><span className="inline-flex px-2 py-0.5 text-xs rounded bg-gray-50 text-gray-600 capitalize">{page.page_type}</span></td>
                       <td className="py-3 px-4 text-center">{page.has_schema ? <CheckCircle className="w-4 h-4 text-green-500 mx-auto" /> : <span className="text-gray-300">—</span>}</td>
                       <td className="py-3 px-4 text-center">{page.issues.length > 0 ? <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-100 text-amber-700 text-xs font-medium">{page.issues.length}</span> : <CheckCircle className="w-4 h-4 text-green-500 mx-auto" />}</td>
