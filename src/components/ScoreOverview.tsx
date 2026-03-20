@@ -6,6 +6,7 @@ import { Shield, FileText, Zap, Globe } from 'lucide-react';
 interface PillarData {
   score: number;
   label: string;
+  tooltip: string;
   icon: React.ReactNode;
   color: string;
   bgColor: string;
@@ -64,6 +65,7 @@ export default function ScoreOverview({
     {
       score: crawlability,
       label: 'Crawlability',
+      tooltip: 'Can AI crawlers like GPTBot, ClaudeBot, and PerplexityBot access your site? This checks robots.txt, sitemaps, and whether your pages return valid responses.',
       icon: <Shield className="w-4 h-4" />,
       color: '#10B981',
       bgColor: '#ECFDF5',
@@ -72,6 +74,7 @@ export default function ScoreOverview({
     {
       score: readability,
       label: 'Machine Readability',
+      tooltip: 'Can AI systems understand your page content? This checks title tags, meta descriptions, structured data (JSON-LD), heading hierarchy, and content depth.',
       icon: <FileText className="w-4 h-4" />,
       color: '#6366F1',
       bgColor: '#E0E7FF',
@@ -80,6 +83,7 @@ export default function ScoreOverview({
     {
       score: commercial,
       label: 'Commercial Clarity',
+      tooltip: 'Are your key business pages discoverable? This checks whether AI can find your pricing, product, contact, and demo pages — the pages that drive revenue.',
       icon: <Zap className="w-4 h-4" />,
       color: '#F59E0B',
       bgColor: '#FEF3C7',
@@ -88,6 +92,7 @@ export default function ScoreOverview({
     {
       score: trust,
       label: 'Trust & Authority',
+      tooltip: 'Does your site establish credibility? This checks for Organization schema, content depth, resource pages (blog/docs), page performance, and about/company pages.',
       icon: <Globe className="w-4 h-4" />,
       color: '#EC4899',
       bgColor: '#FCE7F3',
@@ -113,7 +118,7 @@ export default function ScoreOverview({
             {pillars.map((pillar) => (
               <div
                 key={pillar.label}
-                className="rounded-xl border border-gray-200 p-4 hover:border-gray-300 transition-colors"
+                className="rounded-xl border border-gray-200 p-4 hover:border-gray-300 transition-colors group relative"
               >
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2.5">
@@ -123,7 +128,20 @@ export default function ScoreOverview({
                     >
                       {pillar.icon}
                     </div>
-                    <span className="text-sm font-semibold text-gray-900">{pillar.label}</span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-sm font-semibold text-gray-900">{pillar.label}</span>
+                      <div className="relative inline-flex">
+                        <svg className="w-3.5 h-3.5 text-gray-300 hover:text-gray-500 cursor-help transition-colors peer" viewBox="0 0 16 16" fill="currentColor">
+                          <path fillRule="evenodd" d="M15 8A7 7 0 1 1 1 8a7 7 0 0 1 14 0zM9.25 5a1.25 1.25 0 1 1-2.5 0 1.25 1.25 0 0 1 2.5 0zM7.25 8a.75.75 0 0 1 1.5 0v3a.75.75 0 0 1-1.5 0V8z" clipRule="evenodd" />
+                        </svg>
+                        <div className="invisible peer-hover:visible absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 p-3 bg-gray-900 text-white text-xs leading-relaxed rounded-lg shadow-xl pointer-events-none">
+                          {pillar.tooltip}
+                          <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-px">
+                            <div className="w-2 h-2 bg-gray-900 rotate-45" />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                   <span
                     className="text-lg font-bold tabular-nums"
@@ -137,7 +155,7 @@ export default function ScoreOverview({
                   <div className="mt-3 space-y-1.5">
                     {pillar.findings.slice(0, 3).map((f, i) => (
                       <div key={i} className="flex items-start gap-2 text-xs text-gray-500 leading-relaxed">
-                        <span className="text-amber-500 mt-0.5 shrink-0">•</span>
+                        <span className="text-amber-500 mt-0.5 shrink-0">&bull;</span>
                         <span>{f}</span>
                       </div>
                     ))}
