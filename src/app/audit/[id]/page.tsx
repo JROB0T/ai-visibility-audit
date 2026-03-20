@@ -176,14 +176,12 @@ export default function AuditResultPage() {
           await fetch(`/api/audit/${params.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: user.id }) }).catch(() => {});
         }
         // Check if fix package already exists
-        if (user) {
-          const fpRes = await fetch(`/api/audit/${params.id}/fix-package`);
-          if (fpRes.ok) {
-            const fpData = await fpRes.json();
-            if (fpData.fixPackage) {
-              setFixPackage(fpData.fixPackage);
-              setShowFixPackage(true);
-            }
+        const fpRes = await fetch(`/api/audit/${params.id}/fix-package`);
+        if (fpRes.ok) {
+          const fpData = await fpRes.json();
+          if (fpData.fixPackage) {
+            setFixPackage(fpData.fixPackage);
+            setShowFixPackage(true);
           }
         }
       } catch { setError('Failed to load audit'); }
@@ -496,40 +494,28 @@ export default function AuditResultPage() {
                 ))}
               </div>
 
-              {isAuthenticated ? (
-                <>
-                  <button
-                    onClick={generateFixPackage}
-                    disabled={fixLoading}
-                    className="inline-flex items-center gap-2 px-8 py-3.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all shadow-lg shadow-blue-200 disabled:opacity-60 disabled:cursor-not-allowed text-sm"
-                  >
-                    {fixLoading ? (
-                      <>
-                        <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
-                        Generating fixes…
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="w-4 h-4" />
-                        Generate Fix Package
-                      </>
-                    )}
-                  </button>
-                  {fixError && <p className="mt-3 text-sm text-red-600">{fixError}</p>}
-                  {fixLoading && (
-                    <p className="mt-3 text-sm text-gray-500">
-                      Analyzing your audit data and building custom fixes… this takes 30-60 seconds.
-                    </p>
-                  )}
-                </>
-              ) : (
-                <a
-                  href={`/auth/signup?redirect=/audit/${audit.id}`}
-                  className="inline-flex items-center gap-2 px-8 py-3.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all shadow-lg shadow-blue-200 text-sm"
-                >
-                  <Lock className="w-4 h-4" />
-                  Sign Up to Unlock
-                </a>
+              <button
+                onClick={generateFixPackage}
+                disabled={fixLoading}
+                className="inline-flex items-center gap-2 px-8 py-3.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all shadow-lg shadow-blue-200 disabled:opacity-60 disabled:cursor-not-allowed text-sm"
+              >
+                {fixLoading ? (
+                  <>
+                    <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+                    Generating fixes…
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-4 h-4" />
+                    Generate Fix Package
+                  </>
+                )}
+              </button>
+              {fixError && <p className="mt-3 text-sm text-red-600">{fixError}</p>}
+              {fixLoading && (
+                <p className="mt-3 text-sm text-gray-500">
+                  Analyzing your audit data and building custom fixes… this takes 30-60 seconds.
+                </p>
               )}
             </div>
           </div>
