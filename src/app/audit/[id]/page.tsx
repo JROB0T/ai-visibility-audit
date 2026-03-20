@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client';
 import ScoreOverview from '@/components/ScoreOverview';
 import FixPackageView from '@/components/FixPackageView';
 import SeverityBadge, { EffortBadge } from '@/components/SeverityBadge';
-import { Lock, ArrowRight, CheckCircle, ExternalLink, FileText, AlertTriangle, RefreshCw, ChevronDown, ChevronRight, Filter, Zap, Sparkles, Download, Code2, Globe, Tag, MessageSquare } from 'lucide-react';
+import { Lock, ArrowRight, CheckCircle, ExternalLink, FileText, AlertTriangle, RefreshCw, ChevronDown, ChevronRight, Filter, Zap, Sparkles, Code2, Globe, Tag, MessageSquare } from 'lucide-react';
 
 interface AuditData {
   audit: {
