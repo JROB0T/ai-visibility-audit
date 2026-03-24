@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabase } from '@/lib/supabase/server';
 import { scanSite } from '@/lib/scanner';
-import { calculateScores, generateRecommendations } from '@/lib/scoring';
+import { calculateScores, generateRecommendations, enrichWithCodeSnippets } from '@/lib/scoring';
 
 export const maxDuration = 60; // Allow up to 60s for scanning
 
@@ -78,10 +78,11 @@ export async function POST(request: NextRequest) {
     // Calculate scores
     const scores = calculateScores(scanResult);
 
-    // Generate recommendations
-    const recommendations = generateRecommendations(scanResult);
+    // Generate recommendations and enrich with code snippets
+    const rawRecommendations = generateRecommendations(scanResult);
+    const recommendations = enrichWithCodeSnippets(rawRecommendations, scanResult);
 
-    // Save pages
+    // Save pages (now includes rawHtmlPreview)
     if (scanResult.pages.length > 0) {
       const pageRows = scanResult.pages.map((p) => ({
         audit_id: audit.id,
@@ -103,11 +104,10 @@ export async function POST(request: NextRequest) {
       if (pagesError) console.error('Pages insert error:', pagesError);
     }
 
-    // Save findings and recommendations
+    // Save findings and recommendations (with code snippets)
     for (let i = 0; i < recommendations.length; i++) {
       const rec = recommendations[i];
 
-      // Create finding
       const { data: finding } = await supabase
         .from('audit_findings')
         .insert({
@@ -121,7 +121,6 @@ export async function POST(request: NextRequest) {
         .select()
         .single();
 
-      // Create recommendation
       await supabase.from('audit_recommendations').insert({
         audit_id: audit.id,
         finding_id: finding?.id || null,

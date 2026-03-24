@@ -42,7 +42,7 @@ export function generateRecommendations(scan: ScanResult): RecommendationInput[]
         'Without robots.txt, AI crawlers have no guidance on what to index. This is the first file bots look for.',
       recommendedFix:
         'Create a robots.txt file at your site root. At minimum, allow all crawlers with "User-agent: * Allow: /" and include your sitemap URL.',
-      affectedUrls: [],
+      codeSnippet: null, affectedUrls: [],
     });
   }
 
@@ -56,7 +56,7 @@ export function generateRecommendations(scan: ScanResult): RecommendationInput[]
         'You are actively blocking AI systems from reading your site. This means AI search and assistants cannot reference your content.',
       recommendedFix:
         'Review your robots.txt and remove Disallow rules for AI crawlers you want to allow (GPTBot, ClaudeBot, etc). Keep blocks only for crawlers you intentionally want to exclude.',
-      affectedUrls: [],
+      codeSnippet: null, affectedUrls: [],
     });
   }
 
@@ -70,7 +70,7 @@ export function generateRecommendations(scan: ScanResult): RecommendationInput[]
         'A sitemap tells AI crawlers exactly which pages exist and matter. Without one, crawlers must discover pages on their own and may miss key content.',
       recommendedFix:
         'Generate a sitemap.xml listing your key pages. Most CMS platforms can auto-generate this. Reference it in your robots.txt.',
-      affectedUrls: [],
+      codeSnippet: null, affectedUrls: [],
     });
   } else if (scan.sitemap.urlCount && scan.sitemap.urlCount < 5) {
     recs.push({
@@ -82,7 +82,7 @@ export function generateRecommendations(scan: ScanResult): RecommendationInput[]
         'Your sitemap only lists a handful of pages. Ensure all important commercial and content pages are included.',
       recommendedFix:
         'Review your sitemap and add any missing pages — especially pricing, product, docs, and blog pages.',
-      affectedUrls: [scan.sitemap.url || ''],
+      codeSnippet: null, affectedUrls: [scan.sitemap.url || ''],
     });
   }
 
@@ -98,6 +98,7 @@ export function generateRecommendations(scan: ScanResult): RecommendationInput[]
         'Title tags are the primary way AI systems identify what a page is about. Missing titles make your pages invisible or unclear.',
       recommendedFix:
         'Add unique, descriptive title tags to every page. Include your product name and what the page covers.',
+      codeSnippet: null,
       affectedUrls: pagesWithoutTitle.map((p) => p.url),
     });
   }
@@ -113,6 +114,7 @@ export function generateRecommendations(scan: ScanResult): RecommendationInput[]
         'Meta descriptions help AI systems understand page purpose. They are often used as the summary when AI references your content.',
       recommendedFix:
         'Write clear, specific meta descriptions (120-155 characters) for each page. Describe what the page offers to a potential customer.',
+      codeSnippet: null,
       affectedUrls: pagesWithoutMeta.map((p) => p.url),
     });
   }
@@ -128,6 +130,7 @@ export function generateRecommendations(scan: ScanResult): RecommendationInput[]
         'Canonical tags tell AI systems which version of a page is the "real" one. Without them, AI might index duplicate content or the wrong URL.',
       recommendedFix:
         'Add rel="canonical" link tags pointing to the preferred URL for each page.',
+      codeSnippet: null,
       affectedUrls: pagesWithoutCanonical.map((p) => p.url),
     });
   }
@@ -143,6 +146,7 @@ export function generateRecommendations(scan: ScanResult): RecommendationInput[]
         'Structured data helps AI systems understand exactly what your page represents — is it a product, an article, an FAQ? Without it, AI must guess.',
       recommendedFix:
         'Add JSON-LD structured data to key pages. Use Organization schema on your homepage, Product/SoftwareApplication on product pages, and Article on blog posts.',
+      codeSnippet: null,
       affectedUrls: pagesWithoutSchema.map((p) => p.url),
     });
   }
@@ -158,6 +162,7 @@ export function generateRecommendations(scan: ScanResult): RecommendationInput[]
         'The H1 heading is a strong signal for page topic. Missing H1s make it harder for AI to determine what the page is about.',
       recommendedFix:
         'Add a single, clear H1 heading to each page that describes the main topic.',
+      codeSnippet: null,
       affectedUrls: pagesWithoutH1.map((p) => p.url),
     });
   }
@@ -173,6 +178,7 @@ export function generateRecommendations(scan: ScanResult): RecommendationInput[]
         'Pages with very little text give AI systems almost nothing to work with. These pages are unlikely to be referenced or recommended.',
       recommendedFix:
         'Add meaningful content that explains what the page offers. Even 200-300 words of clear copy helps AI understand the page.',
+      codeSnippet: null,
       affectedUrls: thinPages.map((p) => p.url),
     });
   }
@@ -190,7 +196,7 @@ export function generateRecommendations(scan: ScanResult): RecommendationInput[]
         'When AI systems recommend tools, pricing information is critical. Without a discoverable pricing page, AI cannot answer "how much does X cost?" — and may recommend competitors instead.',
       recommendedFix:
         'Create a dedicated /pricing page linked from your homepage navigation. Even if pricing is "contact us," make the page exist with clear context.',
-      affectedUrls: [],
+      codeSnippet: null, affectedUrls: [],
     });
   }
 
@@ -204,7 +210,7 @@ export function generateRecommendations(scan: ScanResult): RecommendationInput[]
         'AI systems need a clear call-to-action to recommend to users. Without a contact/demo page, there is no obvious "next step" for someone referred by AI.',
       recommendedFix:
         'Create a /contact or /demo page with a clear form and value proposition. Link it prominently from your homepage.',
-      affectedUrls: [],
+      codeSnippet: null, affectedUrls: [],
     });
   }
 
@@ -218,7 +224,7 @@ export function generateRecommendations(scan: ScanResult): RecommendationInput[]
         'Product pages are how AI systems understand what you actually do. Without clear product pages, AI cannot accurately describe or recommend your solution.',
       recommendedFix:
         'Create dedicated pages for your core products or solutions. Each should clearly describe what the product does, who it is for, and key features.',
-      affectedUrls: [],
+      codeSnippet: null, affectedUrls: [],
     });
   }
 
@@ -238,7 +244,7 @@ export function generateRecommendations(scan: ScanResult): RecommendationInput[]
           'Organization schema tells AI systems who you are — your name, URL, logo, and description. This builds trust and accuracy when AI references you.',
         recommendedFix:
           'Add Organization JSON-LD to your homepage with your company name, URL, logo URL, and a brief description.',
-        affectedUrls: [homepage.url],
+        codeSnippet: null, affectedUrls: [homepage.url],
       });
     }
   }
@@ -253,7 +259,7 @@ export function generateRecommendations(scan: ScanResult): RecommendationInput[]
         'Blog posts, docs, and resource pages build topical authority. AI systems are more likely to reference companies that have rich, helpful content in their domain.',
       recommendedFix:
         'Consider creating a blog or resources section with helpful content related to your product category. Even 5-10 quality articles can boost AI visibility.',
-      affectedUrls: [],
+      codeSnippet: null, affectedUrls: [],
     });
   }
 
@@ -269,6 +275,7 @@ export function generateRecommendations(scan: ScanResult): RecommendationInput[]
         'Slow pages may time out when AI crawlers try to fetch them, meaning the content never gets indexed.',
       recommendedFix:
         'Optimize slow pages by reducing image sizes, deferring non-critical scripts, and checking server response times.',
+      codeSnippet: null,
       affectedUrls: slowPages.map((p) => p.url),
     });
   }
@@ -500,4 +507,47 @@ function scoreTrustClarity(scan: ScanResult): CategoryScore {
     issues,
     positives,
   };
+}
+
+// ============================================================
+// Enrich recommendations with code snippets
+// ============================================================
+export function enrichWithCodeSnippets(recs: RecommendationInput[], scan: ScanResult): RecommendationInput[] {
+  const domain = scan.pages[0]?.url ? new URL(scan.pages[0].url).hostname : 'example.com';
+  const siteName = domain.replace(/\.(com|io|co|org|net)$/, '').replace(/^www\./, '');
+  const siteUrl = scan.pages[0]?.url ? new URL(scan.pages[0].url).origin : `https://${domain}`;
+
+  return recs.map(rec => {
+    // robots.txt
+    if (rec.title === 'Add a robots.txt file') {
+      return { ...rec, codeSnippet: `# robots.txt\nUser-agent: *\nAllow: /\n\n# AI Crawlers\nUser-agent: GPTBot\nAllow: /\n\nUser-agent: ClaudeBot\nAllow: /\n\nUser-agent: PerplexityBot\nAllow: /\n\nSitemap: ${siteUrl}/sitemap.xml` };
+    }
+
+    // Sitemap
+    if (rec.title === 'Add an XML sitemap') {
+      return { ...rec, codeSnippet: `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n  <url>\n    <loc>${siteUrl}/</loc>\n    <priority>1.0</priority>\n  </url>\n  <url>\n    <loc>${siteUrl}/pricing</loc>\n    <priority>0.9</priority>\n  </url>\n  <url>\n    <loc>${siteUrl}/product</loc>\n    <priority>0.9</priority>\n  </url>\n  <url>\n    <loc>${siteUrl}/contact</loc>\n    <priority>0.8</priority>\n  </url>\n</urlset>` };
+    }
+
+    // Organization schema
+    if (rec.title.includes('Organization structured data')) {
+      return { ...rec, codeSnippet: `<script type="application/ld+json">\n{\n  "@context": "https://schema.org",\n  "@type": "Organization",\n  "name": "${siteName}",\n  "url": "${siteUrl}",\n  "logo": "${siteUrl}/logo.png",\n  "description": "Your company description here",\n  "sameAs": [\n    "https://twitter.com/${siteName}",\n    "https://linkedin.com/company/${siteName}"\n  ]\n}\n</script>` };
+    }
+
+    // Structured data for pages
+    if (rec.title.includes('missing structured data') || rec.title.includes('Pages missing structured data')) {
+      return { ...rec, codeSnippet: `<!-- For product pages -->\n<script type="application/ld+json">\n{\n  "@context": "https://schema.org",\n  "@type": "SoftwareApplication",\n  "name": "${siteName}",\n  "applicationCategory": "BusinessApplication",\n  "description": "Your product description",\n  "offers": {\n    "@type": "Offer",\n    "price": "0",\n    "priceCurrency": "USD"\n  }\n}\n</script>\n\n<!-- For blog posts -->\n<script type="application/ld+json">\n{\n  "@context": "https://schema.org",\n  "@type": "Article",\n  "headline": "Your Article Title",\n  "author": {\n    "@type": "Organization",\n    "name": "${siteName}"\n  }\n}\n</script>` };
+    }
+
+    // Meta descriptions
+    if (rec.title.includes('meta description')) {
+      return { ...rec, codeSnippet: `<meta name="description" content="Your clear, compelling description of what this page offers. Include your product name and key value proposition. Keep between 120-155 characters.">` };
+    }
+
+    // Canonical tags
+    if (rec.title.includes('canonical')) {
+      return { ...rec, codeSnippet: `<!-- Add to the <head> of each page -->\n<link rel="canonical" href="https://${domain}/your-page-path">` };
+    }
+
+    return rec;
+  });
 }

@@ -66,6 +66,7 @@ export interface AuditRecommendation {
   title: string;
   why_it_matters: string;
   recommended_fix: string;
+  code_snippet: string | null;
   priority_order: number;
   created_at: string;
 }
@@ -76,6 +77,21 @@ export interface ScanResult {
   sitemap: SitemapResult | null;
   pages: PageScanResult[];
   errors: string[];
+  crawlerStatuses: CrawlerStatus[];
+  keyPagesStatus: KeyPageStatus[];
+}
+
+export interface CrawlerStatus {
+  name: string;
+  displayName: string;
+  status: 'allowed' | 'blocked' | 'no_rule';
+}
+
+export interface KeyPageStatus {
+  type: string;
+  label: string;
+  found: boolean;
+  url: string | null;
 }
 
 export interface RobotsTxtResult {
@@ -110,6 +126,7 @@ export interface PageScanResult {
   hasStructuredNav: boolean;
   internalLinks: string[];
   issues: string[];
+  rawHtmlPreview: string | null; // First ~500 chars of what a bot sees
 }
 
 export interface ScoreResult {
@@ -135,5 +152,6 @@ export interface RecommendationInput {
   title: string;
   whyItMatters: string;
   recommendedFix: string;
+  codeSnippet: string | null;
   affectedUrls: string[];
 }

@@ -4,6 +4,8 @@ import type {
   RobotsTxtResult,
   SitemapResult,
   PageScanResult,
+  CrawlerStatus,
+  KeyPageStatus,
 } from '@/lib/types';
 
 const USER_AGENT = 'AIVisibilityAudit/1.0 (+https://aivisibilityaudit.com)';
@@ -49,7 +51,7 @@ export async function scanSite(inputUrl: string): Promise<ScanResult> {
   });
 
   if (!homepageResult) {
-    return { robotsTxt, sitemap, pages: [], errors: [...errors, 'Could not scan homepage'] };
+    return { robotsTxt, sitemap, pages: [], errors: [...errors, 'Could not scan homepage'], crawlerStatuses: buildCrawlerStatuses(robotsTxt), keyPagesStatus: [] };
   }
 
   // 4. Build a prioritized list of URLs to scan from multiple sources
@@ -114,7 +116,102 @@ export async function scanSite(inputUrl: string): Promise<ScanResult> {
     }
   }
 
-  return { robotsTxt, sitemap, pages: pageResults, errors };
+  // Build per-crawler status
+  const crawlerStatuses: CrawlerStatus[] = buildCrawlerStatuses(robotsTxt);
+
+  // Build key pages status (what was found vs missing)
+  const keyPagesStatus: KeyPageStatus[] = buildKeyPagesStatus(pageResults);
+
+  return { robotsTxt, sitemap, pages: pageResults, errors, crawlerStatuses, keyPagesStatus };
+}
+
+// ============================================================
+// Per-crawler status builder
+// ============================================================
+function buildCrawlerStatuses(robotsTxt: RobotsTxtResult | null): CrawlerStatus[] {
+  const crawlers = [
+    { name: 'GPTBot', displayName: 'GPTBot (OpenAI)' },
+    { name: 'ChatGPT-User', displayName: 'ChatGPT User' },
+    { name: 'Google-Extended', displayName: 'Google AI (Gemini)' },
+    { name: 'Anthropic', displayName: 'Anthropic' },
+    { name: 'ClaudeBot', displayName: 'ClaudeBot (Anthropic)' },
+    { name: 'PerplexityBot', displayName: 'PerplexityBot' },
+    { name: 'CCBot', displayName: 'CCBot (Common Crawl)' },
+    { name: 'Bytespider', displayName: 'Bytespider (ByteDance)' },
+    { name: 'Amazonbot', displayName: 'Amazonbot' },
+    { name: 'Meta-ExternalAgent', displayName: 'Meta AI' },
+  ];
+
+  if (!robotsTxt?.exists || !robotsTxt.content) {
+    return crawlers.map(c => ({ ...c, status: 'no_rule' as const }));
+  }
+
+  const content = robotsTxt.content;
+  const lines = content.split('\n').map(l => l.trim());
+
+  // Check for wildcard block (User-agent: * with Disallow: /)
+  let wildcardBlocked = false;
+  let inWildcard = false;
+  for (const line of lines) {
+    if (line.toLowerCase().startsWith('user-agent:')) {
+      const agent = line.substring(11).trim();
+      inWildcard = agent === '*';
+    } else if (inWildcard && (line.toLowerCase() === 'disallow: /' || line.toLowerCase() === 'disallow: *')) {
+      wildcardBlocked = true;
+    } else if (line.toLowerCase().startsWith('user-agent:')) {
+      inWildcard = false;
+    }
+  }
+
+  return crawlers.map(crawler => {
+    // Check if this specific agent has rules
+    let agentActive = false;
+    let agentBlocked = false;
+    let agentAllowed = false;
+
+    for (const line of lines) {
+      if (line.toLowerCase().startsWith('user-agent:')) {
+        const agent = line.substring(11).trim();
+        agentActive = agent.toLowerCase() === crawler.name.toLowerCase();
+      } else if (agentActive) {
+        if (line.toLowerCase() === 'disallow: /' || line.toLowerCase() === 'disallow: *') {
+          agentBlocked = true;
+        } else if (line.toLowerCase() === 'allow: /') {
+          agentAllowed = true;
+        }
+      }
+    }
+
+    if (agentBlocked) return { ...crawler, status: 'blocked' as const };
+    if (agentAllowed) return { ...crawler, status: 'allowed' as const };
+    if (wildcardBlocked) return { ...crawler, status: 'blocked' as const };
+    return { ...crawler, status: 'no_rule' as const };
+  });
+}
+
+// ============================================================
+// Key pages status builder
+// ============================================================
+function buildKeyPagesStatus(pages: PageScanResult[]): KeyPageStatus[] {
+  const keyTypes = [
+    { type: 'homepage', label: 'Homepage' },
+    { type: 'pricing', label: 'Pricing Page' },
+    { type: 'product', label: 'Product / Features Page' },
+    { type: 'contact', label: 'Contact Page' },
+    { type: 'demo', label: 'Demo / Trial Page' },
+    { type: 'docs', label: 'Documentation' },
+    { type: 'blog', label: 'Blog / Resources' },
+  ];
+
+  return keyTypes.map(kt => {
+    const found = pages.find(p => p.pageType === kt.type);
+    return {
+      type: kt.type,
+      label: kt.label,
+      found: !!found,
+      url: found?.url || null,
+    };
+  });
 }
 
 // ============================================================
@@ -389,10 +486,18 @@ async function scanPage(
     issues.push('Page may rely heavily on JavaScript for content rendering');
   }
 
+  // Raw HTML preview — what a bot sees (no JS rendering)
+  const rawTitle = title || '(no title)';
+  const rawDesc = metaDescription || '(no meta description)';
+  const rawH1 = h1Text || '(no H1)';
+  const rawBodySnippet = bodyText.substring(0, 300).trim();
+  const rawHtmlPreview = `Title: ${rawTitle}\nMeta: ${rawDesc}\nH1: ${rawH1}\nSchema: ${schemaTypes.join(', ') || 'none'}\n---\n${rawBodySnippet}`;
+
   return {
     url, pageType, statusCode: res.status, title, metaDescription,
     canonicalUrl, hasSchema, schemaTypes, h1Text, wordCount, loadTimeMs,
     headings, hasStructuredNav, internalLinks, issues,
+    rawHtmlPreview: rawHtmlPreview.substring(0, 800),
   };
 }
 
