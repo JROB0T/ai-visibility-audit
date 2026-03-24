@@ -75,6 +75,50 @@ function getIssueDetail(issue: string): { why: string; fix: string; category: st
   return map[issue] || { why: 'This issue may reduce AI visibility.', fix: 'Review and address to improve AI visibility.', category: 'machine_readability' };
 }
 
+// Generate code snippets client-side based on recommendation title and domain
+function generateCodeSnippet(title: string, domain: string): string | null {
+  const siteUrl = `https://${domain}`;
+  const name = domain.replace(/\.(com|io|co|org|net)$/, '').replace(/^www\./, '');
+
+  if (title.includes('robots.txt')) return `# robots.txt\nUser-agent: *\nAllow: /\n\nUser-agent: GPTBot\nAllow: /\n\nUser-agent: ClaudeBot\nAllow: /\n\nUser-agent: PerplexityBot\nAllow: /\n\nSitemap: ${siteUrl}/sitemap.xml`;
+  if (title.includes('XML sitemap') || title.includes('sitemap')) return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n  <url>\n    <loc>${siteUrl}/</loc>\n    <priority>1.0</priority>\n  </url>\n  <url>\n    <loc>${siteUrl}/pricing</loc>\n    <priority>0.9</priority>\n  </url>\n  <url>\n    <loc>${siteUrl}/product</loc>\n    <priority>0.9</priority>\n  </url>\n</urlset>`;
+  if (title.includes('Organization structured data') || title.includes('Organization schema')) return `<script type="application/ld+json">\n{\n  "@context": "https://schema.org",\n  "@type": "Organization",\n  "name": "${name}",\n  "url": "${siteUrl}",\n  "logo": "${siteUrl}/logo.png",\n  "description": "Your company description here",\n  "sameAs": [\n    "https://twitter.com/${name}",\n    "https://linkedin.com/company/${name}"\n  ]\n}\n</script>`;
+  if (title.includes('structured data') || title.includes('JSON-LD')) return `<!-- Product page -->\n<script type="application/ld+json">\n{\n  "@context": "https://schema.org",\n  "@type": "SoftwareApplication",\n  "name": "${name}",\n  "applicationCategory": "BusinessApplication",\n  "description": "Your product description",\n  "offers": {\n    "@type": "Offer",\n    "price": "0",\n    "priceCurrency": "USD"\n  }\n}\n</script>`;
+  if (title.includes('meta description')) return `<meta name="description" content="Compelling description of this page (120-155 chars). Include your product name and key value proposition.">`;
+  if (title.includes('canonical')) return `<!-- Add to <head> of each page -->\n<link rel="canonical" href="https://${domain}/your-page-path">`;
+  if (title.includes('title')) return `<title>Your Page Topic — ${name}</title>`;
+  if (title.includes('H1')) return `<h1>Clear, Descriptive Main Heading</h1>`;
+  return null;
+}
+
+// Generate AI visibility summary from scan data (no API needed)
+function generateAiSummary(audit: AuditData['audit'], crawlerStatuses: CrawlerStatus[], keyPagesStatus: KeyPageStatus[], findingsCount: number, highCount: number): string {
+  const domain = audit.site?.domain || 'this site';
+  const score = audit.overall_score ?? 0;
+  const parts: string[] = [];
+
+  // Overall assessment
+  if (score >= 80) parts.push(`${domain} has strong AI visibility with a score of ${score}/100. AI systems can likely find and reference most of your key content.`);
+  else if (score >= 60) parts.push(`${domain} has moderate AI visibility with a score of ${score}/100. AI systems can find your site, but several improvements would help them better understand and recommend your product.`);
+  else if (score >= 40) parts.push(`${domain} has limited AI visibility with a score of ${score}/100. AI systems may struggle to accurately describe your product or recommend it to users.`);
+  else parts.push(`${domain} has poor AI visibility with a score of ${score}/100. AI systems likely cannot find or accurately reference most of your key content. Immediate action is needed.`);
+
+  // Crawler access
+  const blocked = crawlerStatuses?.filter(c => c.status === 'blocked') || [];
+  const allowed = crawlerStatuses?.filter(c => c.status === 'allowed') || [];
+  if (blocked.length > 0) parts.push(`${blocked.length} AI crawler(s) are actively blocked, including ${blocked.slice(0, 3).map(b => b.displayName).join(', ')}. These systems cannot access your site at all.`);
+  else if (allowed.length > 0) parts.push(`AI crawlers have access to your site, which is good.`);
+
+  // Missing pages
+  const missing = keyPagesStatus?.filter(kp => !kp.found) || [];
+  if (missing.length > 0) parts.push(`Key pages missing: ${missing.map(m => m.label).join(', ')}. Without these, AI cannot answer common buyer questions about your product.`);
+
+  // Issues
+  if (highCount > 0) parts.push(`There are ${highCount} high-priority issues that should be addressed first to significantly improve how AI systems perceive and recommend ${domain}.`);
+
+  return parts.join('\n\n');
+}
+
 // ============================================================
 // Code snippet copy button
 // ============================================================
@@ -103,8 +147,6 @@ export default function AuditResultPage() {
   const [expandedPages, setExpandedPages] = useState<Set<string>>(new Set());
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set(['crawlability', 'machine_readability', 'commercial_clarity', 'trust_clarity']));
   const [expandedSnippets, setExpandedSnippets] = useState<Set<string>>(new Set());
-  const [aiPerception, setAiPerception] = useState<string | null>(null);
-  const [aiPerceptionLoading, setAiPerceptionLoading] = useState(false);
   const [activePreviewUrl, setActivePreviewUrl] = useState<string | null>(null);
 
   useEffect(() => {
@@ -126,26 +168,12 @@ export default function AuditResultPage() {
     load();
   }, [params.id]);
 
-  // Fetch AI perception
-  async function fetchAiPerception() {
-    if (!data || aiPerception || aiPerceptionLoading) return;
-    setAiPerceptionLoading(true);
-    try {
-      const res = await fetch('/api/ai-perception', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ domain: data.audit.site?.domain, siteName: data.audit.site?.domain?.replace(/\.(com|io|co|org|net)$/,'').replace(/^www\./,'') }),
-      });
-      const result = await res.json();
-      setAiPerception(result.perception);
-    } catch { setAiPerception('Could not check AI perception at this time.'); }
-    finally { setAiPerceptionLoading(false); }
-  }
-
   const allFindings = useMemo(() => {
     if (!data) return [];
     const items: Array<{ id: string; title: string; why: string; fix: string; codeSnippet: string | null; severity: 'high' | 'medium' | 'low'; effort: 'easy' | 'medium' | 'harder'; category: string; affectedUrls: string[]; priorityOrder: number; }> = [];
+    const domain = data.audit.site?.domain || 'example.com';
     for (const rec of data.recommendations) {
-      items.push({ id: rec.id, title: rec.title, why: rec.why_it_matters, fix: rec.recommended_fix, codeSnippet: rec.code_snippet || null, severity: rec.severity as 'high' | 'medium' | 'low', effort: rec.effort as 'easy' | 'medium' | 'harder', category: rec.category, affectedUrls: data.findings.find(f => f.title === rec.title)?.affected_urls || [], priorityOrder: rec.priority_order });
+      items.push({ id: rec.id, title: rec.title, why: rec.why_it_matters, fix: rec.recommended_fix, codeSnippet: generateCodeSnippet(rec.title, domain), severity: rec.severity as 'high' | 'medium' | 'low', effort: rec.effort as 'easy' | 'medium' | 'harder', category: rec.category, affectedUrls: data.findings.find(f => f.title === rec.title)?.affected_urls || [], priorityOrder: rec.priority_order });
     }
     const recTitles = new Set(data.recommendations.map(r => r.title.toLowerCase()));
     const pageIssueMap = new Map<string, string[]>();
@@ -319,31 +347,18 @@ export default function AuditResultPage() {
         </div>
       )}
 
-      {/* ===== FEATURE 6: What AI Says About You ===== */}
+      {/* ===== AI VISIBILITY SUMMARY ===== */}
       {isAuthenticated && (
         <div className="card p-6 mb-6">
           <div className="flex items-center gap-2 mb-3">
             <Bot className="w-5 h-5" style={{ color: '#6366F1' }} />
-            <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>How AI Perceives Your Brand</h2>
+            <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>AI Visibility Summary</h2>
           </div>
-          <p className="text-sm mb-4" style={{ color: 'var(--text-tertiary)' }}>See what an AI assistant says when asked about your company.</p>
-          {!aiPerception && !aiPerceptionLoading && (
-            <button onClick={fetchAiPerception} className="btn-primary px-4 py-2 text-sm inline-flex items-center gap-2">
-              <Bot className="w-4 h-4" />Ask AI about {audit.site?.domain}
-            </button>
-          )}
-          {aiPerceptionLoading && (
-            <div className="flex items-center gap-3 p-4 rounded-lg" style={{ background: 'var(--bg-tertiary)' }}>
-              <div className="animate-spin w-5 h-5 border-2 rounded-full" style={{ borderColor: '#6366F1', borderTopColor: 'transparent' }} />
-              <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Asking AI about {audit.site?.domain}…</span>
-            </div>
-          )}
-          {aiPerception && (
-            <div className="p-4 rounded-lg border" style={{ background: 'var(--bg-tertiary)', borderColor: 'var(--border)' }}>
-              <p className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: 'var(--text-primary)' }}>{aiPerception}</p>
-              <p className="mt-3 text-xs" style={{ color: 'var(--text-tertiary)' }}>Powered by Claude (Anthropic). This is a single AI system — results may vary across ChatGPT, Perplexity, and others.</p>
-            </div>
-          )}
+          <div className="p-4 rounded-lg border" style={{ background: 'var(--bg-tertiary)', borderColor: 'var(--border)' }}>
+            <p className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: 'var(--text-primary)' }}>
+              {generateAiSummary(audit, crawlerStatuses || [], keyPagesStatus || [], allFindings.length, highCount)}
+            </p>
+          </div>
         </div>
       )}
 
@@ -383,7 +398,7 @@ export default function AuditResultPage() {
 
         {(!isAuthenticated || viewMode === 'priority') && (
           <div className="space-y-4">
-            {(isAuthenticated ? [...filteredFindings].sort((a, b) => { const s: Record<string, number> = { high: 0, medium: 1, low: 2 }; return (s[a.severity] - s[b.severity]) || (a.priorityOrder - b.priorityOrder); }) : visibleRecs.map((rec, i) => ({ id: rec.id, title: rec.title, why: rec.why_it_matters, fix: rec.recommended_fix, codeSnippet: rec.code_snippet || null, severity: rec.severity as 'high' | 'medium' | 'low', effort: rec.effort as 'easy' | 'medium' | 'harder', category: rec.category, affectedUrls: [] as string[], priorityOrder: i }))).map((finding, i) => renderFindingCard(finding, i))}
+            {(isAuthenticated ? [...filteredFindings].sort((a, b) => { const s: Record<string, number> = { high: 0, medium: 1, low: 2 }; return (s[a.severity] - s[b.severity]) || (a.priorityOrder - b.priorityOrder); }) : visibleRecs.map((rec, i) => ({ id: rec.id, title: rec.title, why: rec.why_it_matters, fix: rec.recommended_fix, codeSnippet: generateCodeSnippet(rec.title, audit.site?.domain || 'example.com'), severity: rec.severity as 'high' | 'medium' | 'low', effort: rec.effort as 'easy' | 'medium' | 'harder', category: rec.category, affectedUrls: [] as string[], priorityOrder: i }))).map((finding, i) => renderFindingCard(finding, i))}
           </div>
         )}
 
@@ -457,14 +472,14 @@ export default function AuditResultPage() {
         )}
       </div>
 
-      {/* ===== FEATURE 5: What Crawlers See ===== */}
+      {/* ===== WHAT AI CRAWLERS SEE ===== */}
       {isAuthenticated && pagePreviews && pagePreviews.length > 0 && (
         <div className="card p-6 mb-6">
           <div className="flex items-center gap-2 mb-4">
             <Eye className="w-5 h-5" style={{ color: '#6366F1' }} />
             <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>What AI Crawlers See</h2>
           </div>
-          <p className="text-sm mb-4" style={{ color: 'var(--text-tertiary)' }}>A simplified view of what bots read when they visit your pages (no JavaScript rendering).</p>
+          <p className="text-sm mb-4" style={{ color: 'var(--text-tertiary)' }}>What bots read when they visit your pages — no JavaScript rendering.</p>
           <div className="flex flex-wrap gap-2 mb-4">
             {pagePreviews.slice(0, 8).map((pp) => {
               let path = pp.url; try { path = new URL(pp.url).pathname || '/'; } catch {}
@@ -480,13 +495,32 @@ export default function AuditResultPage() {
           {activePreviewUrl && (() => {
             const pp = pagePreviews.find(p => p.url === activePreviewUrl);
             if (!pp) return null;
+            const pageIssues = pages.find(p => p.url === activePreviewUrl)?.issues || [];
             return (
-              <div className="rounded-lg p-4 border font-mono text-xs leading-relaxed" style={{ background: '#0F172A', borderColor: '#1E293B', color: '#E2E8F0' }}>
-                <div><span style={{ color: '#6366F1' }}>Title:</span> {pp.title}</div>
-                <div><span style={{ color: '#6366F1' }}>Meta:</span> {pp.metaDescription}</div>
-                <div><span style={{ color: '#6366F1' }}>H1:</span> {pp.h1}</div>
-                <div><span style={{ color: '#6366F1' }}>Schema:</span> {pp.schemaTypes.length > 0 ? pp.schemaTypes.join(', ') : 'none'}</div>
-                <div><span style={{ color: '#6366F1' }}>Words:</span> {pp.wordCount || 'unknown'}</div>
+              <div>
+                <div className="rounded-lg p-4 border font-mono text-xs leading-relaxed mb-3" style={{ background: '#0F172A', borderColor: '#1E293B', color: '#E2E8F0' }}>
+                  <div><span style={{ color: '#6366F1' }}>Title:</span> {pp.title}</div>
+                  <div><span style={{ color: '#6366F1' }}>Meta:</span> {pp.metaDescription}</div>
+                  <div><span style={{ color: '#6366F1' }}>H1:</span> {pp.h1}</div>
+                  <div><span style={{ color: '#6366F1' }}>Schema:</span> {pp.schemaTypes.length > 0 ? pp.schemaTypes.join(', ') : 'none'}</div>
+                  <div><span style={{ color: '#6366F1' }}>Words:</span> {pp.wordCount || 'unknown'}</div>
+                </div>
+                {pageIssues.length > 0 && (
+                  <div className="rounded-lg p-4 border" style={{ borderColor: 'rgba(245,158,11,0.2)', background: 'rgba(245,158,11,0.05)' }}>
+                    <p className="text-xs font-semibold mb-2" style={{ color: '#F59E0B' }}>Recommendations for this page:</p>
+                    <ul className="space-y-1.5">
+                      {pageIssues.map((issue, i) => {
+                        const detail = getIssueDetail(issue);
+                        return <li key={i} className="text-xs" style={{ color: 'var(--text-secondary)' }}>• <strong>{issue}</strong> — {detail.fix}</li>;
+                      })}
+                    </ul>
+                  </div>
+                )}
+                {pageIssues.length === 0 && (
+                  <div className="rounded-lg p-3 border" style={{ borderColor: 'rgba(16,185,129,0.2)', background: 'rgba(16,185,129,0.05)' }}>
+                    <p className="text-xs font-semibold" style={{ color: '#10B981' }}>✓ This page looks good — no issues found for AI crawlers.</p>
+                  </div>
+                )}
               </div>
             );
           })()}

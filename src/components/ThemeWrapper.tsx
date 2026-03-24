@@ -1,8 +1,29 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { ThemeProvider, ThemeToggle } from '@/components/ThemeToggle';
+import { createClient } from '@/lib/supabase/client';
+import { LogOut } from 'lucide-react';
 
 export function ThemeWrapper({ children }: { children: React.ReactNode }) {
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function checkAuth() {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) setUserEmail(user.email || 'User');
+    }
+    checkAuth();
+  }, []);
+
+  async function handleSignOut() {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    setUserEmail(null);
+    window.location.href = '/';
+  }
+
   return (
     <ThemeProvider>
       <nav className="sticky top-0 z-50 border-b glass" style={{ borderColor: 'var(--border)' }}>
@@ -16,8 +37,20 @@ export function ThemeWrapper({ children }: { children: React.ReactNode }) {
             <span className="text-sm font-semibold tracking-tight" style={{ color: 'var(--text-primary)' }}>AI Visibility Audit</span>
           </a>
           <div className="flex items-center gap-1.5">
-            <a href="/dashboard" className="text-sm px-3 py-1.5 rounded-lg transition-colors" style={{ color: 'var(--text-secondary)' }}>Dashboard</a>
-            <a href="/auth/login" className="text-sm font-medium px-3.5 py-1.5 rounded-lg border transition-colors" style={{ color: '#6366F1', borderColor: 'rgba(99,102,241,0.2)' }}>Sign in</a>
+            {userEmail ? (
+              <>
+                <a href="/dashboard" className="text-sm px-3 py-1.5 rounded-lg transition-colors font-medium" style={{ color: '#6366F1' }}>Dashboard</a>
+                <span className="text-xs px-2 py-1 rounded-md hidden sm:inline" style={{ color: 'var(--text-tertiary)', background: 'var(--bg-tertiary)' }}>{userEmail}</span>
+                <button onClick={handleSignOut} className="text-sm px-2 py-1.5 rounded-lg transition-colors flex items-center gap-1" style={{ color: 'var(--text-tertiary)' }}>
+                  <LogOut className="w-3.5 h-3.5" />
+                </button>
+              </>
+            ) : (
+              <>
+                <a href="/dashboard" className="text-sm px-3 py-1.5 rounded-lg transition-colors" style={{ color: 'var(--text-secondary)' }}>Dashboard</a>
+                <a href="/auth/login" className="text-sm font-medium px-3.5 py-1.5 rounded-lg border transition-colors" style={{ color: '#6366F1', borderColor: 'rgba(99,102,241,0.2)' }}>Sign in</a>
+              </>
+            )}
             <ThemeToggle />
           </div>
         </div>
