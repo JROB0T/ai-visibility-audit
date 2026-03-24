@@ -146,7 +146,6 @@ export default function AuditResultPage() {
   const [severityFilter, setSeverityFilter] = useState<SeverityFilter>('all');
   const [expandedPages, setExpandedPages] = useState<Set<string>>(new Set());
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set(['crawlability', 'machine_readability', 'commercial_clarity', 'trust_clarity']));
-  const [expandedSnippets, setExpandedSnippets] = useState<Set<string>>(new Set());
   const [activePreviewUrl, setActivePreviewUrl] = useState<string | null>(null);
 
   useEffect(() => {
@@ -215,7 +214,6 @@ export default function AuditResultPage() {
 
   function togglePage(url: string) { setExpandedPages(prev => { const n = new Set(prev); if (n.has(url)) n.delete(url); else n.add(url); return n; }); }
   function toggleCategory(cat: string) { setExpandedCategories(prev => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; }); }
-  function toggleSnippet(id: string) { setExpandedSnippets(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; }); }
 
   if (loading) return (<div className="max-w-4xl mx-auto px-4 py-20 text-center"><div className="animate-spin w-8 h-8 border-2 rounded-full mx-auto" style={{ borderColor: '#6366F1', borderTopColor: 'transparent' }} /><p className="mt-4" style={{ color: 'var(--text-tertiary)' }}>Loading audit results…</p></div>);
   if (error || !data) return (<div className="max-w-4xl mx-auto px-4 py-20 text-center"><AlertTriangle className="w-10 h-10 text-amber-500 mx-auto" /><p className="mt-4 font-medium" style={{ color: 'var(--text-primary)' }}>{error || 'Something went wrong'}</p><a href="/" className="mt-4 inline-block" style={{ color: '#6366F1' }}>← Try another URL</a></div>);
@@ -231,7 +229,6 @@ export default function AuditResultPage() {
 
   function renderFindingCard(finding: typeof allFindings[0], index?: number) {
     const hasSnippet = !!finding.codeSnippet;
-    const snippetExpanded = expandedSnippets.has(finding.id);
     return (
       <div key={finding.id} className={`rounded-xl border p-5 finding-${finding.severity}`} style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
         <div className="flex items-start justify-between gap-3">
@@ -248,16 +245,12 @@ export default function AuditResultPage() {
                 <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>{finding.fix}</p>
               </div>
               {hasSnippet && (
-                <div className="mt-2">
-                  <button onClick={() => toggleSnippet(finding.id)} className="flex items-center gap-1.5 text-xs font-medium transition-colors" style={{ color: '#6366F1' }}>
-                    <Code className="w-3.5 h-3.5" />{snippetExpanded ? 'Hide code' : 'Show code snippet'}
-                  </button>
-                  {snippetExpanded && (
-                    <div className="mt-2 rounded-lg p-3 overflow-x-auto border" style={{ background: '#0F172A', borderColor: '#1E293B' }}>
-                      <div className="flex justify-end mb-1"><CopyButton text={finding.codeSnippet!} /></div>
-                      <pre className="text-xs leading-relaxed" style={{ color: '#E2E8F0', fontFamily: 'var(--font-mono)' }}>{finding.codeSnippet}</pre>
-                    </div>
-                  )}
+                <div className="mt-3 rounded-lg p-3 overflow-x-auto border" style={{ background: '#0F172A', borderColor: '#1E293B' }}>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-medium flex items-center gap-1" style={{ color: '#818CF8' }}><Code className="w-3 h-3" />Copy &amp; paste this code:</span>
+                    <CopyButton text={finding.codeSnippet!} />
+                  </div>
+                  <pre className="text-xs leading-relaxed whitespace-pre-wrap" style={{ color: '#E2E8F0', fontFamily: 'var(--font-mono)' }}>{finding.codeSnippet}</pre>
                 </div>
               )}
               {finding.affectedUrls.length > 0 && (
@@ -507,13 +500,27 @@ export default function AuditResultPage() {
                 </div>
                 {pageIssues.length > 0 && (
                   <div className="rounded-lg p-4 border" style={{ borderColor: 'rgba(245,158,11,0.2)', background: 'rgba(245,158,11,0.05)' }}>
-                    <p className="text-xs font-semibold mb-2" style={{ color: '#F59E0B' }}>Recommendations for this page:</p>
-                    <ul className="space-y-1.5">
+                    <p className="text-xs font-semibold mb-3" style={{ color: '#F59E0B' }}>Recommendations for this page:</p>
+                    <div className="space-y-3">
                       {pageIssues.map((issue, i) => {
                         const detail = getIssueDetail(issue);
-                        return <li key={i} className="text-xs" style={{ color: 'var(--text-secondary)' }}>• <strong>{issue}</strong> — {detail.fix}</li>;
+                        const snippet = generateCodeSnippet(issue, audit.site?.domain || 'example.com');
+                        return (
+                          <div key={i}>
+                            <p className="text-xs mb-1" style={{ color: 'var(--text-secondary)' }}><strong style={{ color: 'var(--text-primary)' }}>{issue}</strong> — {detail.fix}</p>
+                            {snippet && (
+                              <div className="rounded-md p-2.5 mt-1.5 border overflow-x-auto" style={{ background: '#0F172A', borderColor: '#1E293B' }}>
+                                <div className="flex items-center justify-between mb-1">
+                                  <span className="text-xs" style={{ color: '#818CF8' }}>Suggested code:</span>
+                                  <CopyButton text={snippet} />
+                                </div>
+                                <pre className="text-xs leading-relaxed whitespace-pre-wrap" style={{ color: '#E2E8F0', fontFamily: 'var(--font-mono)' }}>{snippet}</pre>
+                              </div>
+                            )}
+                          </div>
+                        );
                       })}
-                    </ul>
+                    </div>
                   </div>
                 )}
                 {pageIssues.length === 0 && (
