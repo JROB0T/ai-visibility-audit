@@ -301,12 +301,12 @@ function scoreCrawlability(scan: ScanResult): CategoryScore {
   const positives: string[] = [];
 
   if (!scan.robotsTxt?.exists) {
-    score -= 25;
+    score -= 20;
     issues.push('No robots.txt file found');
   } else {
     positives.push('robots.txt file is present');
     if (scan.robotsTxt.blocksAI) {
-      score -= 30;
+      score -= 25;
       issues.push(`AI crawlers are blocked: ${scan.robotsTxt.blockedAgents.join(', ')}`);
     } else {
       positives.push('AI crawlers are not blocked');
@@ -314,29 +314,33 @@ function scoreCrawlability(scan: ScanResult): CategoryScore {
   }
 
   if (!scan.sitemap?.exists) {
-    score -= 25;
+    score -= 20;
     issues.push('No XML sitemap found');
   } else {
     positives.push('XML sitemap found');
     if (scan.sitemap.urlCount && scan.sitemap.urlCount < 5) {
-      score -= 10;
+      score -= 8;
       issues.push('Sitemap has very few URLs');
     }
   }
 
   if (scan.pages.length === 0) {
-    score -= 30;
+    score -= 25;
     issues.push('Could not access any pages');
   } else {
     const errorPages = scan.pages.filter((p) => p.statusCode && p.statusCode >= 400);
     if (errorPages.length > 0) {
-      score -= errorPages.length * 5;
+      score -= Math.min(15, errorPages.length * 3);
       issues.push(`${errorPages.length} page(s) returned error status codes`);
+    } else {
+      positives.push('All pages returned valid status codes');
     }
   }
 
+  // Floor: never below 25 if at least some things work
+  const floor = issues.length <= 1 ? 60 : issues.length <= 2 ? 40 : 25;
   return {
-    score: Math.max(0, Math.min(100, score)),
+    score: Math.max(floor, Math.min(100, score)),
     maxScore: 100,
     explanation: 'How easily AI crawlers can access and navigate your site.',
     issues,
@@ -350,7 +354,7 @@ function scoreMachineReadability(scan: ScanResult): CategoryScore {
   const positives: string[] = [];
 
   if (scan.pages.length === 0) {
-    return { score: 0, maxScore: 100, explanation: 'How well AI systems can understand your page content.', issues: ['No pages scanned'], positives: [] };
+    return { score: 20, maxScore: 100, explanation: 'How well AI systems can understand your page content.', issues: ['No pages scanned'], positives: [] };
   }
 
   const totalPages = scan.pages.length;
@@ -359,7 +363,7 @@ function scoreMachineReadability(scan: ScanResult): CategoryScore {
   const withTitle = scan.pages.filter((p) => p.title).length;
   if (withTitle === totalPages) positives.push('All pages have title tags');
   else {
-    const pct = Math.round(((totalPages - withTitle) / totalPages) * 20);
+    const pct = Math.round(((totalPages - withTitle) / totalPages) * 15);
     score -= pct;
     issues.push(`${totalPages - withTitle} of ${totalPages} pages missing title tags`);
   }
@@ -368,7 +372,7 @@ function scoreMachineReadability(scan: ScanResult): CategoryScore {
   const withMeta = scan.pages.filter((p) => p.metaDescription).length;
   if (withMeta === totalPages) positives.push('All pages have meta descriptions');
   else {
-    const pct = Math.round(((totalPages - withMeta) / totalPages) * 15);
+    const pct = Math.round(((totalPages - withMeta) / totalPages) * 12);
     score -= pct;
     issues.push(`${totalPages - withMeta} of ${totalPages} pages missing meta descriptions`);
   }
@@ -377,7 +381,7 @@ function scoreMachineReadability(scan: ScanResult): CategoryScore {
   const withCanonical = scan.pages.filter((p) => p.canonicalUrl).length;
   if (withCanonical === totalPages) positives.push('All pages have canonical tags');
   else {
-    const pct = Math.round(((totalPages - withCanonical) / totalPages) * 10);
+    const pct = Math.round(((totalPages - withCanonical) / totalPages) * 8);
     score -= pct;
     issues.push(`${totalPages - withCanonical} of ${totalPages} pages missing canonical tags`);
   }
@@ -386,29 +390,31 @@ function scoreMachineReadability(scan: ScanResult): CategoryScore {
   const withSchema = scan.pages.filter((p) => p.hasSchema).length;
   if (withSchema > 0) positives.push(`${withSchema} of ${totalPages} pages have structured data`);
   if (withSchema === 0) {
-    score -= 20;
+    score -= 15;
     issues.push('No pages have structured data (JSON-LD)');
   } else if (withSchema < totalPages / 2) {
-    score -= 10;
+    score -= 8;
     issues.push('Most pages lack structured data');
   }
 
   // H1 headings
   const withH1 = scan.pages.filter((p) => p.h1Text).length;
-  if (withH1 < totalPages) {
-    score -= Math.round(((totalPages - withH1) / totalPages) * 10);
+  if (withH1 === totalPages) positives.push('All pages have H1 headings');
+  else if (withH1 < totalPages) {
+    score -= Math.round(((totalPages - withH1) / totalPages) * 8);
     issues.push(`${totalPages - withH1} pages missing H1 headings`);
   }
 
   // Thin content
   const thin = scan.pages.filter((p) => p.wordCount && p.wordCount < 100).length;
   if (thin > 0) {
-    score -= thin * 5;
+    score -= Math.min(15, thin * 3);
     issues.push(`${thin} pages have very thin content`);
   }
 
+  const floor = issues.length <= 1 ? 65 : issues.length <= 2 ? 50 : 30;
   return {
-    score: Math.max(0, Math.min(100, score)),
+    score: Math.max(floor, Math.min(100, score)),
     maxScore: 100,
     explanation: 'How well AI systems can understand your page content and structure.',
     issues,
@@ -424,18 +430,18 @@ function scoreCommercialClarity(scan: ScanResult): CategoryScore {
   const types = new Set(scan.pages.map((p) => p.pageType));
 
   if (types.has('pricing')) positives.push('Pricing page found');
-  else { score -= 25; issues.push('No pricing page discoverable'); }
+  else { score -= 20; issues.push('No pricing page discoverable'); }
 
   if (types.has('contact') || types.has('demo')) positives.push('Contact/demo page found');
-  else { score -= 25; issues.push('No contact or demo page discoverable'); }
+  else { score -= 20; issues.push('No contact or demo page discoverable'); }
 
   if (types.has('product')) positives.push('Product/solution pages found');
-  else { score -= 20; issues.push('No dedicated product pages found'); }
+  else { score -= 15; issues.push('No dedicated product pages found'); }
 
   // Check if homepage has clear navigation
   const homepage = scan.pages.find((p) => p.pageType === 'homepage');
   if (homepage?.hasStructuredNav) positives.push('Homepage has structured navigation');
-  else { score -= 10; issues.push('Homepage may lack clear navigation structure'); }
+  else { score -= 8; issues.push('Homepage may lack clear navigation structure'); }
 
   // Check commercial pages have adequate content
   const commercialPages = scan.pages.filter((p) =>
@@ -443,12 +449,13 @@ function scoreCommercialClarity(scan: ScanResult): CategoryScore {
   );
   const thinCommercial = commercialPages.filter((p) => p.wordCount && p.wordCount < 100);
   if (thinCommercial.length > 0) {
-    score -= thinCommercial.length * 10;
+    score -= Math.min(12, thinCommercial.length * 5);
     issues.push(`${thinCommercial.length} commercial pages have thin content`);
   }
 
+  const floor = issues.length <= 1 ? 60 : issues.length <= 2 ? 45 : 25;
   return {
-    score: Math.max(0, Math.min(100, score)),
+    score: Math.max(floor, Math.min(100, score)),
     maxScore: 100,
     explanation: 'How clearly your key commercial pages are structured for AI discovery.',
     issues,
@@ -467,7 +474,7 @@ function scoreTrustClarity(scan: ScanResult): CategoryScore {
   if (types.has('blog') || types.has('resource') || types.has('docs')) {
     positives.push('Content/resource pages found');
   } else {
-    score -= 20;
+    score -= 15;
     issues.push('No blog, docs, or resource content found');
   }
 
@@ -478,16 +485,16 @@ function scoreTrustClarity(scan: ScanResult): CategoryScore {
       (t) => t.includes('Organization') || t.includes('WebSite')
     );
     if (hasOrg) positives.push('Homepage has Organization/WebSite schema');
-    else { score -= 15; issues.push('Homepage missing Organization schema'); }
+    else { score -= 12; issues.push('Homepage missing Organization schema'); }
   } else {
-    score -= 15;
+    score -= 12;
     issues.push('Homepage has no structured data');
   }
 
   // Performance
   const slowPages = scan.pages.filter((p) => p.loadTimeMs && p.loadTimeMs > 3000);
   if (slowPages.length > 0) {
-    score -= slowPages.length * 5;
+    score -= Math.min(12, slowPages.length * 3);
     issues.push(`${slowPages.length} slow-loading pages (>3s)`);
   } else {
     positives.push('All scanned pages loaded within 3 seconds');
@@ -498,10 +505,12 @@ function scoreTrustClarity(scan: ScanResult): CategoryScore {
     (p) => p.url.includes('/about') || p.url.includes('/company') || p.url.includes('/team')
   );
   if (hasAbout) positives.push('About/company page found');
-  else { score -= 10; issues.push('No about/company page found'); }
+  else { score -= 8; issues.push('No about/company page found'); }
 
+  // Floor: 2 low/medium issues should still leave score around 55-65
+  const floor = issues.length <= 1 ? 65 : issues.length <= 2 ? 55 : 35;
   return {
-    score: Math.max(0, Math.min(100, score)),
+    score: Math.max(floor, Math.min(100, score)),
     maxScore: 100,
     explanation: 'How well your site establishes trust and authority signals for AI systems.',
     issues,

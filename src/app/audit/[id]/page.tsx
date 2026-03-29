@@ -175,10 +175,10 @@ export default function AuditResultPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [viewMode, setViewMode] = useState<ViewMode>('priority');
+  const [viewMode, setViewMode] = useState<ViewMode>('category');
   const [severityFilter, setSeverityFilter] = useState<SeverityFilter>('all');
   const [expandedPages, setExpandedPages] = useState<Set<string>>(new Set());
-  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set(['crawlability', 'machine_readability', 'commercial_clarity', 'trust_clarity']));
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   const [activePreviewUrl, setActivePreviewUrl] = useState<string | null>(null);
 
   useEffect(() => {
@@ -308,7 +308,7 @@ export default function AuditResultPage() {
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
-      {/* Header */}
+      {/* 1. HEADER */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
         <div>
           <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>AI Visibility Report</h1>
@@ -317,7 +317,7 @@ export default function AuditResultPage() {
         <a href="/" className="btn-secondary inline-flex items-center gap-2 px-4 py-2 text-sm"><RefreshCw className="w-4 h-4" />New Audit</a>
       </div>
 
-      {/* Score overview */}
+      {/* 2. SCORE OVERVIEW (graph) */}
       <div className="card p-6 sm:p-8 mb-6">
         <div className="flex flex-col sm:flex-row items-center gap-8">
           <ScoreRing score={audit.overall_score ?? 0} label="Overall Score" size={160} />
@@ -328,36 +328,36 @@ export default function AuditResultPage() {
             <ScoreBar score={audit.trust_clarity_score ?? 0} label="Trust" />
           </div>
         </div>
-        {audit.summary && <p className="mt-6 text-sm rounded-lg p-4" style={{ color: 'var(--text-secondary)', background: 'var(--bg-tertiary)' }}>{audit.summary}</p>}
       </div>
 
-      {/* ===== FEATURE 1: Per-Crawler Status ===== */}
-      {isAuthenticated && crawlerStatuses && crawlerStatuses.length > 0 && (
+      {/* 3. AI VISIBILITY SUMMARY */}
+      {isAuthenticated && (
         <div className="card p-6 mb-6">
-          <div className="flex items-center gap-2 mb-4">
-            <Shield className="w-5 h-5" style={{ color: '#6366F1' }} />
-            <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>AI Crawler Access</h2>
+          <div className="flex items-center gap-2 mb-3">
+            <Bot className="w-5 h-5" style={{ color: '#6366F1' }} />
+            <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>AI Visibility Summary</h2>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {crawlerStatuses.map((c) => (
-              <div key={c.name} className="rounded-lg p-3 border text-center" style={{ borderColor: 'var(--border)', background: 'var(--bg-tertiary)' }}>
-                <p className="text-xs font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>{c.displayName}</p>
-                {c.status === 'allowed' && <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-500"><CheckCircle className="w-3.5 h-3.5" />Allowed</span>}
-                {c.status === 'blocked' && <span className="inline-flex items-center gap-1 text-xs font-semibold text-red-500"><XCircle className="w-3.5 h-3.5" />Blocked</span>}
-                {c.status === 'no_rule' && <span className="inline-flex items-center gap-1 text-xs font-semibold" style={{ color: 'var(--text-tertiary)' }}><Minus className="w-3.5 h-3.5" />No Rule</span>}
-              </div>
-            ))}
+          <div className="p-4 rounded-lg border" style={{ background: 'var(--bg-tertiary)', borderColor: 'var(--border)' }}>
+            <p className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: 'var(--text-primary)' }}>
+              {generateAiSummary(audit, crawlerStatuses || [], keyPagesStatus || [], allFindings.length, highCount)}
+            </p>
           </div>
         </div>
       )}
+      {!isAuthenticated && audit.summary && (
+        <div className="card p-4 mb-6">
+          <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>{audit.summary}</p>
+        </div>
+      )}
 
-      {/* ===== FEATURE 3: Key Pages Found vs Missing ===== */}
+      {/* 4. KEY PAGES STATUS */}
       {isAuthenticated && keyPagesStatus && keyPagesStatus.length > 0 && (
         <div className="card p-6 mb-6">
           <div className="flex items-center gap-2 mb-4">
             <Globe className="w-5 h-5" style={{ color: '#6366F1' }} />
             <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>Key Pages Status</h2>
           </div>
+          <p className="text-sm mb-4" style={{ color: 'var(--text-tertiary)' }}>Can AI find the pages that matter most for discovery, trust, and purchase decisions?</p>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {keyPagesStatus.map((kp) => (
               <div key={kp.type} className="rounded-lg p-3 border" style={{ borderColor: kp.found ? 'rgba(16,185,129,0.2)' : 'rgba(239,68,68,0.2)', background: kp.found ? 'rgba(16,185,129,0.05)' : 'rgba(239,68,68,0.05)' }}>
@@ -373,141 +373,37 @@ export default function AuditResultPage() {
         </div>
       )}
 
-      {/* ===== AI VISIBILITY SUMMARY ===== */}
-      {isAuthenticated && (
+      {/* 5. AI CRAWLER ACCESS */}
+      {isAuthenticated && crawlerStatuses && crawlerStatuses.length > 0 && (
         <div className="card p-6 mb-6">
-          <div className="flex items-center gap-2 mb-3">
-            <Bot className="w-5 h-5" style={{ color: '#6366F1' }} />
-            <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>AI Visibility Summary</h2>
+          <div className="flex items-center gap-2 mb-4">
+            <Shield className="w-5 h-5" style={{ color: '#6366F1' }} />
+            <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>AI Crawler Access</h2>
           </div>
-          <div className="p-4 rounded-lg border" style={{ background: 'var(--bg-tertiary)', borderColor: 'var(--border)' }}>
-            <p className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: 'var(--text-primary)' }}>
-              {generateAiSummary(audit, crawlerStatuses || [], keyPagesStatus || [], allFindings.length, highCount)}
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* Issue summary bar */}
-      <div className="flex items-center gap-3 mb-6 text-sm">
-        <span className="font-medium" style={{ color: 'var(--text-secondary)' }}>{allFindings.length} findings:</span>
-        {highCount > 0 && <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium" style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444', border: '1px solid rgba(239,68,68,0.2)' }}>{highCount} high</span>}
-        {medCount > 0 && <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium" style={{ background: 'rgba(245,158,11,0.1)', color: '#F59E0B', border: '1px solid rgba(245,158,11,0.2)' }}>{medCount} medium</span>}
-        {lowCount > 0 && <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium" style={{ background: 'rgba(99,102,241,0.1)', color: '#6366F1', border: '1px solid rgba(99,102,241,0.2)' }}>{lowCount} low</span>}
-      </div>
-
-      {/* View toggle and filters */}
-      {isAuthenticated && (
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
-          <div className="flex items-center gap-1 rounded-lg p-0.5" style={{ background: 'var(--bg-tertiary)' }}>
-            {(['priority', 'page', 'category'] as ViewMode[]).map((mode) => (
-              <button key={mode} onClick={() => setViewMode(mode)} className="px-3 py-1.5 text-sm font-medium rounded-md transition-colors" style={{ background: viewMode === mode ? 'var(--surface)' : 'transparent', color: viewMode === mode ? 'var(--text-primary)' : 'var(--text-tertiary)', boxShadow: viewMode === mode ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}>
-                {mode === 'priority' ? 'By Priority' : mode === 'page' ? 'By Page' : 'By Category'}
-              </button>
+          <p className="text-sm mb-4" style={{ color: 'var(--text-tertiary)' }}>Which AI systems can crawl and index your site content?</p>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {crawlerStatuses.map((c) => (
+              <div key={c.name} className="rounded-lg p-3 border text-center" style={{ borderColor: 'var(--border)', background: 'var(--bg-tertiary)' }}>
+                <p className="text-xs font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>{c.displayName}</p>
+                {c.status === 'allowed' && <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-500"><CheckCircle className="w-3.5 h-3.5" />Allowed</span>}
+                {c.status === 'blocked' && <span className="inline-flex items-center gap-1 text-xs font-semibold text-red-500"><XCircle className="w-3.5 h-3.5" />Blocked</span>}
+                {c.status === 'no_rule' && <span className="inline-flex items-center gap-1 text-xs font-semibold" style={{ color: 'var(--text-tertiary)' }}><Minus className="w-3.5 h-3.5" />No Rule</span>}
+              </div>
             ))}
           </div>
-          <div className="flex items-center gap-2">
-            <Filter className="w-4 h-4" style={{ color: 'var(--text-tertiary)' }} />
-            <select value={severityFilter} onChange={(e) => setSeverityFilter(e.target.value as SeverityFilter)} className="text-sm rounded-lg px-3 py-1.5" style={{ background: 'var(--surface)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}>
-              <option value="all">All severities</option>
-              <option value="high">High only</option>
-              <option value="medium">Medium only</option>
-              <option value="low">Low only</option>
-            </select>
-          </div>
         </div>
       )}
 
-      {/* Findings section */}
-      <div className="mb-6">
-        <h2 className="text-xl font-bold mb-4" style={{ color: 'var(--text-primary)' }}>{isAuthenticated ? 'Detailed Findings' : 'Top Recommendations'}</h2>
-
-        {(!isAuthenticated || viewMode === 'priority') && (
-          <div className="space-y-4">
-            {(isAuthenticated ? [...filteredFindings].sort((a, b) => { const s: Record<string, number> = { high: 0, medium: 1, low: 2 }; return (s[a.severity] - s[b.severity]) || (a.priorityOrder - b.priorityOrder); }) : visibleRecs.map((rec, i) => ({ id: rec.id, title: rec.title, why: rec.why_it_matters, fix: rec.recommended_fix, codeSnippet: generateCodeSnippet(rec.title, audit.site?.domain || 'example.com'), severity: rec.severity as 'high' | 'medium' | 'low', effort: rec.effort as 'easy' | 'medium' | 'harder', category: rec.category, affectedUrls: [] as string[], priorityOrder: i }))).map((finding, i) => renderFindingCard(finding, i))}
-          </div>
-        )}
-
-        {isAuthenticated && viewMode === 'page' && (
-          <div className="space-y-3">
-            {Array.from(findingsByPage.entries()).map(([url, pageFindings]) => {
-              const isExp = expandedPages.has(url);
-              const page = pages.find(p => p.url === url);
-              const isSW = url === '__site_wide__';
-              let name = isSW ? 'Site-wide issues' : url;
-              try { if (!isSW) name = page?.title || new URL(url).pathname || url; } catch {}
-              return (
-                <div key={url} className="rounded-xl border overflow-hidden" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
-                  <button onClick={() => togglePage(url)} className="w-full flex items-center justify-between p-4 transition-colors text-left" style={{ background: isExp ? 'var(--bg-tertiary)' : 'transparent' }}>
-                    <div className="flex items-center gap-3 min-w-0">
-                      {isExp ? <ChevronDown className="w-4 h-4 shrink-0" style={{ color: 'var(--text-tertiary)' }} /> : <ChevronRight className="w-4 h-4 shrink-0" style={{ color: 'var(--text-tertiary)' }} />}
-                      <div className="min-w-0">
-                        <p className="font-medium truncate" style={{ color: 'var(--text-primary)' }}>{name}</p>
-                        {!isSW && page && <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}><span className="capitalize">{page.page_type}</span>{page.word_count ? ` · ${page.word_count} words` : ''}</p>}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      {pageFindings.filter(f => f.severity === 'high').length > 0 && <span className="text-xs px-1.5 py-0.5 rounded font-medium" style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444' }}>{pageFindings.filter(f => f.severity === 'high').length} high</span>}
-                      <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>{pageFindings.length} issue{pageFindings.length !== 1 ? 's' : ''}</span>
-                    </div>
-                  </button>
-                  {isExp && <div className="border-t p-4 space-y-3" style={{ borderColor: 'var(--border)' }}>{pageFindings.map(f => renderFindingCard(f))}</div>}
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        {isAuthenticated && viewMode === 'category' && (
-          <div className="space-y-3">
-            {Array.from(findingsByCategory.entries()).map(([cat, catFindings]) => {
-              const isExp = expandedCategories.has(cat);
-              const cs = cat === 'crawlability' ? audit.crawlability_score : cat === 'machine_readability' ? audit.machine_readability_score : cat === 'commercial_clarity' ? audit.commercial_clarity_score : audit.trust_clarity_score;
-              return (
-                <div key={cat} className="rounded-xl border overflow-hidden" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
-                  <button onClick={() => toggleCategory(cat)} className="w-full flex items-center justify-between p-4 transition-colors text-left">
-                    <div className="flex items-center gap-3">
-                      {isExp ? <ChevronDown className="w-4 h-4 shrink-0" style={{ color: 'var(--text-tertiary)' }} /> : <ChevronRight className="w-4 h-4 shrink-0" style={{ color: 'var(--text-tertiary)' }} />}
-                      <div><p className="font-medium" style={{ color: 'var(--text-primary)' }}>{CATEGORY_LABELS[cat] || cat}</p><p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>{CATEGORY_DESCRIPTIONS[cat]}</p></div>
-                    </div>
-                    <div className="flex items-center gap-3 shrink-0">
-                      <span className="text-sm font-bold" style={{ color: (cs ?? 0) >= 80 ? '#10B981' : (cs ?? 0) >= 50 ? '#F59E0B' : '#EF4444', fontFamily: 'var(--font-mono)' }}>{cs ?? 0}/100</span>
-                      <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>{catFindings.length} issue{catFindings.length !== 1 ? 's' : ''}</span>
-                    </div>
-                  </button>
-                  {isExp && <div className="border-t p-4 space-y-3" style={{ borderColor: 'var(--border)' }}>{catFindings.map(f => renderFindingCard(f))}</div>}
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        {/* Gate */}
-        {!isAuthenticated && gatedCount > 0 && (
-          <div className="mt-6 relative">
-            <div className="rounded-xl border p-5 opacity-40 blur-[2px] pointer-events-none" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}><div className="flex items-start gap-3"><span className="flex items-center justify-center w-6 h-6 rounded-full text-xs font-semibold" style={{ background: 'var(--bg-tertiary)', color: 'var(--text-tertiary)' }}>{FREE_RECOMMENDATION_LIMIT + 1}</span><div><div className="h-4 w-64 rounded" style={{ background: 'var(--bg-tertiary)' }} /><div className="h-3 w-96 rounded mt-2" style={{ background: 'var(--bg-tertiary)' }} /></div></div></div>
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="rounded-xl border-2 p-6 text-center shadow-lg max-w-sm" style={{ background: 'var(--surface)', borderColor: 'rgba(99,102,241,0.3)' }}>
-                <Lock className="w-8 h-8 mx-auto" style={{ color: '#6366F1' }} />
-                <h3 className="mt-3 font-semibold" style={{ color: 'var(--text-primary)' }}>{gatedCount} more finding{gatedCount > 1 ? 's' : ''} available</h3>
-                <p className="mt-2 text-sm" style={{ color: 'var(--text-secondary)' }}>Sign up free to unlock crawler status, page analysis, code snippets, and AI perception check.</p>
-                <a href={`/auth/signup?redirect=/audit/${audit.id}`} className="mt-4 btn-primary inline-flex items-center gap-2 px-5 py-2.5 text-sm">Unlock Full Report <ArrowRight className="w-4 h-4" /></a>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* ===== WHAT AI CRAWLERS SEE ===== */}
+      {/* 6. WHAT AI CRAWLERS SEE */}
       {isAuthenticated && pagePreviews && pagePreviews.length > 0 && (
         <div className="card p-6 mb-6">
           <div className="flex items-center gap-2 mb-4">
             <Eye className="w-5 h-5" style={{ color: '#6366F1' }} />
             <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>What AI Crawlers See</h2>
           </div>
-          <p className="text-sm mb-4" style={{ color: 'var(--text-tertiary)' }}>What bots read when they visit your pages — no JavaScript rendering.</p>
+          <p className="text-sm mb-4" style={{ color: 'var(--text-tertiary)' }}>What bots read when they visit your pages — no JavaScript rendering. Select a page to see what AI sees and what to improve.</p>
           <div className="flex flex-wrap gap-2 mb-4">
-            {pagePreviews.slice(0, 8).map((pp) => {
+            {pagePreviews.slice(0, 10).map((pp) => {
               let path = pp.url; try { path = new URL(pp.url).pathname || '/'; } catch {}
               return (
                 <button key={pp.url} onClick={() => setActivePreviewUrl(activePreviewUrl === pp.url ? null : pp.url)}
@@ -567,7 +463,124 @@ export default function AuditResultPage() {
         </div>
       )}
 
-      {/* Pages table */}
+      {/* 7. DETAILED FINDINGS */}
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-2">
+          <h2 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>{isAuthenticated ? 'Detailed Findings' : 'Top Recommendations'}</h2>
+          <div className="flex items-center gap-3 text-xs">
+            {highCount > 0 && <span className="px-2 py-0.5 rounded font-medium" style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444', border: '1px solid rgba(239,68,68,0.2)' }}>{highCount} high</span>}
+            {medCount > 0 && <span className="px-2 py-0.5 rounded font-medium" style={{ background: 'rgba(245,158,11,0.1)', color: '#F59E0B', border: '1px solid rgba(245,158,11,0.2)' }}>{medCount} medium</span>}
+            {lowCount > 0 && <span className="px-2 py-0.5 rounded font-medium" style={{ background: 'rgba(99,102,241,0.1)', color: '#6366F1', border: '1px solid rgba(99,102,241,0.2)' }}>{lowCount} low</span>}
+          </div>
+        </div>
+
+        {/* View toggle and filters */}
+        {isAuthenticated && (
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+            <div className="flex items-center gap-1 rounded-lg p-0.5" style={{ background: 'var(--bg-tertiary)' }}>
+              {(['category', 'priority', 'page'] as ViewMode[]).map((mode) => (
+                <button key={mode} onClick={() => setViewMode(mode)} className="px-3 py-1.5 text-sm font-medium rounded-md transition-colors" style={{ background: viewMode === mode ? 'var(--surface)' : 'transparent', color: viewMode === mode ? 'var(--text-primary)' : 'var(--text-tertiary)', boxShadow: viewMode === mode ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}>
+                  {mode === 'category' ? 'By Category' : mode === 'priority' ? 'By Priority' : 'By Page'}
+                </button>
+              ))}
+            </div>
+            <div className="flex items-center gap-2">
+              <Filter className="w-4 h-4" style={{ color: 'var(--text-tertiary)' }} />
+              <select value={severityFilter} onChange={(e) => setSeverityFilter(e.target.value as SeverityFilter)} className="text-sm rounded-lg px-3 py-1.5" style={{ background: 'var(--surface)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}>
+                <option value="all">All severities</option>
+                <option value="high">High only</option>
+                <option value="medium">Medium only</option>
+                <option value="low">Low only</option>
+              </select>
+            </div>
+          </div>
+        )}
+
+        {/* Category view (default for authenticated) */}
+        {isAuthenticated && viewMode === 'category' && (
+          <div className="space-y-3">
+            {Array.from(findingsByCategory.entries()).map(([cat, catFindings]) => {
+              const isExp = expandedCategories.has(cat);
+              const cs = cat === 'crawlability' ? audit.crawlability_score : cat === 'machine_readability' ? audit.machine_readability_score : cat === 'commercial_clarity' ? audit.commercial_clarity_score : audit.trust_clarity_score;
+              const catHigh = catFindings.filter(f => f.severity === 'high').length;
+              return (
+                <div key={cat} className="rounded-xl border overflow-hidden" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
+                  <button onClick={() => toggleCategory(cat)} className="w-full flex items-center justify-between p-4 transition-colors text-left">
+                    <div className="flex items-center gap-3">
+                      {isExp ? <ChevronDown className="w-4 h-4 shrink-0" style={{ color: 'var(--text-tertiary)' }} /> : <ChevronRight className="w-4 h-4 shrink-0" style={{ color: 'var(--text-tertiary)' }} />}
+                      <div>
+                        <p className="font-semibold" style={{ color: 'var(--text-primary)' }}>{CATEGORY_LABELS[cat] || cat}</p>
+                        <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>{CATEGORY_DESCRIPTIONS[cat]}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3 shrink-0">
+                      {catHigh > 0 && <span className="text-xs px-1.5 py-0.5 rounded font-medium" style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444' }}>{catHigh} high</span>}
+                      <span className="text-sm font-bold" style={{ color: (cs ?? 0) >= 80 ? '#10B981' : (cs ?? 0) >= 50 ? '#F59E0B' : '#EF4444', fontFamily: 'var(--font-mono)' }}>{cs ?? 0}</span>
+                      <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>{catFindings.length} issue{catFindings.length !== 1 ? 's' : ''}</span>
+                    </div>
+                  </button>
+                  {isExp && <div className="border-t p-4 space-y-3" style={{ borderColor: 'var(--border)' }}>{catFindings.map((f, i) => renderFindingCard(f, i))}</div>}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Priority view */}
+        {(!isAuthenticated || viewMode === 'priority') && (
+          <div className="space-y-4">
+            {(isAuthenticated ? [...filteredFindings].sort((a, b) => { const s: Record<string, number> = { high: 0, medium: 1, low: 2 }; return (s[a.severity] - s[b.severity]) || (a.priorityOrder - b.priorityOrder); }) : visibleRecs.map((rec, i) => ({ id: rec.id, title: rec.title, why: rec.why_it_matters, fix: rec.recommended_fix, codeSnippet: generateCodeSnippet(rec.title, audit.site?.domain || 'example.com'), severity: rec.severity as 'high' | 'medium' | 'low', effort: rec.effort as 'easy' | 'medium' | 'harder', category: rec.category, affectedUrls: [] as string[], priorityOrder: i }))).map((finding, i) => renderFindingCard(finding, i))}
+          </div>
+        )}
+
+        {/* Page view */}
+        {isAuthenticated && viewMode === 'page' && (
+          <div className="space-y-3">
+            {Array.from(findingsByPage.entries()).map(([url, pageFindings]) => {
+              const isExp = expandedPages.has(url);
+              const page = pages.find(p => p.url === url);
+              const isSW = url === '__site_wide__';
+              let name = isSW ? 'Site-wide issues' : url;
+              try { if (!isSW) name = page?.title || new URL(url).pathname || url; } catch {}
+              return (
+                <div key={url} className="rounded-xl border overflow-hidden" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
+                  <button onClick={() => togglePage(url)} className="w-full flex items-center justify-between p-4 transition-colors text-left">
+                    <div className="flex items-center gap-3 min-w-0">
+                      {isExp ? <ChevronDown className="w-4 h-4 shrink-0" style={{ color: 'var(--text-tertiary)' }} /> : <ChevronRight className="w-4 h-4 shrink-0" style={{ color: 'var(--text-tertiary)' }} />}
+                      <div className="min-w-0">
+                        <p className="font-medium truncate" style={{ color: 'var(--text-primary)' }}>{name}</p>
+                        {!isSW && page && <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}><span className="capitalize">{page.page_type}</span>{page.word_count ? ` · ${page.word_count} words` : ''}</p>}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {pageFindings.filter(f => f.severity === 'high').length > 0 && <span className="text-xs px-1.5 py-0.5 rounded font-medium" style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444' }}>{pageFindings.filter(f => f.severity === 'high').length} high</span>}
+                      <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>{pageFindings.length} issue{pageFindings.length !== 1 ? 's' : ''}</span>
+                    </div>
+                  </button>
+                  {isExp && <div className="border-t p-4 space-y-3" style={{ borderColor: 'var(--border)' }}>{pageFindings.map(f => renderFindingCard(f))}</div>}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Gate for unauthenticated */}
+        {!isAuthenticated && gatedCount > 0 && (
+          <div className="mt-6 relative">
+            <div className="rounded-xl border p-5 opacity-40 blur-[2px] pointer-events-none" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}><div className="flex items-start gap-3"><span className="flex items-center justify-center w-6 h-6 rounded-full text-xs font-semibold" style={{ background: 'var(--bg-tertiary)', color: 'var(--text-tertiary)' }}>{FREE_RECOMMENDATION_LIMIT + 1}</span><div><div className="h-4 w-64 rounded" style={{ background: 'var(--bg-tertiary)' }} /><div className="h-3 w-96 rounded mt-2" style={{ background: 'var(--bg-tertiary)' }} /></div></div></div>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="rounded-xl border-2 p-6 text-center shadow-lg max-w-sm" style={{ background: 'var(--surface)', borderColor: 'rgba(99,102,241,0.3)' }}>
+                <Lock className="w-8 h-8 mx-auto" style={{ color: '#6366F1' }} />
+                <h3 className="mt-3 font-semibold" style={{ color: 'var(--text-primary)' }}>{gatedCount} more finding{gatedCount > 1 ? 's' : ''} available</h3>
+                <p className="mt-2 text-sm" style={{ color: 'var(--text-secondary)' }}>Sign up free to unlock crawler status, page analysis, code snippets, and full report.</p>
+                <a href={`/auth/signup?redirect=/audit/${audit.id}`} className="mt-4 btn-primary inline-flex items-center gap-2 px-5 py-2.5 text-sm">Unlock Full Report <ArrowRight className="w-4 h-4" /></a>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* 8. PAGES ANALYZED */}
       {isAuthenticated && pages.length > 0 && (
         <div className="mb-6">
           <h2 className="text-xl font-bold mb-4" style={{ color: 'var(--text-primary)' }}>Pages Analyzed</h2>
