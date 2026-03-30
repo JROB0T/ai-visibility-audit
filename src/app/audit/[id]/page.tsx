@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import ScoreRing, { ScoreBar } from '@/components/ScoreRing';
 import SeverityBadge, { EffortBadge } from '@/components/SeverityBadge';
-import { Lock, ArrowRight, CheckCircle, XCircle, ExternalLink, FileText, AlertTriangle, RefreshCw, ChevronDown, ChevronRight, Filter, Shield, Code, Eye, Bot, Copy, Check, Globe, Minus } from 'lucide-react';
+import { Lock, ArrowRight, ArrowLeft, CheckCircle, XCircle, ExternalLink, FileText, AlertTriangle, RefreshCw, ChevronDown, ChevronRight, Filter, Shield, Code, Eye, Bot, Copy, Check, Globe, Minus, LayoutGrid, Wrench, Zap, MonitorSmartphone } from 'lucide-react';
 
 // ============================================================
 // Types
@@ -44,6 +44,7 @@ interface AuditData {
 
 type ViewMode = 'priority' | 'page' | 'category';
 type SeverityFilter = 'all' | 'high' | 'medium' | 'low';
+type ReportTab = 'overview' | 'diagnostics' | 'action-plan' | 'ai-sees' | 'pages';
 
 const FREE_RECOMMENDATION_LIMIT = 3;
 
@@ -180,6 +181,13 @@ export default function AuditResultPage() {
   const [expandedPages, setExpandedPages] = useState<Set<string>>(new Set());
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   const [activePreviewUrl, setActivePreviewUrl] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<ReportTab>('overview');
+
+  function switchTab(tab: ReportTab) {
+    setActiveTab(tab);
+    if (tab === 'diagnostics') setViewMode('category');
+    else if (tab === 'action-plan') setViewMode('priority');
+  }
 
   useEffect(() => {
     async function load() {
@@ -308,15 +316,37 @@ export default function AuditResultPage() {
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
-      {/* 1. HEADER */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+      {/* HEADER with breadcrumb */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
         <div>
+          <a href="/dashboard" className="text-xs inline-flex items-center gap-1 mb-1" style={{ color: '#6366F1' }}><ArrowLeft className="w-3 h-3" />Dashboard</a>
           <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>AI Visibility Report</h1>
           <p className="mt-1" style={{ color: 'var(--text-tertiary)' }}>{audit.site?.domain} · {new Date(audit.created_at).toLocaleDateString()}{audit.pages_scanned > 0 && ` · ${audit.pages_scanned} pages`}</p>
         </div>
         <a href="/" className="btn-secondary inline-flex items-center gap-2 px-4 py-2 text-sm"><RefreshCw className="w-4 h-4" />New Audit</a>
       </div>
 
+      {/* TAB NAVIGATION */}
+      {isAuthenticated && (
+        <div className="flex items-center gap-1 overflow-x-auto mb-6 pb-1 rounded-lg p-1" style={{ background: 'var(--bg-tertiary)' }}>
+          {([
+            { id: 'overview' as ReportTab, label: 'Overview', icon: LayoutGrid },
+            { id: 'diagnostics' as ReportTab, label: 'Diagnostics', icon: Wrench },
+            { id: 'action-plan' as ReportTab, label: 'Action Plan', icon: Zap },
+            { id: 'ai-sees' as ReportTab, label: 'What AI Sees', icon: Eye },
+            { id: 'pages' as ReportTab, label: 'Pages', icon: MonitorSmartphone },
+          ]).map(tab => (
+            <button key={tab.id} onClick={() => switchTab(tab.id)}
+              className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-md whitespace-nowrap transition-colors"
+              style={{ background: activeTab === tab.id ? 'var(--surface)' : 'transparent', color: activeTab === tab.id ? 'var(--text-primary)' : 'var(--text-tertiary)', boxShadow: activeTab === tab.id ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}>
+              <tab.icon className="w-3.5 h-3.5" />{tab.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* ===== OVERVIEW TAB ===== */}
+      {(!isAuthenticated || activeTab === 'overview') && (<>
       {/* 2. SCORE OVERVIEW (graph) */}
       <div className="card p-6 sm:p-8 mb-6">
         <div className="flex flex-col sm:flex-row items-center gap-8">
@@ -394,6 +424,11 @@ export default function AuditResultPage() {
         </div>
       )}
 
+      </>)}
+
+      {/* ===== WHAT AI SEES TAB ===== */}
+      {isAuthenticated && activeTab === 'ai-sees' && (
+      <>
       {/* 6. WHAT AI CRAWLERS SEE */}
       {isAuthenticated && pagePreviews && pagePreviews.length > 0 && (
         <div className="card p-6 mb-6">
@@ -463,6 +498,12 @@ export default function AuditResultPage() {
         </div>
       )}
 
+      </>
+      )}
+
+      {/* ===== DIAGNOSTICS + ACTION PLAN TABS ===== */}
+      {(!isAuthenticated || activeTab === 'diagnostics' || activeTab === 'action-plan') && (
+      <>
       {/* 7. DETAILED FINDINGS */}
       <div className="mb-6">
         <div className="flex items-center justify-between mb-2">
@@ -580,6 +621,12 @@ export default function AuditResultPage() {
         )}
       </div>
 
+      </>
+      )}
+
+      {/* ===== PAGES TAB ===== */}
+      {(!isAuthenticated || activeTab === 'pages') && (
+      <>
       {/* 8. PAGES ANALYZED */}
       {isAuthenticated && pages.length > 0 && (
         <div className="mb-6">
@@ -614,6 +661,8 @@ export default function AuditResultPage() {
             <p className="mt-3" style={{ color: 'var(--text-secondary)' }}>We scanned {pages.length} pages. <a href={`/auth/signup?redirect=/audit/${audit.id}`} className="font-medium" style={{ color: '#6366F1' }}>Sign up free</a> to see the full breakdown.</p>
           </div>
         </div>
+      )}
+      </>
       )}
     </div>
   );
