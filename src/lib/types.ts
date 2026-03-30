@@ -31,7 +31,7 @@ export interface AuditPage {
   id: string;
   audit_id: string;
   url: string;
-  page_type: 'homepage' | 'pricing' | 'contact' | 'demo' | 'product' | 'docs' | 'blog' | 'resource' | 'other';
+  page_type: PageType;
   title: string | null;
   meta_description: string | null;
   canonical_url: string | null;
@@ -44,6 +44,8 @@ export interface AuditPage {
   issues: string[];
   created_at: string;
 }
+
+export type PageType = 'homepage' | 'pricing' | 'contact' | 'demo' | 'product' | 'docs' | 'blog' | 'resource' | 'about' | 'security' | 'privacy' | 'terms' | 'careers' | 'integrations' | 'comparison' | 'use-case' | 'changelog' | 'status' | 'other';
 
 export interface AuditFinding {
   id: string;
@@ -79,6 +81,29 @@ export interface ScanResult {
   errors: string[];
   crawlerStatuses: CrawlerStatus[];
   keyPagesStatus: KeyPageStatus[];
+  siteWideChecks: SiteWideChecks;
+}
+
+export interface SiteWideChecks {
+  usesHttps: boolean;
+  hasNoindexOnKeyPages: boolean;
+  noindexPages: string[];
+  hasNofollowOnKeyLinks: boolean;
+  nofollowLinks: string[];
+  hasRedirectChains: boolean;
+  redirectChainUrls: string[];
+  hasBrokenLinks: boolean;
+  brokenLinks: string[];
+  hasPrivacyPolicy: boolean;
+  hasTermsOfService: boolean;
+  hasSocialLinks: boolean;
+  socialLinks: string[];
+  hasCustomerLogos: boolean;
+  hasTestimonials: boolean;
+  hasReviewPlatformLinks: boolean;
+  reviewPlatformLinks: string[];
+  navigationLinksToKeyPages: boolean;
+  missingNavLinks: string[];
 }
 
 export interface CrawlerStatus {
@@ -112,7 +137,7 @@ export interface SitemapResult {
 
 export interface PageScanResult {
   url: string;
-  pageType: AuditPage['page_type'];
+  pageType: PageType;
   statusCode: number | null;
   title: string | null;
   metaDescription: string | null;
@@ -126,7 +151,54 @@ export interface PageScanResult {
   hasStructuredNav: boolean;
   internalLinks: string[];
   issues: string[];
-  rawHtmlPreview: string | null; // First ~500 chars of what a bot sees
+  rawHtmlPreview: string | null;
+
+  // New P0 checks
+  hasNoindex: boolean;
+  usesHttps: boolean;
+  hasOpenGraph: boolean;
+  ogTags: { title: string | null; description: string | null; image: string | null };
+  imagesWithoutAlt: number;
+  totalImages: number;
+  hasPricingContent: boolean;
+  hasCtaButton: boolean;
+  firstParagraphText: string | null;
+  hasCustomerLogos: boolean;
+  hasTestimonials: boolean;
+  hasReviewLinks: boolean;
+  reviewPlatformUrls: string[];
+  hasSocialLinks: boolean;
+  socialLinkUrls: string[];
+  hasPrivacyLink: boolean;
+  hasTermsLink: boolean;
+  navLinks: string[];
+
+  // New P1 checks
+  headingHierarchyValid: boolean;
+  headingIssues: string[];
+  hasLangAttribute: boolean;
+  langValue: string | null;
+  hasBreadcrumbs: boolean;
+  hasFaqSchema: boolean;
+  hasPricingSchema: boolean;
+  hasArticleDates: boolean;
+  hasAuthorInfo: boolean;
+  hasNofollowIssues: boolean;
+  nofollowInternalLinks: string[];
+  duplicateContentHash: string | null;
+  anchorTextIssues: string[];
+  hasComparisonContent: boolean;
+  hasUseCaseContent: boolean;
+  hasSecurityPage: boolean;
+  hasFreeTrial: boolean;
+  hasTeamInfo: boolean;
+
+  // New P2 checks
+  hasTwitterCard: boolean;
+  hasTableHeaders: boolean;
+  usesSemanticLists: boolean;
+  hasViewportMeta: boolean;
+  hasAddressInfo: boolean;
 }
 
 export interface ScoreResult {
