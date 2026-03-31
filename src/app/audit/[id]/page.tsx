@@ -10,7 +10,15 @@ import { Lock, ArrowRight, ArrowLeft, CheckCircle, XCircle, ExternalLink, FileTe
 // ============================================================
 // Types
 // ============================================================
-interface CrawlerStatus { name: string; displayName: string; status: 'allowed' | 'blocked' | 'no_rule'; }
+interface CrawlerStatus {
+  name: string; displayName: string; operator: string;
+  status: 'allowed' | 'blocked' | 'no_rule';
+  statusBasis: string; statusDetail: string;
+  visibilityValue: string; visibilityLabel: string;
+  description: string; readinessScore: number;
+  barriers: string[]; recommendations: string[];
+  confidenceLevel: string;
+}
 interface KeyPageStatus { type: string; label: string; found: boolean; url: string | null; }
 interface PagePreview { url: string; title: string; metaDescription: string; h1: string; schemaTypes: string[]; wordCount: number | null; hasSchema: boolean; }
 
@@ -180,6 +188,7 @@ export default function AuditResultPage() {
   const [severityFilter, setSeverityFilter] = useState<SeverityFilter>('all');
   const [expandedPages, setExpandedPages] = useState<Set<string>>(new Set());
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
+  const [expandedCrawlers, setExpandedCrawlers] = useState<Set<string>>(new Set());
   const [activePreviewUrl, setActivePreviewUrl] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<ReportTab>('overview');
 
@@ -255,6 +264,7 @@ export default function AuditResultPage() {
 
   function togglePage(url: string) { setExpandedPages(prev => { const n = new Set(prev); if (n.has(url)) n.delete(url); else n.add(url); return n; }); }
   function toggleCategory(cat: string) { setExpandedCategories(prev => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; }); }
+  function toggleCrawler(name: string) { setExpandedCrawlers(prev => { const n = new Set(prev); if (n.has(name)) n.delete(name); else n.add(name); return n; }); }
 
   if (loading) return (<div className="max-w-4xl mx-auto px-4 py-20 text-center"><div className="animate-spin w-8 h-8 border-2 rounded-full mx-auto" style={{ borderColor: '#6366F1', borderTopColor: 'transparent' }} /><p className="mt-4" style={{ color: 'var(--text-tertiary)' }}>Loading audit results…</p></div>);
   if (error || !data) return (<div className="max-w-4xl mx-auto px-4 py-20 text-center"><AlertTriangle className="w-10 h-10 text-amber-500 mx-auto" /><p className="mt-4 font-medium" style={{ color: 'var(--text-primary)' }}>{error || 'Something went wrong'}</p><a href="/" className="mt-4 inline-block" style={{ color: '#6366F1' }}>← Try another URL</a></div>);
@@ -403,23 +413,123 @@ export default function AuditResultPage() {
         </div>
       )}
 
-      {/* 5. AI CRAWLER ACCESS */}
+      {/* 5. AI SOURCE VISIBILITY */}
       {isAuthenticated && crawlerStatuses && crawlerStatuses.length > 0 && (
         <div className="card p-6 mb-6">
-          <div className="flex items-center gap-2 mb-4">
+          <div className="flex items-center gap-2 mb-2">
             <Shield className="w-5 h-5" style={{ color: '#6366F1' }} />
-            <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>AI Crawler Access</h2>
+            <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>AI Source Visibility</h2>
           </div>
-          <p className="text-sm mb-4" style={{ color: 'var(--text-tertiary)' }}>Which AI systems can crawl and index your site content?</p>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {crawlerStatuses.map((c) => (
-              <div key={c.name} className="rounded-lg p-3 border text-center" style={{ borderColor: 'var(--border)', background: 'var(--bg-tertiary)' }}>
-                <p className="text-xs font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>{c.displayName}</p>
-                {c.status === 'allowed' && <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-500"><CheckCircle className="w-3.5 h-3.5" />Allowed</span>}
-                {c.status === 'blocked' && <span className="inline-flex items-center gap-1 text-xs font-semibold text-red-500"><XCircle className="w-3.5 h-3.5" />Blocked</span>}
-                {c.status === 'no_rule' && <span className="inline-flex items-center gap-1 text-xs font-semibold" style={{ color: 'var(--text-tertiary)' }}><Minus className="w-3.5 h-3.5" />No Rule</span>}
-              </div>
-            ))}
+          <p className="text-sm mb-4" style={{ color: 'var(--text-tertiary)' }}>How visible and useful your site is to each AI system. Click any source for details.</p>
+          <div className="space-y-2">
+            {crawlerStatuses.map((c) => {
+              const isExp = expandedCrawlers.has(c.name);
+              const readColor = c.readinessScore >= 75 ? '#10B981' : c.readinessScore >= 50 ? '#F59E0B' : '#EF4444';
+              return (
+                <div key={c.name} className="rounded-xl border overflow-hidden" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
+                  {/* Collapsed card */}
+                  <button onClick={() => toggleCrawler(c.name)} className="w-full flex items-center justify-between p-4 text-left transition-colors" style={{ background: isExp ? 'var(--bg-tertiary)' : 'transparent' }}>
+                    <div className="flex items-center gap-3 min-w-0">
+                      {isExp ? <ChevronDown className="w-4 h-4 shrink-0" style={{ color: 'var(--text-tertiary)' }} /> : <ChevronRight className="w-4 h-4 shrink-0" style={{ color: 'var(--text-tertiary)' }} />}
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>{c.displayName}</span>
+                          <span className="text-xs px-1.5 py-0.5 rounded" style={{ color: 'var(--text-tertiary)', background: 'var(--bg-tertiary)' }}>{c.operator}</span>
+                          <span className="text-xs px-1.5 py-0.5 rounded" style={{ color: c.visibilityValue === 'search_citation' ? '#6366F1' : c.visibilityValue === 'assistant_browsing' ? '#F59E0B' : '#64748B', background: c.visibilityValue === 'search_citation' ? 'rgba(99,102,241,0.1)' : c.visibilityValue === 'assistant_browsing' ? 'rgba(245,158,11,0.1)' : 'var(--bg-tertiary)' }}>{c.visibilityLabel}</span>
+                        </div>
+                        {c.barriers.length > 0 && !isExp && <p className="text-xs mt-0.5 truncate" style={{ color: 'var(--text-tertiary)' }}>{c.barriers[0]}</p>}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3 shrink-0">
+                      {c.status === 'allowed' && <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-500"><CheckCircle className="w-3.5 h-3.5" />Allowed</span>}
+                      {c.status === 'blocked' && <span className="inline-flex items-center gap-1 text-xs font-semibold text-red-500"><XCircle className="w-3.5 h-3.5" />Blocked</span>}
+                      {c.status === 'no_rule' && <span className="inline-flex items-center gap-1 text-xs font-semibold" style={{ color: 'var(--text-tertiary)' }}><Minus className="w-3.5 h-3.5" />No Rule</span>}
+                      <div className="flex items-center gap-1.5 ml-2">
+                        <div className="w-12 h-1.5 rounded-full" style={{ background: 'var(--bg-tertiary)' }}>
+                          <div className="h-full rounded-full" style={{ width: `${c.readinessScore}%`, background: readColor }} />
+                        </div>
+                        <span className="text-xs font-bold w-7 text-right" style={{ color: readColor, fontFamily: 'var(--font-mono)' }}>{c.readinessScore}</span>
+                      </div>
+                    </div>
+                  </button>
+
+                  {/* Expanded detail */}
+                  {isExp && (
+                    <div className="border-t p-4 space-y-4" style={{ borderColor: 'var(--border)' }}>
+                      {/* About this source */}
+                      <div>
+                        <p className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>{c.description}</p>
+                        <span className="inline-flex items-center gap-1 text-xs mt-1.5 px-1.5 py-0.5 rounded" style={{ color: '#818CF8', background: 'rgba(99,102,241,0.08)' }}>Inferred context</span>
+                      </div>
+
+                      {/* Access Status */}
+                      <div className="rounded-lg p-3 border" style={{ borderColor: 'var(--border)', background: 'var(--bg-tertiary)' }}>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>Access Status</span>
+                          <span className="text-xs px-1.5 py-0.5 rounded" style={{ color: '#10B981', background: 'rgba(16,185,129,0.08)' }}>Observed</span>
+                        </div>
+                        <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>{c.statusDetail}</p>
+                      </div>
+
+                      {/* Detection Status — placeholder */}
+                      <div className="rounded-lg p-3 border" style={{ borderColor: 'var(--border)', background: 'var(--bg-tertiary)' }}>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>Detection Status</span>
+                          <span className="text-xs px-1.5 py-0.5 rounded" style={{ color: 'var(--text-tertiary)', background: 'var(--bg-tertiary)', border: '1px solid var(--border)' }}>Not yet measured</span>
+                        </div>
+                        <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>Actual visit detection requires server log monitoring. This will be available in a future update.</p>
+                      </div>
+
+                      {/* Readiness for this source */}
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>Site Readiness for {c.displayName}</span>
+                            <span className="text-xs px-1.5 py-0.5 rounded" style={{ color: '#F59E0B', background: 'rgba(245,158,11,0.08)' }}>Measured + Inferred</span>
+                          </div>
+                          <span className="text-sm font-bold" style={{ color: readColor, fontFamily: 'var(--font-mono)' }}>{c.readinessScore}/100</span>
+                        </div>
+                        <div className="w-full h-2 rounded-full mb-3" style={{ background: 'var(--bg-tertiary)' }}>
+                          <div className="h-full rounded-full transition-all" style={{ width: `${c.readinessScore}%`, background: readColor }} />
+                        </div>
+                        {c.barriers.length > 0 && (
+                          <div className="space-y-1">
+                            <p className="text-xs font-medium" style={{ color: 'var(--text-tertiary)' }}>Barriers:</p>
+                            {c.barriers.map((b, i) => (
+                              <div key={i} className="flex items-start gap-1.5">
+                                <XCircle className="w-3 h-3 mt-0.5 shrink-0 text-red-400" />
+                                <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{b}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {c.barriers.length === 0 && (
+                          <p className="text-xs" style={{ color: '#10B981' }}>No significant barriers detected for this source.</p>
+                        )}
+                      </div>
+
+                      {/* Source-specific recommendations */}
+                      {c.recommendations.length > 0 && (
+                        <div>
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>Recommendations for {c.displayName}</span>
+                            <span className="text-xs px-1.5 py-0.5 rounded" style={{ color: '#F59E0B', background: 'rgba(245,158,11,0.08)' }}>Inferred</span>
+                          </div>
+                          <div className="space-y-1.5">
+                            {c.recommendations.map((r, i) => (
+                              <div key={i} className="flex items-start gap-1.5">
+                                <Zap className="w-3 h-3 mt-0.5 shrink-0" style={{ color: '#6366F1' }} />
+                                <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{r}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       )}

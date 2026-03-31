@@ -109,7 +109,17 @@ export interface SiteWideChecks {
 export interface CrawlerStatus {
   name: string;
   displayName: string;
+  operator: string;
   status: 'allowed' | 'blocked' | 'no_rule';
+  statusBasis: 'explicit_rule' | 'wildcard_rule' | 'default';
+  statusDetail: string;
+  visibilityValue: 'search_citation' | 'assistant_browsing' | 'training_corpus' | 'unknown';
+  visibilityLabel: string;
+  description: string;
+  readinessScore: number;
+  barriers: string[];
+  recommendations: string[];
+  confidenceLevel: 'observed' | 'inferred' | 'not_measured';
 }
 
 export interface KeyPageStatus {

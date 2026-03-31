@@ -55,7 +55,7 @@ export async function scanSite(inputUrl: string): Promise<ScanResult> {
   if (!homepageResult) {
     return {
       robotsTxt, sitemap, pages: [], errors: [...errors, 'Could not scan homepage'],
-      crawlerStatuses: buildCrawlerStatuses(robotsTxt),
+      crawlerStatuses: buildCrawlerStatuses(robotsTxt, []),
       keyPagesStatus: [],
       siteWideChecks: defaultSiteWideChecks(),
     };
@@ -110,7 +110,7 @@ export async function scanSite(inputUrl: string): Promise<ScanResult> {
     }
   }
 
-  const crawlerStatuses = buildCrawlerStatuses(robotsTxt);
+  const crawlerStatuses = buildCrawlerStatuses(robotsTxt, pageResults);
   const keyPagesStatus = buildKeyPagesStatus(pageResults);
   const siteWideChecks = buildSiteWideChecks(pageResults, homepageResult);
 
@@ -511,41 +511,162 @@ function discoverKeyPages(links: string[]): { url: string; type: PageType; prior
 }
 
 // ============================================================
-// Per-crawler status
+// Per-crawler status — enriched with metadata + readiness
 // ============================================================
-function buildCrawlerStatuses(robotsTxt: RobotsTxtResult | null): CrawlerStatus[] {
-  const crawlers = [
-    { name: 'GPTBot', displayName: 'GPTBot (OpenAI)' },
-    { name: 'ChatGPT-User', displayName: 'ChatGPT User' },
-    { name: 'Google-Extended', displayName: 'Google AI (Gemini)' },
-    { name: 'Anthropic', displayName: 'Anthropic' },
-    { name: 'ClaudeBot', displayName: 'ClaudeBot (Anthropic)' },
-    { name: 'PerplexityBot', displayName: 'PerplexityBot' },
-    { name: 'CCBot', displayName: 'CCBot (Common Crawl)' },
-    { name: 'Amazonbot', displayName: 'Amazonbot' },
-    { name: 'Meta-ExternalAgent', displayName: 'Meta AI' },
-  ];
-  if (!robotsTxt?.exists || !robotsTxt.content) return crawlers.map(c => ({ ...c, status: 'no_rule' as const }));
-  const lines = robotsTxt.content.split('\n').map(l => l.trim());
+
+interface CrawlerMeta {
+  name: string;
+  displayName: string;
+  operator: string;
+  description: string;
+  visibilityValue: 'search_citation' | 'assistant_browsing' | 'training_corpus' | 'unknown';
+  visibilityLabel: string;
+  contentFocus: string[];
+}
+
+const CRAWLER_METADATA: CrawlerMeta[] = [
+  { name: 'GPTBot', displayName: 'GPTBot', operator: 'OpenAI', description: 'OpenAI\'s web crawler that indexes content for ChatGPT and other OpenAI products. Used to gather training data and keep ChatGPT\'s knowledge current.', visibilityValue: 'search_citation', visibilityLabel: 'Search & Citation', contentFocus: ['structured_data', 'clear_content', 'product_pages'] },
+  { name: 'ChatGPT-User', displayName: 'ChatGPT User', operator: 'OpenAI', description: 'Fetches pages in real-time when ChatGPT users browse the web or ask questions that trigger live web access. This is direct assistant browsing.', visibilityValue: 'assistant_browsing', visibilityLabel: 'Assistant Browsing', contentFocus: ['fast_loading', 'clear_content', 'pricing', 'product_pages'] },
+  { name: 'Google-Extended', displayName: 'Google AI', operator: 'Google', description: 'Google\'s crawler for AI products including Gemini. Controls whether your content is used by Google\'s generative AI features in search and Gemini.', visibilityValue: 'search_citation', visibilityLabel: 'Search & Citation', contentFocus: ['structured_data', 'schema', 'open_graph', 'clear_content'] },
+  { name: 'ClaudeBot', displayName: 'ClaudeBot', operator: 'Anthropic', description: 'Anthropic\'s web crawler used to help Claude access and reference web content. Supports Claude\'s ability to provide current, accurate information.', visibilityValue: 'search_citation', visibilityLabel: 'Search & Citation', contentFocus: ['clear_content', 'structured_data', 'trust_signals'] },
+  { name: 'PerplexityBot', displayName: 'PerplexityBot', operator: 'Perplexity AI', description: 'Perplexity\'s crawler for its AI-powered search engine. Perplexity directly cites sources in answers, making it a high-value citation source.', visibilityValue: 'search_citation', visibilityLabel: 'Search & Citation', contentFocus: ['clear_content', 'pricing', 'product_pages', 'comparison'] },
+  { name: 'Anthropic', displayName: 'Anthropic', operator: 'Anthropic', description: 'Anthropic\'s general crawler for building and improving Claude\'s capabilities. Separate from ClaudeBot\'s real-time browsing.', visibilityValue: 'training_corpus', visibilityLabel: 'Training & Corpus', contentFocus: ['clear_content', 'trust_signals', 'structured_data'] },
+  { name: 'CCBot', displayName: 'CCBot', operator: 'Common Crawl', description: 'Common Crawl\'s web crawler that builds a free, open web archive used by many AI companies for training data. Widely used as a foundational data source.', visibilityValue: 'training_corpus', visibilityLabel: 'Training & Corpus', contentFocus: ['clear_content', 'html_structure'] },
+  { name: 'Bytespider', displayName: 'Bytespider', operator: 'ByteDance', description: 'ByteDance\'s web crawler, used for various products including search and AI features. Provides visibility in ByteDance\'s ecosystem.', visibilityValue: 'unknown', visibilityLabel: 'Unknown', contentFocus: ['clear_content'] },
+  { name: 'Amazonbot', displayName: 'Amazonbot', operator: 'Amazon', description: 'Amazon\'s crawler used for Alexa AI and Amazon\'s product recommendation systems. Relevant if your product integrates with or competes in Amazon\'s ecosystem.', visibilityValue: 'assistant_browsing', visibilityLabel: 'Assistant Browsing', contentFocus: ['product_pages', 'pricing', 'clear_content'] },
+  { name: 'Meta-ExternalAgent', displayName: 'Meta AI', operator: 'Meta', description: 'Meta\'s crawler for AI products including Meta AI assistant across Facebook, Instagram, and WhatsApp. Expanding presence in AI search.', visibilityValue: 'search_citation', visibilityLabel: 'Search & Citation', contentFocus: ['open_graph', 'clear_content', 'social_signals'] },
+];
+
+function buildCrawlerStatuses(robotsTxt: RobotsTxtResult | null, pages: PageScanResult[]): CrawlerStatus[] {
+  // Parse robots.txt for access rules
   let wildcardBlocked = false;
+  const lines = robotsTxt?.content ? robotsTxt.content.split('\n').map(l => l.trim()) : [];
   let inWildcard = false;
   for (const line of lines) {
     if (line.toLowerCase().startsWith('user-agent:')) { inWildcard = line.substring(11).trim() === '*'; }
     else if (inWildcard && (line.toLowerCase() === 'disallow: /' || line.toLowerCase() === 'disallow: *')) { wildcardBlocked = true; }
   }
-  return crawlers.map(crawler => {
-    let agentActive = false, agentBlocked = false, agentAllowed = false;
-    for (const line of lines) {
-      if (line.toLowerCase().startsWith('user-agent:')) { agentActive = line.substring(11).trim().toLowerCase() === crawler.name.toLowerCase(); }
-      else if (agentActive) {
-        if (line.toLowerCase() === 'disallow: /' || line.toLowerCase() === 'disallow: *') agentBlocked = true;
-        else if (line.toLowerCase() === 'allow: /') agentAllowed = true;
+
+  // Compute site-level readiness signals
+  const homepage = pages.find(p => p.pageType === 'homepage');
+  const totalPages = pages.length || 1;
+  const pagesWithSchema = pages.filter(p => p.hasSchema).length;
+  const pagesWithOG = pages.filter(p => p.hasOpenGraph).length;
+  const pagesWithMeta = pages.filter(p => p.metaDescription).length;
+  const pagesWithTitle = pages.filter(p => p.title).length;
+  const avgLoadTime = pages.reduce((s, p) => s + (p.loadTimeMs || 0), 0) / totalPages;
+  const hasStructuredData = pagesWithSchema > 0;
+  const hasPricingPage = pages.some(p => p.pageType === 'pricing');
+  const hasProductPage = pages.some(p => p.pageType === 'product');
+  const hasComparisonContent = pages.some(p => p.pageType === 'comparison' || p.hasComparisonContent);
+  const hasSocialLinks = homepage?.hasSocialLinks || false;
+  const hasCustomerLogos = homepage?.hasCustomerLogos || false;
+  const hasReviewLinks = pages.some(p => p.hasReviewLinks);
+  const hasClearHomepage = homepage?.h1Text ? homepage.h1Text.length > 15 && !homepage.h1Text.toLowerCase().includes('welcome') : false;
+  const jsHeavyPages = pages.filter(p => p.issues.some(i => i.includes('JavaScript'))).length;
+
+  return CRAWLER_METADATA.map(meta => {
+    // Determine access status
+    let status: 'allowed' | 'blocked' | 'no_rule' = 'no_rule';
+    let statusBasis: 'explicit_rule' | 'wildcard_rule' | 'default' = 'default';
+    let statusDetail = 'No specific rule found — allowed by default';
+
+    if (robotsTxt?.exists && robotsTxt.content) {
+      let agentActive = false, agentBlocked = false, agentAllowed = false;
+      for (const line of lines) {
+        if (line.toLowerCase().startsWith('user-agent:')) { agentActive = line.substring(11).trim().toLowerCase() === meta.name.toLowerCase(); }
+        else if (agentActive) {
+          if (line.toLowerCase() === 'disallow: /' || line.toLowerCase() === 'disallow: *') agentBlocked = true;
+          else if (line.toLowerCase() === 'allow: /') agentAllowed = true;
+        }
+      }
+      if (agentBlocked) {
+        status = 'blocked'; statusBasis = 'explicit_rule';
+        statusDetail = `Blocked via robots.txt rule: User-agent: ${meta.name} / Disallow: /`;
+      } else if (agentAllowed) {
+        status = 'allowed'; statusBasis = 'explicit_rule';
+        statusDetail = `Explicitly allowed via robots.txt rule: User-agent: ${meta.name} / Allow: /`;
+      } else if (wildcardBlocked) {
+        status = 'blocked'; statusBasis = 'wildcard_rule';
+        statusDetail = 'Blocked via wildcard rule: User-agent: * / Disallow: /';
+      } else {
+        status = 'no_rule'; statusBasis = 'default';
+        statusDetail = 'No specific rule — allowed by default under robots.txt convention';
+      }
+    } else if (!robotsTxt?.exists) {
+      statusDetail = 'No robots.txt found — all crawlers allowed by default';
+    }
+
+    // Compute readiness score for this source
+    const barriers: string[] = [];
+    const recommendations: string[] = [];
+    let readiness = 100;
+
+    // Universal barriers
+    if (status === 'blocked') { readiness -= 40; barriers.push('Crawler is blocked by robots.txt'); recommendations.push(`Allow ${meta.name} in your robots.txt to enable access`); }
+    if (pagesWithTitle < totalPages) { readiness -= 5; barriers.push('Some pages missing title tags'); }
+    if (pagesWithMeta < totalPages * 0.5) { readiness -= 5; barriers.push('Many pages missing meta descriptions'); }
+    if (jsHeavyPages > 0) { readiness -= 8; barriers.push('JS-heavy pages may not render for crawlers'); recommendations.push('Ensure key content is in initial HTML, not loaded via JavaScript'); }
+    if (avgLoadTime > 3000) { readiness -= 5; barriers.push('Slow page load times may cause timeouts'); }
+
+    // Source-specific barriers based on content focus
+    for (const focus of meta.contentFocus) {
+      switch (focus) {
+        case 'structured_data':
+          if (!hasStructuredData) { readiness -= 8; if (!barriers.includes('No structured data (JSON-LD) found')) { barriers.push('No structured data (JSON-LD) found'); recommendations.push('Add Organization schema to homepage and Product schema to product pages'); } }
+          break;
+        case 'schema':
+          if (pagesWithSchema < totalPages * 0.3) { readiness -= 5; if (!barriers.includes('Limited schema coverage')) { barriers.push('Limited schema coverage across pages'); } }
+          break;
+        case 'open_graph':
+          if (pagesWithOG < totalPages * 0.5) { readiness -= 6; if (!barriers.includes('Missing Open Graph tags')) { barriers.push('Missing Open Graph tags on most pages'); recommendations.push('Add og:title, og:description, og:image to all key pages'); } }
+          break;
+        case 'clear_content':
+          if (!hasClearHomepage) { readiness -= 5; if (!barriers.includes('Homepage heading may be vague')) { barriers.push('Homepage heading may not clearly describe your product'); recommendations.push('Rewrite your H1 to clearly state what you do and who it\'s for'); } }
+          break;
+        case 'pricing':
+          if (!hasPricingPage) { readiness -= 6; if (!barriers.includes('No pricing page')) { barriers.push('No pricing page discoverable'); recommendations.push('Create a dedicated pricing page with clear plans and pricing'); } }
+          break;
+        case 'product_pages':
+          if (!hasProductPage) { readiness -= 5; if (!barriers.includes('No product pages')) { barriers.push('No dedicated product/features pages'); recommendations.push('Create product pages explaining what you do and key features'); } }
+          break;
+        case 'comparison':
+          if (!hasComparisonContent) { readiness -= 4; if (!barriers.includes('No comparison content')) { barriers.push('No comparison or vs. content found'); recommendations.push('Create comparison pages for top competitors'); } }
+          break;
+        case 'trust_signals':
+          if (!hasCustomerLogos && !hasReviewLinks) { readiness -= 5; if (!barriers.includes('Weak trust signals')) { barriers.push('Weak trust signals — no customer logos or review links'); recommendations.push('Add customer logos and link to review platforms (G2, Capterra)'); } }
+          break;
+        case 'social_signals':
+          if (!hasSocialLinks) { readiness -= 4; if (!barriers.includes('No social media links')) { barriers.push('No social media profiles linked'); recommendations.push('Link your social profiles in the footer'); } }
+          break;
+        case 'fast_loading':
+          if (avgLoadTime > 2000) { readiness -= 5; if (!barriers.includes('Pages may be slow for real-time browsing')) { barriers.push('Pages may be slow for real-time assistant browsing'); recommendations.push('Optimize page load speed to under 2 seconds for key pages'); } }
+          break;
+        case 'html_structure':
+          const badHeadings = pages.filter(p => !p.headingHierarchyValid).length;
+          if (badHeadings > totalPages * 0.3) { readiness -= 4; if (!barriers.includes('Heading hierarchy issues')) { barriers.push('Heading hierarchy issues on many pages'); } }
+          break;
       }
     }
-    if (agentBlocked) return { ...crawler, status: 'blocked' as const };
-    if (agentAllowed) return { ...crawler, status: 'allowed' as const };
-    if (wildcardBlocked) return { ...crawler, status: 'blocked' as const };
-    return { ...crawler, status: 'no_rule' as const };
+
+    // Floor the readiness score
+    readiness = Math.max(status === 'blocked' ? 10 : 25, Math.min(100, readiness));
+
+    return {
+      name: meta.name,
+      displayName: meta.displayName,
+      operator: meta.operator,
+      status,
+      statusBasis,
+      statusDetail,
+      visibilityValue: meta.visibilityValue,
+      visibilityLabel: meta.visibilityLabel,
+      description: meta.description,
+      readinessScore: readiness,
+      barriers: barriers.slice(0, 6),
+      recommendations: recommendations.slice(0, 4),
+      confidenceLevel: 'observed' as const,
+    };
   });
 }
 
