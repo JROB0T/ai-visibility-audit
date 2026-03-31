@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import ScoreRing, { ScoreBar } from '@/components/ScoreRing';
 import SeverityBadge, { EffortBadge } from '@/components/SeverityBadge';
-import { Lock, ArrowRight, ArrowLeft, CheckCircle, XCircle, ExternalLink, FileText, AlertTriangle, RefreshCw, ChevronDown, ChevronRight, Filter, Shield, Code, Eye, Bot, Copy, Check, Globe, Minus, LayoutGrid, Wrench, Zap, MonitorSmartphone } from 'lucide-react';
+import { Lock, ArrowRight, ArrowLeft, CheckCircle, XCircle, ExternalLink, FileText, AlertTriangle, RefreshCw, ChevronDown, ChevronRight, Filter, Shield, Code, Eye, Bot, Copy, Check, Globe, Minus, LayoutGrid, Wrench, Zap, MonitorSmartphone, X, Download } from 'lucide-react';
 
 // ============================================================
 // Types
@@ -158,7 +158,147 @@ function generateAiSummary(audit: AuditData['audit'], crawlerStatuses: CrawlerSt
   // Issues
   if (highCount > 0) parts.push(`There are ${highCount} high-priority issues that should be addressed first to significantly improve how AI systems perceive and recommend ${domain}.`);
 
+  // Next steps
+  const steps: string[] = [];
+  if (highCount > 0) steps.push('Review the Diagnostics tab to see all findings by category');
+  if (missing.length > 0) steps.push('Click any missing page above to see what to create and example code');
+  steps.push('Use the Action Plan tab for a prioritized list of fixes with copy-paste code');
+  if (blocked.length > 0) steps.push('Check AI Source Visibility below — some AI systems are blocked and need robots.txt changes');
+  steps.push('Export this report to share with your team using the download button');
+  parts.push('Next steps: ' + steps.join('. ') + '.');
+
   return parts.join('\n\n');
+}
+
+// ============================================================
+// Key page detail data for side panel
+// ============================================================
+function getKeyPageDetail(type: string, domain: string): { title: string; whyItMatters: string; whatToInclude: string[]; exampleCode: string } {
+  const name = domain.replace(/\.(com|io|co|org|net)$/, '').replace(/^www\./, '');
+  const cap = name.charAt(0).toUpperCase() + name.slice(1);
+  const url = `https://${domain}`;
+
+  const details: Record<string, { title: string; whyItMatters: string; whatToInclude: string[]; exampleCode: string }> = {
+    homepage: { title: 'Homepage', whyItMatters: 'The homepage is the first page AI crawlers visit. It must clearly state what your product does, who it\'s for, and how to get started.', whatToInclude: ['Clear H1 describing your product', 'Meta description with value proposition', 'Organization schema (JSON-LD)', 'Open Graph meta tags', 'Primary CTA button', 'Navigation to pricing, product, contact', 'Customer logos or trust signals'], exampleCode: `<title>${cap} — [What You Do] for [Who You Serve]</title>\n<meta name="description" content="${cap} helps [audience] [solve problem]. Start free today.">\n<meta property="og:title" content="${cap} — [What You Do]">\n<meta property="og:description" content="[Value proposition in one sentence]">\n<meta property="og:image" content="${url}/og-image.png">\n<script type="application/ld+json">\n{"@context":"https://schema.org","@type":"Organization","name":"${cap}","url":"${url}","logo":"${url}/logo.png"}\n</script>` },
+    pricing: { title: 'Pricing Page', whyItMatters: 'AI systems are frequently asked "how much does X cost?" Without a pricing page, AI cannot answer this question and may not recommend your product.', whatToInclude: ['Clear plan names and prices in HTML text', 'Feature comparison between plans', 'Offer/PriceSpecification schema', 'Free tier or trial option clearly visible', 'FAQ section about billing', 'CTA for each plan'], exampleCode: `<!-- ${url}/pricing -->\n<title>Pricing — ${cap} | Plans Starting at $X/mo</title>\n<meta name="description" content="${cap} pricing: Free, Pro ($X/mo), Enterprise. Compare features.">\n<h1>${cap} Pricing</h1>\n<script type="application/ld+json">\n{"@context":"https://schema.org","@type":"WebPage","name":"${cap} Pricing","offers":[{"@type":"Offer","name":"Pro","price":"X","priceCurrency":"USD"}]}\n</script>` },
+    product: { title: 'Product / Features Page', whyItMatters: 'Product pages tell AI what you actually do. Without them, AI has very limited ability to describe or recommend your product for specific use cases.', whatToInclude: ['Clear explanation of what the product does', 'Specific feature list (not vague marketing)', 'Who it\'s for (target audience)', 'What problem it solves', 'SoftwareApplication schema', 'Screenshots or demo', 'CTA to sign up or try'], exampleCode: `<!-- ${url}/product -->\n<title>${cap} Features — [Key Benefit] for [Audience]</title>\n<meta name="description" content="${cap} helps [audience] [benefit]. Features: [feature 1], [feature 2], [feature 3].">\n<h1>${cap}: [What it does in one line]</h1>\n<script type="application/ld+json">\n{"@context":"https://schema.org","@type":"SoftwareApplication","name":"${cap}","applicationCategory":"BusinessApplication","description":"[What it does]"}\n</script>` },
+    contact: { title: 'Contact Page', whyItMatters: 'When AI recommends a product, users often ask "how do I get in touch?" A contact page provides the conversion path that makes your product actionable.', whatToInclude: ['Contact form with name, email, message', 'Business email address', 'Phone number if applicable', 'Physical address for trust', 'Support hours', 'Link to demo booking if available'], exampleCode: `<!-- ${url}/contact -->\n<title>Contact Us — ${cap}</title>\n<meta name="description" content="Get in touch with ${cap}. Request a demo, ask questions, or reach our team.">\n<h1>Contact ${cap}</h1>` },
+    demo: { title: 'Demo / Trial Page', whyItMatters: 'A demo page gives AI a clear "next step" to recommend. When users ask "how do I try X?", AI needs a page to point them to.', whatToInclude: ['Clear headline about trying the product', 'Demo booking form or free trial signup', 'What to expect from the demo/trial', 'No credit card required messaging', 'Social proof near the CTA'], exampleCode: `<!-- ${url}/demo -->\n<title>Book a Demo — ${cap}</title>\n<meta name="description" content="See ${cap} in action. Schedule a free 15-minute demo with our team.">\n<h1>See ${cap} in Action</h1>` },
+    docs: { title: 'Documentation', whyItMatters: 'Documentation signals product maturity and helps AI answer technical questions about your product. It\'s especially important for developer-focused tools.', whatToInclude: ['Getting started guide', 'API reference if applicable', 'Searchable content', 'Clear navigation structure', 'Code examples', 'Breadcrumb navigation'], exampleCode: `<!-- ${url}/docs -->\n<title>${cap} Documentation — Getting Started</title>\n<meta name="description" content="Learn how to use ${cap}. API reference, guides, and examples.">\n<h1>${cap} Documentation</h1>` },
+    blog: { title: 'Blog / Content', whyItMatters: 'Blog content builds AI trust (E-E-A-T signals) and gives AI systems material to reference about your expertise. It helps AI understand your domain authority.', whatToInclude: ['Regular publishing cadence', 'Author bylines with credentials', 'Publish dates on every post', 'Article schema (JSON-LD)', 'Internal links to product/pricing', 'Topics demonstrating domain expertise'], exampleCode: `<!-- Blog post template -->\n<title>[Post Title] — ${cap} Blog</title>\n<meta name="author" content="[Author Name]">\n<meta property="article:published_time" content="2025-01-15">\n<script type="application/ld+json">\n{"@context":"https://schema.org","@type":"Article","headline":"[Title]","author":{"@type":"Person","name":"[Author]"},"datePublished":"2025-01-15"}\n</script>` },
+    about: { title: 'About / Team', whyItMatters: 'An about page verifies your legitimacy to AI systems. It helps AI confirm you\'re a real company with real people, which increases trust and recommendation confidence.', whatToInclude: ['Company story and mission', 'Team members with names and roles', 'Founded date', 'Company size or stage', 'Office location', 'Photos of real team members'], exampleCode: `<!-- ${url}/about -->\n<title>About ${cap} — Our Mission & Team</title>\n<meta name="description" content="Learn about ${cap}, our mission, and the team building [product description].">\n<h1>About ${cap}</h1>` },
+    security: { title: 'Security / Compliance', whyItMatters: 'For B2B products, security information is critical. When AI recommends tools to enterprise buyers, compliance certifications are often a deciding factor.', whatToInclude: ['Compliance certifications (SOC2, GDPR, HIPAA)', 'Data handling practices', 'Security architecture overview', 'Encryption details', 'Privacy controls', 'Contact for security inquiries'], exampleCode: `<!-- ${url}/security -->\n<title>Security & Compliance — ${cap}</title>\n<meta name="description" content="${cap} security: SOC 2 Type II certified, GDPR compliant. Enterprise-grade data protection.">\n<h1>Security at ${cap}</h1>` },
+    privacy: { title: 'Privacy Policy', whyItMatters: 'A privacy policy is a baseline trust signal. Its absence signals to AI systems that the business may not be established or trustworthy.', whatToInclude: ['What data you collect', 'How data is used', 'Data retention policies', 'User rights (access, deletion)', 'Cookie policy', 'Contact for privacy inquiries', 'Last updated date'], exampleCode: `<!-- ${url}/privacy -->\n<title>Privacy Policy — ${cap}</title>\n<meta name="description" content="${cap} privacy policy. How we collect, use, and protect your data.">\n<h1>Privacy Policy</h1>\n<p>Last updated: ${new Date().toLocaleDateString()}</p>` },
+    comparison: { title: 'Comparison Pages', whyItMatters: 'When users ask AI "X vs Y" or "alternatives to Z", comparison pages make you part of that conversation. Without them, competitors with comparison pages win those queries.', whatToInclude: ['Feature-by-feature comparison table', 'Honest pros/cons', 'Pricing comparison', 'Use case fit analysis', 'Clear CTA for your product'], exampleCode: `<!-- ${url}/compare/competitor -->\n<title>${cap} vs [Competitor] — Feature Comparison</title>\n<meta name="description" content="Compare ${cap} and [Competitor]. See features, pricing, and which is right for your team.">\n<h1>${cap} vs [Competitor]</h1>` },
+    integrations: { title: 'Integrations', whyItMatters: 'AI uses integration data to recommend products that work with a user\'s existing tools. "Does X integrate with Slack?" is a common AI query.', whatToInclude: ['List of all integrations', 'Category grouping (CRM, messaging, analytics)', 'Setup instructions per integration', 'API/webhook documentation', 'Logos of integration partners'], exampleCode: `<!-- ${url}/integrations -->\n<title>${cap} Integrations — Connect Your Tools</title>\n<meta name="description" content="${cap} integrates with Slack, Salesforce, HubSpot, and 50+ other tools.">\n<h1>Integrations</h1>` },
+  };
+
+  return details[type] || { title: type, whyItMatters: 'This page type helps AI systems better understand your site.', whatToInclude: ['Clear page title and meta description', 'Relevant structured data', 'Internal links to other key pages'], exampleCode: `<title>[Page Title] — ${cap}</title>\n<meta name="description" content="[Page description]">` };
+}
+
+// ============================================================
+// Export consultant report as HTML
+// ============================================================
+function generateConsultantReport(audit: AuditData['audit'], pages: AuditData['pages'], recommendations: AuditData['recommendations'], crawlerStatuses: CrawlerStatus[], keyPagesStatus: KeyPageStatus[]): string {
+  const domain = audit.site?.domain || 'unknown';
+  const date = new Date(audit.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+  const score = audit.overall_score ?? 0;
+  const highRecs = recommendations.filter(r => r.severity === 'high');
+  const medRecs = recommendations.filter(r => r.severity === 'medium');
+  const lowRecs = recommendations.filter(r => r.severity === 'low');
+  const blocked = crawlerStatuses?.filter(c => c.status === 'blocked') || [];
+  const missing = keyPagesStatus?.filter(kp => !kp.found) || [];
+
+  return `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>AI Visibility Audit Report — ${domain}</title>
+<style>
+body{font-family:system-ui,-apple-system,sans-serif;max-width:800px;margin:0 auto;padding:40px 20px;color:#1a1a2e;line-height:1.6}
+h1{font-size:24px;border-bottom:3px solid #6366F1;padding-bottom:12px;margin-top:40px}
+h2{font-size:18px;color:#6366F1;margin-top:32px;border-bottom:1px solid #e2e8f0;padding-bottom:8px}
+h3{font-size:15px;margin-top:20px}
+.meta{color:#64748b;font-size:13px}
+.score-box{background:#f8fafc;border:2px solid #6366F1;border-radius:12px;padding:24px;text-align:center;margin:20px 0}
+.score-num{font-size:48px;font-weight:bold;color:${score >= 80 ? '#10B981' : score >= 50 ? '#F59E0B' : '#EF4444'}}
+.score-bar{display:flex;align-items:center;gap:8px;margin:4px 0}
+.score-bar-label{width:120px;font-size:13px;color:#64748b}
+.score-bar-fill{height:8px;border-radius:4px}
+.score-bar-track{flex:1;height:8px;background:#e2e8f0;border-radius:4px}
+table{width:100%;border-collapse:collapse;margin:12px 0}
+th,td{text-align:left;padding:8px 12px;border-bottom:1px solid #e2e8f0;font-size:13px}
+th{background:#f8fafc;font-weight:600;color:#64748b}
+.badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600}
+.badge-high{background:#FEE2E2;color:#DC2626}
+.badge-medium{background:#FEF3C7;color:#D97706}
+.badge-low{background:#DBEAFE;color:#2563EB}
+.badge-found{background:#ECFDF5;color:#059669}
+.badge-missing{background:#FEE2E2;color:#DC2626}
+.rec-card{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:16px;margin:8px 0}
+.rec-title{font-weight:600;font-size:14px}
+.rec-fix{font-size:13px;color:#475569;margin-top:4px}
+.footer{margin-top:40px;padding-top:20px;border-top:1px solid #e2e8f0;color:#94a3b8;font-size:12px;text-align:center}
+@media print{body{padding:20px}.score-box{break-inside:avoid}}
+</style></head><body>
+
+<div style="text-align:center;margin-bottom:32px">
+<div style="font-size:13px;color:#6366F1;font-weight:600;letter-spacing:1px;text-transform:uppercase">AI Visibility Audit Report</div>
+<h1 style="border:none;margin-top:8px;padding:0;font-size:28px">${domain}</h1>
+<p class="meta">Report generated ${date} · ${pages.length} pages scanned</p>
+</div>
+
+<h2>Executive Summary</h2>
+<div class="score-box">
+<div class="score-num">${score}/100</div>
+<p style="color:#64748b;margin:8px 0 16px">Overall AI Visibility Score</p>
+<div class="score-bar"><span class="score-bar-label">Crawlability</span><div class="score-bar-track"><div class="score-bar-fill" style="width:${audit.crawlability_score ?? 0}%;background:${(audit.crawlability_score ?? 0) >= 80 ? '#10B981' : (audit.crawlability_score ?? 0) >= 50 ? '#F59E0B' : '#EF4444'}"></div></div><span style="font-weight:600;width:30px;text-align:right">${audit.crawlability_score ?? 0}</span></div>
+<div class="score-bar"><span class="score-bar-label">Readability</span><div class="score-bar-track"><div class="score-bar-fill" style="width:${audit.machine_readability_score ?? 0}%;background:${(audit.machine_readability_score ?? 0) >= 80 ? '#10B981' : (audit.machine_readability_score ?? 0) >= 50 ? '#F59E0B' : '#EF4444'}"></div></div><span style="font-weight:600;width:30px;text-align:right">${audit.machine_readability_score ?? 0}</span></div>
+<div class="score-bar"><span class="score-bar-label">Commercial</span><div class="score-bar-track"><div class="score-bar-fill" style="width:${audit.commercial_clarity_score ?? 0}%;background:${(audit.commercial_clarity_score ?? 0) >= 80 ? '#10B981' : (audit.commercial_clarity_score ?? 0) >= 50 ? '#F59E0B' : '#EF4444'}"></div></div><span style="font-weight:600;width:30px;text-align:right">${audit.commercial_clarity_score ?? 0}</span></div>
+<div class="score-bar"><span class="score-bar-label">Trust</span><div class="score-bar-track"><div class="score-bar-fill" style="width:${audit.trust_clarity_score ?? 0}%;background:${(audit.trust_clarity_score ?? 0) >= 80 ? '#10B981' : (audit.trust_clarity_score ?? 0) >= 50 ? '#F59E0B' : '#EF4444'}"></div></div><span style="font-weight:600;width:30px;text-align:right">${audit.trust_clarity_score ?? 0}</span></div>
+</div>
+
+<p>${score >= 80 ? 'Your site has strong AI visibility.' : score >= 60 ? 'Your site has moderate AI visibility with clear areas for improvement.' : score >= 40 ? 'Your site has limited AI visibility. AI systems may struggle to accurately describe or recommend your product.' : 'Your site has poor AI visibility. Immediate action is needed to ensure AI systems can find and reference your content.'} We identified ${highRecs.length} high-priority, ${medRecs.length} medium-priority, and ${lowRecs.length} low-priority findings across ${pages.length} scanned pages.</p>
+
+<h2>Methodology</h2>
+<p>This audit scanned ${pages.length} pages on ${domain} using 100+ automated checks across four categories: Crawlability (can AI systems access your site?), Machine Readability (can they understand it?), Commercial Page Clarity (can they help someone buy?), and Trust & Source Clarity (can they trust and recommend you?). Each page was analyzed for technical SEO signals, structured data, content quality, and commercial clarity.</p>
+
+<h2>Key Pages Status</h2>
+<table>
+<tr><th>Page Type</th><th>Status</th></tr>
+${keyPagesStatus?.map(kp => `<tr><td>${kp.label}</td><td><span class="badge badge-${kp.found ? 'found' : 'missing'}">${kp.found ? 'Found' : 'Missing'}</span></td></tr>`).join('\n') || ''}
+</table>
+${missing.length > 0 ? `<p><strong>Missing pages:</strong> ${missing.map(m => m.label).join(', ')}. These gaps mean AI cannot answer common questions about your product's pricing, contact information, or key features.</p>` : '<p>All key page types were found.</p>'}
+
+<h2>AI Crawler Access</h2>
+${blocked.length > 0 ? `<p><strong>${blocked.length} AI system(s) are blocked:</strong> ${blocked.map(b => b.displayName + ' (' + b.operator + ')').join(', ')}. These systems cannot access your site content at all.</p>` : '<p>No AI crawlers are blocked. All major AI systems can access your site.</p>'}
+
+<h2>Findings & Recommendations</h2>
+<h3>High Priority (${highRecs.length})</h3>
+${highRecs.map(r => `<div class="rec-card"><div class="rec-title"><span class="badge badge-high">HIGH</span> ${r.title}</div><div class="rec-fix"><strong>Why:</strong> ${r.why_it_matters}</div><div class="rec-fix"><strong>Fix:</strong> ${r.recommended_fix}</div></div>`).join('\n') || '<p>No high-priority issues found.</p>'}
+
+<h3>Medium Priority (${medRecs.length})</h3>
+${medRecs.map(r => `<div class="rec-card"><div class="rec-title"><span class="badge badge-medium">MEDIUM</span> ${r.title}</div><div class="rec-fix"><strong>Why:</strong> ${r.why_it_matters}</div><div class="rec-fix"><strong>Fix:</strong> ${r.recommended_fix}</div></div>`).join('\n') || '<p>No medium-priority issues found.</p>'}
+
+<h3>Low Priority (${lowRecs.length})</h3>
+${lowRecs.map(r => `<div class="rec-card"><div class="rec-title"><span class="badge badge-low">LOW</span> ${r.title}</div><div class="rec-fix"><strong>Fix:</strong> ${r.recommended_fix}</div></div>`).join('\n') || '<p>No low-priority issues found.</p>'}
+
+<h2>Pages Analyzed</h2>
+<table>
+<tr><th>Page</th><th>Type</th><th>Schema</th><th>Issues</th></tr>
+${pages.map(p => { let path = p.url; try { path = new URL(p.url).pathname; } catch {} return `<tr><td>${p.title || path}</td><td>${p.page_type}</td><td>${p.has_schema ? '✓' : '—'}</td><td>${p.issues.length}</td></tr>`; }).join('\n')}
+</table>
+
+<h2>Next Steps</h2>
+<ol>
+<li><strong>Address high-priority issues first</strong> — these have the largest impact on whether AI can find and recommend your product.</li>
+<li><strong>Create missing key pages</strong> — ${missing.length > 0 ? missing.map(m => m.label).join(', ') : 'all key pages are present'}.</li>
+<li><strong>Add structured data</strong> — JSON-LD schema on your homepage, product pages, and blog posts.</li>
+<li><strong>Re-scan in 2-4 weeks</strong> — after implementing fixes, run another audit to measure progress.</li>
+</ol>
+
+<div class="footer">
+<p>AI Visibility Audit — aivisibilityaudit.com</p>
+<p>This report was generated automatically. Recommendations are based on automated scanning and should be reviewed by your development team before implementation.</p>
+</div>
+</body></html>`;
 }
 
 // ============================================================
@@ -189,6 +329,19 @@ export default function AuditResultPage() {
   const [expandedPages, setExpandedPages] = useState<Set<string>>(new Set());
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   const [expandedCrawlers, setExpandedCrawlers] = useState<Set<string>>(new Set());
+  const [selectedKeyPage, setSelectedKeyPage] = useState<KeyPageStatus | null>(null);
+
+  function handleExportReport() {
+    if (!data) return;
+    const html = generateConsultantReport(data.audit, data.pages, data.recommendations, data.crawlerStatuses || [], data.keyPagesStatus || []);
+    const blob = new Blob([html], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `ai-visibility-report-${data.audit.site?.domain}-${new Date(data.audit.created_at).toISOString().split('T')[0]}.html`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
   const [activePreviewUrl, setActivePreviewUrl] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<ReportTab>('overview');
 
@@ -333,7 +486,10 @@ export default function AuditResultPage() {
           <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>AI Visibility Report</h1>
           <p className="mt-1" style={{ color: 'var(--text-tertiary)' }}>{audit.site?.domain} · {new Date(audit.created_at).toLocaleDateString()}{audit.pages_scanned > 0 && ` · ${audit.pages_scanned} pages`}</p>
         </div>
-        <a href="/" className="btn-secondary inline-flex items-center gap-2 px-4 py-2 text-sm"><RefreshCw className="w-4 h-4" />New Audit</a>
+        <div className="flex items-center gap-2">
+          {isAuthenticated && <button onClick={handleExportReport} className="btn-secondary inline-flex items-center gap-2 px-4 py-2 text-sm"><Download className="w-4 h-4" />Export Report</button>}
+          <a href="/" className="btn-secondary inline-flex items-center gap-2 px-4 py-2 text-sm"><RefreshCw className="w-4 h-4" />New Audit</a>
+        </div>
       </div>
 
       {/* TAB NAVIGATION */}
@@ -397,20 +553,83 @@ export default function AuditResultPage() {
             <Globe className="w-5 h-5" style={{ color: '#6366F1' }} />
             <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>Key Pages Status</h2>
           </div>
-          <p className="text-sm mb-4" style={{ color: 'var(--text-tertiary)' }}>Can AI find the pages that matter most for discovery, trust, and purchase decisions?</p>
+          <p className="text-sm mb-4" style={{ color: 'var(--text-tertiary)' }}>Can AI find the pages that matter most? Click any missing page for details and recommended code.</p>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {keyPagesStatus.map((kp) => (
-              <div key={kp.type} className="rounded-lg p-3 border" style={{ borderColor: kp.found ? 'rgba(16,185,129,0.2)' : 'rgba(239,68,68,0.2)', background: kp.found ? 'rgba(16,185,129,0.05)' : 'rgba(239,68,68,0.05)' }}>
+              <button key={kp.type} onClick={() => setSelectedKeyPage(kp)}
+                className="rounded-lg p-3 border text-left transition-all hover:shadow-md" style={{ borderColor: kp.found ? 'rgba(16,185,129,0.2)' : 'rgba(239,68,68,0.2)', background: kp.found ? 'rgba(16,185,129,0.05)' : 'rgba(239,68,68,0.05)', cursor: 'pointer' }}>
                 <p className="text-xs font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>{kp.label}</p>
                 {kp.found ? (
                   <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-500"><CheckCircle className="w-3.5 h-3.5" />Found</span>
                 ) : (
                   <span className="inline-flex items-center gap-1 text-xs font-semibold text-red-500"><XCircle className="w-3.5 h-3.5" />Missing</span>
                 )}
-              </div>
+              </button>
             ))}
           </div>
         </div>
+      )}
+
+      {/* KEY PAGE DETAIL SIDE PANEL */}
+      {selectedKeyPage && (
+        <>
+          <div className="fixed inset-0 z-40" style={{ background: 'rgba(0,0,0,0.4)' }} onClick={() => setSelectedKeyPage(null)} />
+          <div className="fixed top-0 right-0 bottom-0 z-50 w-full sm:w-[480px] overflow-y-auto" style={{ background: 'var(--surface)', borderLeft: '1px solid var(--border)' }}>
+            {(() => {
+              const detail = getKeyPageDetail(selectedKeyPage.type, audit.site?.domain || 'example.com');
+              return (
+                <div className="p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>{detail.title}</h3>
+                    <button onClick={() => setSelectedKeyPage(null)} className="p-1.5 rounded-lg transition-colors" style={{ color: 'var(--text-tertiary)', background: 'var(--bg-tertiary)' }}><X className="w-4 h-4" /></button>
+                  </div>
+                  <div className="flex items-center gap-2 mb-4">
+                    {selectedKeyPage.found ? (
+                      <span className="inline-flex items-center gap-1 text-sm font-semibold text-emerald-500 px-2 py-1 rounded" style={{ background: 'rgba(16,185,129,0.1)' }}><CheckCircle className="w-4 h-4" />Found{selectedKeyPage.url && ` — ${new URL(selectedKeyPage.url).pathname}`}</span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 text-sm font-semibold text-red-500 px-2 py-1 rounded" style={{ background: 'rgba(239,68,68,0.1)' }}><XCircle className="w-4 h-4" />Not Found</span>
+                    )}
+                  </div>
+
+                  <div className="rounded-lg p-4 mb-4 border" style={{ borderColor: 'rgba(245,158,11,0.2)', background: 'rgba(245,158,11,0.05)' }}>
+                    <p className="text-xs font-semibold mb-1" style={{ color: '#F59E0B' }}>Why This Page Matters for AI</p>
+                    <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>{detail.whyItMatters}</p>
+                  </div>
+
+                  <div className="mb-4">
+                    <p className="text-xs font-semibold mb-2" style={{ color: 'var(--text-primary)' }}>What This Page Should Include</p>
+                    <div className="space-y-1.5">
+                      {detail.whatToInclude.map((item, i) => (
+                        <div key={i} className="flex items-start gap-2">
+                          <CheckCircle className="w-3.5 h-3.5 mt-0.5 shrink-0" style={{ color: '#6366F1' }} />
+                          <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{item}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>Recommended Code</p>
+                      <CopyButton text={detail.exampleCode} />
+                    </div>
+                    <div className="rounded-lg p-3 overflow-x-auto border" style={{ background: '#0F172A', borderColor: '#1E293B' }}>
+                      <pre className="text-xs leading-relaxed whitespace-pre-wrap" style={{ color: '#E2E8F0', fontFamily: 'var(--font-mono)' }}>{detail.exampleCode}</pre>
+                    </div>
+                  </div>
+
+                  {selectedKeyPage.found && selectedKeyPage.url && (
+                    <div className="mt-4">
+                      <a href={selectedKeyPage.url} target="_blank" rel="noopener" className="text-sm inline-flex items-center gap-1" style={{ color: '#6366F1' }}>
+                        View page <ExternalLink className="w-3.5 h-3.5" />
+                      </a>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+          </div>
+        </>
       )}
 
       {/* 5. AI SOURCE VISIBILITY */}
