@@ -52,7 +52,7 @@ interface AuditData {
 
 type ViewMode = 'priority' | 'page' | 'category';
 type SeverityFilter = 'all' | 'high' | 'medium' | 'low';
-type ReportTab = 'overview' | 'diagnostics' | 'action-plan' | 'ai-sees' | 'pages';
+type ReportTab = 'overview' | 'diagnostics' | 'action-plan' | 'ai-perception' | 'pages';
 
 const FREE_RECOMMENDATION_LIMIT = 3;
 
@@ -342,13 +342,142 @@ export default function AuditResultPage() {
     a.click();
     URL.revokeObjectURL(url);
   }
-  const [activePreviewUrl, setActivePreviewUrl] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<ReportTab>('overview');
+  const [perceptionQuestions, setPerceptionQuestions] = useState<Array<{ question: string; intent: string; what_ai_needs: string; status: 'pass' | 'partial' | 'fail'; assessment: string; fix: string; codeSnippet: string | null }> | null>(null);
+  const [perceptionLoading, setPerceptionLoading] = useState(false);
 
   function switchTab(tab: ReportTab) {
     setActiveTab(tab);
     if (tab === 'diagnostics') setViewMode('category');
     else if (tab === 'action-plan') setViewMode('priority');
+    else if (tab === 'ai-perception' && !perceptionQuestions && !perceptionLoading) loadPerceptionQuestions();
+  }
+
+  async function loadPerceptionQuestions() {
+    if (!data || perceptionLoading) return;
+    setPerceptionLoading(true);
+
+    const { audit, pages } = data;
+    const domain = audit.site?.domain || 'example.com';
+    const name = domain.replace(/\.(com|io|co|org|net)$/, '').replace(/^www\./, '');
+    const cap = name.charAt(0).toUpperCase() + name.slice(1);
+    const homepage = pages.find((p: { page_type: string }) => p.page_type === 'homepage');
+    const h1 = homepage?.h1_text || null;
+    const metaDesc = homepage?.meta_description || null;
+    const pageTypes = Array.from(new Set(pages.map((p: { page_type: string }) => p.page_type)));
+    const hasSchema = pages.some((p: { has_schema: boolean }) => p.has_schema);
+    const hasPricingPage = pageTypes.includes('pricing');
+    const hasProductPage = pageTypes.includes('product');
+    const hasContactPage = pageTypes.includes('contact') || pageTypes.includes('demo');
+    const hasBlog = pageTypes.includes('blog') || pageTypes.includes('resource') || pageTypes.includes('docs');
+    const hasAbout = pageTypes.includes('about');
+    const hasComparison = pageTypes.includes('comparison');
+    const hasSecurity = pageTypes.includes('security');
+    // Build core questions from scan data
+    const coreQuestions: Array<{ question: string; intent: string; what_ai_needs: string; status: 'pass' | 'partial' | 'fail'; assessment: string; fix: string; codeSnippet: string | null }> = [];
+
+    // Q1: What does this company do?
+    const hasGoodH1 = h1 && h1.length > 15 && !h1.toLowerCase().includes('welcome') && !h1.toLowerCase().includes('hello');
+    const hasGoodMeta = metaDesc && metaDesc.length > 50;
+    coreQuestions.push({
+      question: `"What is ${cap} and what do they do?"`,
+      intent: 'discovery',
+      what_ai_needs: 'Clear homepage heading, meta description, and first paragraph explaining the product',
+      status: hasGoodH1 && hasGoodMeta && hasProductPage ? 'pass' : hasGoodH1 || hasGoodMeta ? 'partial' : 'fail',
+      assessment: hasGoodH1 && hasGoodMeta
+        ? `AI would likely describe you as: "${h1}". Your meta description provides additional context: "${(metaDesc || '').substring(0, 100)}…"${hasProductPage ? ' Product pages give AI more detail to work with.' : ''}`
+        : hasGoodH1
+        ? `AI would see your heading "${h1}" but ${!hasGoodMeta ? 'your meta description is missing or too short to give full context' : ''}. ${!hasProductPage ? 'No product page found for deeper detail.' : ''}`
+        : 'AI would struggle to describe your product. Your homepage heading is vague or missing, and there isn\'t enough structured content to form a clear description.',
+      fix: !hasGoodH1 ? 'Rewrite your homepage H1 to clearly state what you do and who you serve.' : !hasGoodMeta ? 'Add a meta description (120-155 chars) with your value proposition.' : !hasProductPage ? 'Create a dedicated product page with feature details.' : 'Your core description is solid.',
+      codeSnippet: !hasGoodH1 ? `<h1>${cap}: [What you do] for [who you serve]</h1>` : !hasGoodMeta ? `<meta name="description" content="${cap} helps [audience] [solve problem]. [Key differentiator]. Start free today.">` : null,
+    });
+
+    // Q2: How much does it cost?
+    coreQuestions.push({
+      question: `"How much does ${cap} cost?"`,
+      intent: 'evaluation',
+      what_ai_needs: 'A pricing page with plan names, dollar amounts, and feature tiers in plain HTML text',
+      status: hasPricingPage ? 'pass' : 'fail',
+      assessment: hasPricingPage
+        ? 'AI can find your pricing page and likely extract plan information. Having Offer schema would make pricing even more accessible to AI.'
+        : 'AI cannot answer this question. No pricing page was found during the scan. Users asking AI about your pricing will get no answer or be told to visit your website directly.',
+      fix: hasPricingPage ? 'Consider adding Offer schema to make pricing machine-readable.' : 'Create a /pricing page with clear plan names, prices, and features in HTML text (not images).',
+      codeSnippet: !hasPricingPage ? `<!-- Create ${domain}/pricing -->\n<title>Pricing — ${cap}</title>\n<h1>${cap} Pricing</h1>\n<h2>Free — $0/mo</h2>\n<h2>Pro — $X/mo</h2>` : null,
+    });
+
+    // Q3: How do I try / get started?
+    coreQuestions.push({
+      question: `"How do I try ${cap}?" or "Does ${cap} have a free trial?"`,
+      intent: 'use_case',
+      what_ai_needs: 'A visible free trial, demo page, or getting-started path with clear CTAs',
+      status: hasContactPage ? 'pass' : 'partial',
+      assessment: hasContactPage
+        ? `AI can find a contact or demo page to direct users to.${hasBlog ? ' Your docs/blog content may also help users understand how to get started.' : ''}`
+        : 'AI would have difficulty directing users to try your product. No clear demo, trial, or contact page was found.',
+      fix: !hasContactPage ? 'Create a /demo or /contact page. Add prominent "Start Free Trial" or "Book a Demo" CTAs to your homepage.' : 'Your trial path is visible. Consider adding a /getting-started guide for more context.',
+      codeSnippet: !hasContactPage ? `<!-- Create ${domain}/demo -->\n<title>Try ${cap} Free — Book a Demo</title>\n<h1>See ${cap} in Action</h1>\n<a href="/signup">Start Free Trial</a>` : null,
+    });
+
+    // Q4: Is this company trustworthy/legitimate?
+    const trustSignals = [hasAbout, hasSecurity, hasBlog].filter(Boolean).length;
+    coreQuestions.push({
+      question: `"Is ${cap} legit?" or "Can I trust ${cap}?"`,
+      intent: 'evaluation',
+      what_ai_needs: 'About page, customer logos, review platform links, privacy policy, social media presence',
+      status: trustSignals >= 2 ? 'pass' : trustSignals === 1 ? 'partial' : 'fail',
+      assessment: trustSignals >= 2
+        ? `AI has several trust signals to reference: ${hasAbout ? 'about page, ' : ''}${hasBlog ? 'content/blog presence, ' : ''}${hasSecurity ? 'security page' : ''}. Adding customer logos and review links would strengthen this further.`
+        : trustSignals === 1
+        ? `AI has limited trust signals. Only ${hasAbout ? 'an about page' : hasBlog ? 'blog content' : 'a security page'} was found. Missing: ${!hasAbout ? 'about page, ' : ''}${!hasBlog ? 'blog/content, ' : ''}customer logos, review platform links.`
+        : 'AI has very few trust signals to work with. No about page, limited content, and no obvious social proof. AI systems may hesitate to recommend you confidently.',
+      fix: trustSignals < 2 ? `Create ${!hasAbout ? 'an /about page with your team and mission, ' : ''}${!hasBlog ? 'a blog with expert content, ' : ''}and add customer logos + G2/Capterra links to your homepage.` : 'Consider adding customer testimonials and third-party review links to strengthen trust signals.',
+      codeSnippet: !hasAbout ? `<!-- Create ${domain}/about -->\n<title>About ${cap} — Our Mission & Team</title>\n<h1>About ${cap}</h1>\n<p>[Company story, mission, and team]</p>` : null,
+    });
+
+    // Q5: How does it compare?
+    coreQuestions.push({
+      question: `"${cap} vs [competitor]" or "What are alternatives to ${cap}?"`,
+      intent: 'evaluation',
+      what_ai_needs: 'Comparison pages, feature differentiation content, and clear positioning',
+      status: hasComparison ? 'pass' : hasProductPage ? 'partial' : 'fail',
+      assessment: hasComparison
+        ? 'You have comparison content that AI can reference when users ask about alternatives. This is a strong competitive advantage.'
+        : hasProductPage
+        ? 'AI can reference your product pages for features, but without dedicated comparison content, competitors with comparison pages may win these queries.'
+        : 'AI has no comparison content and limited product detail to work with. When users ask how you compare to alternatives, AI will likely recommend competitors who have comparison pages.',
+      fix: !hasComparison ? 'Create comparison pages: /compare/[competitor-name] with feature tables and honest pros/cons.' : 'Your comparison content is a strong asset. Keep it updated as competitors change.',
+      codeSnippet: !hasComparison ? `<!-- Create ${domain}/compare/[competitor] -->\n<title>${cap} vs [Competitor] — Honest Comparison</title>\n<h1>${cap} vs [Competitor]</h1>\n<h2>Feature Comparison</h2>\n<!-- Feature-by-feature table -->` : null,
+    });
+
+    // Fetch dynamic questions from API
+    try {
+      const res = await fetch('/api/ai-perception', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          domain, homepageH1: h1, homepageDescription: metaDesc,
+          pageTypes, hasSchema, hasPricing: hasPricingPage, hasComparison,
+          industryHints: h1,
+        }),
+      });
+      const result = await res.json();
+      if (result.questions && Array.isArray(result.questions)) {
+        for (const dq of result.questions.slice(0, 3)) {
+          coreQuestions.push({
+            question: `"${dq.question}"`,
+            intent: dq.intent || 'discovery',
+            what_ai_needs: dq.what_ai_needs || 'Relevant content on your site',
+            status: 'partial',
+            assessment: 'This is a question potential buyers may ask AI about your type of product. Having clear, specific content addressing this topic improves your chances of being referenced.',
+            fix: dq.what_ai_needs || 'Create content that directly addresses this question.',
+            codeSnippet: null,
+          });
+        }
+      }
+    } catch { /* API unavailable — core questions are enough */ }
+
+    setPerceptionQuestions(coreQuestions);
+    setPerceptionLoading(false);
   }
 
   useEffect(() => {
@@ -422,7 +551,7 @@ export default function AuditResultPage() {
   if (loading) return (<div className="max-w-4xl mx-auto px-4 py-20 text-center"><div className="animate-spin w-8 h-8 border-2 rounded-full mx-auto" style={{ borderColor: '#6366F1', borderTopColor: 'transparent' }} /><p className="mt-4" style={{ color: 'var(--text-tertiary)' }}>Loading audit results…</p></div>);
   if (error || !data) return (<div className="max-w-4xl mx-auto px-4 py-20 text-center"><AlertTriangle className="w-10 h-10 text-amber-500 mx-auto" /><p className="mt-4 font-medium" style={{ color: 'var(--text-primary)' }}>{error || 'Something went wrong'}</p><a href="/" className="mt-4 inline-block" style={{ color: '#6366F1' }}>← Try another URL</a></div>);
 
-  const { audit, pages, recommendations, crawlerStatuses, keyPagesStatus, pagePreviews } = data;
+  const { audit, pages, recommendations, crawlerStatuses, keyPagesStatus } = data;
   if (audit.status === 'failed') return (<div className="max-w-4xl mx-auto px-4 py-20 text-center"><AlertTriangle className="w-10 h-10 text-red-500 mx-auto" /><h2 className="mt-4 text-xl font-semibold" style={{ color: 'var(--text-primary)' }}>Scan failed</h2><p className="mt-2" style={{ color: 'var(--text-secondary)' }}>{audit.summary || 'The site could not be scanned.'}</p><a href="/" className="mt-6 inline-block" style={{ color: '#6366F1' }}>← Try another URL</a></div>);
 
   const visibleRecs = isAuthenticated ? recommendations : recommendations.slice(0, FREE_RECOMMENDATION_LIMIT);
@@ -499,7 +628,7 @@ export default function AuditResultPage() {
             { id: 'overview' as ReportTab, label: 'Overview', icon: LayoutGrid },
             { id: 'diagnostics' as ReportTab, label: 'Diagnostics', icon: Wrench },
             { id: 'action-plan' as ReportTab, label: 'Action Plan', icon: Zap },
-            { id: 'ai-sees' as ReportTab, label: 'What AI Sees', icon: Eye },
+            { id: 'ai-perception' as ReportTab, label: 'AI Perception', icon: Eye },
             { id: 'pages' as ReportTab, label: 'Pages', icon: MonitorSmartphone },
           ]).map(tab => (
             <button key={tab.id} onClick={() => switchTab(tab.id)}
@@ -755,77 +884,122 @@ export default function AuditResultPage() {
 
       </>)}
 
-      {/* ===== WHAT AI SEES TAB ===== */}
-      {isAuthenticated && activeTab === 'ai-sees' && (
+      {/* ===== AI PERCEPTION TAB ===== */}
+      {isAuthenticated && activeTab === 'ai-perception' && (
       <>
-      {/* 6. WHAT AI CRAWLERS SEE */}
-      {isAuthenticated && pagePreviews && pagePreviews.length > 0 && (
-        <div className="card p-6 mb-6">
-          <div className="flex items-center gap-2 mb-4">
-            <Eye className="w-5 h-5" style={{ color: '#6366F1' }} />
-            <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>What AI Crawlers See</h2>
+      <div className="card p-6 mb-6">
+        <div className="flex items-center gap-2 mb-2">
+          <Eye className="w-5 h-5" style={{ color: '#6366F1' }} />
+          <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>AI Perception Check</h2>
+        </div>
+        <p className="text-sm mb-6" style={{ color: 'var(--text-tertiary)' }}>When someone asks an AI assistant about your business, can it answer accurately? We evaluate your site against the questions buyers actually ask.</p>
+
+        {perceptionLoading && (
+          <div className="flex items-center gap-3 p-6 rounded-lg" style={{ background: 'var(--bg-tertiary)' }}>
+            <div className="animate-spin w-5 h-5 border-2 rounded-full" style={{ borderColor: '#6366F1', borderTopColor: 'transparent' }} />
+            <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Evaluating how AI perceives {audit.site?.domain}…</span>
           </div>
-          <p className="text-sm mb-4" style={{ color: 'var(--text-tertiary)' }}>What bots read when they visit your pages — no JavaScript rendering. Select a page to see what AI sees and what to improve.</p>
-          <div className="flex flex-wrap gap-2 mb-4">
-            {pagePreviews.slice(0, 10).map((pp) => {
-              let path = pp.url; try { path = new URL(pp.url).pathname || '/'; } catch {}
-              return (
-                <button key={pp.url} onClick={() => setActivePreviewUrl(activePreviewUrl === pp.url ? null : pp.url)}
-                  className="text-xs px-3 py-1.5 rounded-lg border transition-colors"
-                  style={{ borderColor: activePreviewUrl === pp.url ? '#6366F1' : 'var(--border)', background: activePreviewUrl === pp.url ? 'rgba(99,102,241,0.1)' : 'var(--bg-tertiary)', color: activePreviewUrl === pp.url ? '#6366F1' : 'var(--text-secondary)' }}>
-                  {path}
-                </button>
-              );
-            })}
+        )}
+
+        {!perceptionQuestions && !perceptionLoading && (
+          <div className="text-center p-8 rounded-lg border" style={{ borderColor: 'var(--border)', background: 'var(--bg-tertiary)' }}>
+            <Bot className="w-10 h-10 mx-auto mb-3" style={{ color: '#6366F1' }} />
+            <p className="text-sm mb-3" style={{ color: 'var(--text-secondary)' }}>Click to evaluate how AI assistants would answer questions about your business.</p>
+            <button onClick={loadPerceptionQuestions} className="btn-primary px-5 py-2.5 text-sm inline-flex items-center gap-2">
+              <Eye className="w-4 h-4" />Run AI Perception Check
+            </button>
           </div>
-          {activePreviewUrl && (() => {
-            const pp = pagePreviews.find(p => p.url === activePreviewUrl);
-            if (!pp) return null;
-            const pageIssues = pages.find(p => p.url === activePreviewUrl)?.issues || [];
-            return (
-              <div>
-                <div className="rounded-lg p-4 border font-mono text-xs leading-relaxed mb-3" style={{ background: '#0F172A', borderColor: '#1E293B', color: '#E2E8F0' }}>
-                  <div><span style={{ color: '#6366F1' }}>Title:</span> {pp.title}</div>
-                  <div><span style={{ color: '#6366F1' }}>Meta:</span> {pp.metaDescription}</div>
-                  <div><span style={{ color: '#6366F1' }}>H1:</span> {pp.h1}</div>
-                  <div><span style={{ color: '#6366F1' }}>Schema:</span> {pp.schemaTypes.length > 0 ? pp.schemaTypes.join(', ') : 'none'}</div>
-                  <div><span style={{ color: '#6366F1' }}>Words:</span> {pp.wordCount || 'unknown'}</div>
+        )}
+
+        {perceptionQuestions && (
+          <div className="space-y-4">
+            {/* Score summary */}
+            <div className="flex items-center gap-4 p-4 rounded-lg border" style={{ borderColor: 'var(--border)', background: 'var(--bg-tertiary)' }}>
+              <div className="flex items-center gap-6">
+                <div className="text-center">
+                  <span className="text-2xl font-bold" style={{ color: '#10B981', fontFamily: 'var(--font-mono)' }}>{perceptionQuestions.filter(q => q.status === 'pass').length}</span>
+                  <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>Can Answer</p>
                 </div>
-                {pageIssues.length > 0 && (
-                  <div className="rounded-lg p-4 border" style={{ borderColor: 'rgba(245,158,11,0.2)', background: 'rgba(245,158,11,0.05)' }}>
-                    <p className="text-xs font-semibold mb-3" style={{ color: '#F59E0B' }}>Recommendations for this page:</p>
-                    <div className="space-y-3">
-                      {pageIssues.map((issue, i) => {
-                        const detail = getIssueDetail(issue);
-                        const snippet = generateCodeSnippet(issue, audit.site?.domain || 'example.com');
-                        return (
-                          <div key={i}>
-                            <p className="text-xs mb-1" style={{ color: 'var(--text-secondary)' }}><strong style={{ color: 'var(--text-primary)' }}>{issue}</strong> — {detail.fix}</p>
-                            {snippet && (
-                              <div className="rounded-md p-2.5 mt-1.5 border overflow-x-auto" style={{ background: '#0F172A', borderColor: '#1E293B' }}>
-                                <div className="flex items-center justify-between mb-1">
-                                  <span className="text-xs" style={{ color: '#818CF8' }}>Suggested code:</span>
-                                  <CopyButton text={snippet} />
-                                </div>
-                                <pre className="text-xs leading-relaxed whitespace-pre-wrap" style={{ color: '#E2E8F0', fontFamily: 'var(--font-mono)' }}>{snippet}</pre>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
+                <div className="text-center">
+                  <span className="text-2xl font-bold" style={{ color: '#F59E0B', fontFamily: 'var(--font-mono)' }}>{perceptionQuestions.filter(q => q.status === 'partial').length}</span>
+                  <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>Partially</p>
+                </div>
+                <div className="text-center">
+                  <span className="text-2xl font-bold" style={{ color: '#EF4444', fontFamily: 'var(--font-mono)' }}>{perceptionQuestions.filter(q => q.status === 'fail').length}</span>
+                  <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>Cannot Answer</p>
+                </div>
+              </div>
+              <p className="text-sm ml-4" style={{ color: 'var(--text-secondary)' }}>
+                of {perceptionQuestions.length} questions a buyer might ask AI about your business
+              </p>
+            </div>
+
+            {/* Individual questions */}
+            {perceptionQuestions.map((q, i) => (
+              <div key={i} className="rounded-xl border overflow-hidden" style={{ borderColor: 'var(--border)', background: 'var(--surface)' }}>
+                <div className="p-4">
+                  <div className="flex items-start gap-3">
+                    <div className="shrink-0 mt-0.5">
+                      {q.status === 'pass' && <CheckCircle className="w-5 h-5 text-emerald-500" />}
+                      {q.status === 'partial' && <AlertTriangle className="w-5 h-5" style={{ color: '#F59E0B' }} />}
+                      {q.status === 'fail' && <XCircle className="w-5 h-5 text-red-500" />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>{q.question}</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-xs px-1.5 py-0.5 rounded" style={{
+                          color: q.status === 'pass' ? '#10B981' : q.status === 'partial' ? '#F59E0B' : '#EF4444',
+                          background: q.status === 'pass' ? 'rgba(16,185,129,0.1)' : q.status === 'partial' ? 'rgba(245,158,11,0.1)' : 'rgba(239,68,68,0.1)',
+                        }}>
+                          {q.status === 'pass' ? 'AI can answer this' : q.status === 'partial' ? 'Partial answer possible' : 'AI cannot answer this'}
+                        </span>
+                        <span className="text-xs px-1.5 py-0.5 rounded" style={{ color: 'var(--text-tertiary)', background: 'var(--bg-tertiary)' }}>
+                          {q.intent === 'discovery' ? 'Discovery' : q.intent === 'evaluation' ? 'Evaluation' : 'Use Case'}
+                        </span>
+                        <span className="text-xs px-1.5 py-0.5 rounded" style={{ color: '#818CF8', background: 'rgba(99,102,241,0.08)' }}>Based on scan data</span>
+                      </div>
                     </div>
                   </div>
-                )}
-                {pageIssues.length === 0 && (
-                  <div className="rounded-lg p-3 border" style={{ borderColor: 'rgba(16,185,129,0.2)', background: 'rgba(16,185,129,0.05)' }}>
-                    <p className="text-xs font-semibold" style={{ color: '#10B981' }}>✓ This page looks good — no issues found for AI crawlers.</p>
+
+                  {/* Assessment */}
+                  <div className="mt-3 rounded-lg p-3 border" style={{ borderColor: 'var(--border)', background: 'var(--bg-tertiary)' }}>
+                    <p className="text-xs font-medium mb-1" style={{ color: 'var(--text-primary)' }}>What AI would likely piece together:</p>
+                    <p className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>{q.assessment}</p>
                   </div>
-                )}
+
+                  {/* What AI needs */}
+                  <div className="mt-2">
+                    <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}><strong>What AI needs to answer well:</strong> {q.what_ai_needs}</p>
+                  </div>
+
+                  {/* Fix */}
+                  {q.status !== 'pass' && (
+                    <div className="mt-3 rounded-lg p-3 border" style={{ borderColor: 'rgba(99,102,241,0.15)', background: 'rgba(99,102,241,0.04)' }}>
+                      <p className="text-xs font-medium mb-1" style={{ color: '#6366F1' }}>How to fix:</p>
+                      <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>{q.fix}</p>
+                    </div>
+                  )}
+
+                  {/* Code snippet */}
+                  {q.codeSnippet && q.status !== 'pass' && (
+                    <div className="mt-2 rounded-lg p-3 overflow-x-auto border" style={{ background: '#0F172A', borderColor: '#1E293B' }}>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs" style={{ color: '#818CF8' }}>Recommended code:</span>
+                        <CopyButton text={q.codeSnippet} />
+                      </div>
+                      <pre className="text-xs leading-relaxed whitespace-pre-wrap" style={{ color: '#E2E8F0', fontFamily: 'var(--font-mono)' }}>{q.codeSnippet}</pre>
+                    </div>
+                  )}
+                </div>
               </div>
-            );
-          })()}
-        </div>
-      )}
+            ))}
+
+            <p className="text-xs text-center pt-2" style={{ color: 'var(--text-tertiary)' }}>
+              Assessments are based on scan data analysis. AI behavior varies across ChatGPT, Perplexity, Claude, and other systems.
+            </p>
+          </div>
+        )}
+      </div>
 
       </>
       )}
