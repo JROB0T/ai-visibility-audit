@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Search, Globe, Plus, AlertTriangle, ChevronRight } from 'lucide-react';
+import { scoreToGrade, getScoreColor } from '@/components/ScoreRing';
 
 interface SiteWithLatest {
   id: string;
@@ -77,8 +78,7 @@ export default function DashboardPage() {
   }
 
   function scoreColor(s: number | null) {
-    if (s === null) return 'var(--text-tertiary)';
-    return s >= 80 ? '#10B981' : s >= 50 ? '#F59E0B' : '#EF4444';
+    return getScoreColor(s ?? 0);
   }
 
   if (loading) return (<div className="max-w-5xl mx-auto px-4 py-20 text-center"><div className="animate-spin w-8 h-8 border-2 rounded-full mx-auto" style={{ borderColor: '#6366F1', borderTopColor: 'transparent' }} /><p className="mt-4" style={{ color: 'var(--text-tertiary)' }}>Loading your sites…</p></div>);
@@ -130,8 +130,8 @@ export default function DashboardPage() {
                 {la && la.status === 'completed' ? (
                   <>
                     <div className="flex items-center gap-3 mb-3">
-                      <span className="text-3xl font-bold" style={{ color: scoreColor(score ?? null), fontFamily: 'var(--font-mono)' }}>{score}</span>
-                      <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>/100</span>
+                      <span className="text-3xl font-bold" style={{ color: scoreColor(score ?? null), fontFamily: 'var(--font-mono)' }}>{scoreToGrade(score ?? 0)}</span>
+                      <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>{score}/100</span>
                     </div>
                     <div className="space-y-1.5">
                       {[{ label: 'Crawl', s: la.crawlability_score }, { label: 'Read', s: la.machine_readability_score }, { label: 'Commercial', s: la.commercial_clarity_score }, { label: 'Trust', s: la.trust_clarity_score }].map(({ label, s }) => (
@@ -140,7 +140,7 @@ export default function DashboardPage() {
                           <div className="flex-1 h-1.5 rounded-full" style={{ background: 'var(--bg-tertiary)' }}>
                             <div className="h-full rounded-full" style={{ width: `${s ?? 0}%`, background: scoreColor(s ?? 0) }} />
                           </div>
-                          <span className="text-xs font-medium w-7 text-right" style={{ color: scoreColor(s ?? 0), fontFamily: 'var(--font-mono)' }}>{s ?? 0}</span>
+                          <span className="text-xs font-bold w-7 text-right" style={{ color: scoreColor(s ?? 0), fontFamily: 'var(--font-mono)' }}>{scoreToGrade(s ?? 0)}</span>
                         </div>
                       ))}
                     </div>

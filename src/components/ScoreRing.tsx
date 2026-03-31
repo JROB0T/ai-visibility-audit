@@ -7,20 +7,29 @@ interface ScoreRingProps {
   label?: string;
 }
 
-function getScoreColor(score: number): string {
-  if (score >= 80) return '#10B981';
-  if (score >= 60) return '#34D399';
-  if (score >= 40) return '#F59E0B';
-  if (score >= 20) return '#F97316';
+export function getScoreColor(score: number): string {
+  if (score >= 90) return '#10B981';
+  if (score >= 80) return '#34D399';
+  if (score >= 70) return '#6366F1';
+  if (score >= 60) return '#F59E0B';
+  if (score >= 50) return '#F97316';
   return '#EF4444';
 }
 
-function getScoreLabel(score: number): string {
-  if (score >= 80) return 'Great';
-  if (score >= 60) return 'Good';
-  if (score >= 40) return 'Needs Work';
-  if (score >= 20) return 'Poor';
-  return 'Critical';
+export function scoreToGrade(score: number): string {
+  if (score >= 97) return 'A+';
+  if (score >= 93) return 'A';
+  if (score >= 90) return 'A-';
+  if (score >= 87) return 'B+';
+  if (score >= 83) return 'B';
+  if (score >= 80) return 'B-';
+  if (score >= 77) return 'C+';
+  if (score >= 73) return 'C';
+  if (score >= 70) return 'C-';
+  if (score >= 67) return 'D+';
+  if (score >= 63) return 'D';
+  if (score >= 60) return 'D-';
+  return 'F';
 }
 
 export default function ScoreRing({ score, size = 140, strokeWidth = 10, label }: ScoreRingProps) {
@@ -28,6 +37,7 @@ export default function ScoreRing({ score, size = 140, strokeWidth = 10, label }
   const circumference = 2 * Math.PI * radius;
   const offset = circumference - (score / 100) * circumference;
   const color = getScoreColor(score);
+  const grade = scoreToGrade(score);
 
   return (
     <div className="flex flex-col items-center">
@@ -40,25 +50,25 @@ export default function ScoreRing({ score, size = 140, strokeWidth = 10, label }
           />
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-3xl font-bold" style={{ color, fontFamily: 'var(--font-mono)' }}>{score}</span>
-          <span className="text-xs font-medium" style={{ color: 'var(--text-tertiary)' }}>/ 100</span>
+          <span className="font-bold" style={{ color, fontFamily: 'var(--font-mono)', fontSize: grade.length > 1 ? '2rem' : '2.5rem' }}>{grade}</span>
+          <span className="text-xs font-medium" style={{ color: 'var(--text-tertiary)' }}>{score}/100</span>
         </div>
       </div>
       {label && <div className="mt-2 text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>{label}</div>}
-      <div className="text-xs font-medium mt-0.5" style={{ color }}>{getScoreLabel(score)}</div>
     </div>
   );
 }
 
 export function ScoreBar({ score, label }: { score: number; label: string }) {
   const color = getScoreColor(score);
+  const grade = scoreToGrade(score);
   return (
     <div className="flex items-center gap-3">
       <div className="w-24 sm:w-28 text-sm font-medium shrink-0" style={{ color: 'var(--text-secondary)' }}>{label}</div>
       <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: 'var(--bg-tertiary)' }}>
         <div className="h-full rounded-full transition-all duration-700" style={{ width: `${score}%`, backgroundColor: color, boxShadow: `0 0 6px ${color}30` }} />
       </div>
-      <div className="w-10 text-right text-sm font-semibold" style={{ color, fontFamily: 'var(--font-mono)' }}>{score}</div>
+      <div className="w-10 text-right text-sm font-bold" style={{ color, fontFamily: 'var(--font-mono)' }}>{grade}</div>
     </div>
   );
 }

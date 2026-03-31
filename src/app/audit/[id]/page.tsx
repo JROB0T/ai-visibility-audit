@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import ScoreRing, { ScoreBar } from '@/components/ScoreRing';
+import ScoreRing, { ScoreBar, scoreToGrade, getScoreColor } from '@/components/ScoreRing';
 import SeverityBadge, { EffortBadge } from '@/components/SeverityBadge';
 import { Lock, ArrowRight, ArrowLeft, CheckCircle, XCircle, ExternalLink, FileText, AlertTriangle, RefreshCw, ChevronDown, ChevronRight, Filter, Shield, Code, Eye, Bot, Copy, Check, Globe, Minus, LayoutGrid, Wrench, Zap, MonitorSmartphone, X, Download } from 'lucide-react';
 
@@ -247,12 +247,12 @@ th{background:#f8fafc;font-weight:600;color:#64748b}
 
 <h2>Executive Summary</h2>
 <div class="score-box">
-<div class="score-num">${score}/100</div>
-<p style="color:#64748b;margin:8px 0 16px">Overall AI Visibility Score</p>
-<div class="score-bar"><span class="score-bar-label">Crawlability</span><div class="score-bar-track"><div class="score-bar-fill" style="width:${audit.crawlability_score ?? 0}%;background:${(audit.crawlability_score ?? 0) >= 80 ? '#10B981' : (audit.crawlability_score ?? 0) >= 50 ? '#F59E0B' : '#EF4444'}"></div></div><span style="font-weight:600;width:30px;text-align:right">${audit.crawlability_score ?? 0}</span></div>
-<div class="score-bar"><span class="score-bar-label">Readability</span><div class="score-bar-track"><div class="score-bar-fill" style="width:${audit.machine_readability_score ?? 0}%;background:${(audit.machine_readability_score ?? 0) >= 80 ? '#10B981' : (audit.machine_readability_score ?? 0) >= 50 ? '#F59E0B' : '#EF4444'}"></div></div><span style="font-weight:600;width:30px;text-align:right">${audit.machine_readability_score ?? 0}</span></div>
-<div class="score-bar"><span class="score-bar-label">Commercial</span><div class="score-bar-track"><div class="score-bar-fill" style="width:${audit.commercial_clarity_score ?? 0}%;background:${(audit.commercial_clarity_score ?? 0) >= 80 ? '#10B981' : (audit.commercial_clarity_score ?? 0) >= 50 ? '#F59E0B' : '#EF4444'}"></div></div><span style="font-weight:600;width:30px;text-align:right">${audit.commercial_clarity_score ?? 0}</span></div>
-<div class="score-bar"><span class="score-bar-label">Trust</span><div class="score-bar-track"><div class="score-bar-fill" style="width:${audit.trust_clarity_score ?? 0}%;background:${(audit.trust_clarity_score ?? 0) >= 80 ? '#10B981' : (audit.trust_clarity_score ?? 0) >= 50 ? '#F59E0B' : '#EF4444'}"></div></div><span style="font-weight:600;width:30px;text-align:right">${audit.trust_clarity_score ?? 0}</span></div>
+<div class="score-num">${scoreToGrade(score)}</div>
+<p style="color:#64748b;margin:8px 0 16px">${score}/100 — Overall AI Visibility Grade</p>
+<div class="score-bar"><span class="score-bar-label">Crawlability</span><div class="score-bar-track"><div class="score-bar-fill" style="width:${audit.crawlability_score ?? 0}%;background:${getScoreColor(audit.crawlability_score ?? 0)}"></div></div><span style="font-weight:600;width:30px;text-align:right">${scoreToGrade(audit.crawlability_score ?? 0)}</span></div>
+<div class="score-bar"><span class="score-bar-label">Readability</span><div class="score-bar-track"><div class="score-bar-fill" style="width:${audit.machine_readability_score ?? 0}%;background:${getScoreColor(audit.machine_readability_score ?? 0)}"></div></div><span style="font-weight:600;width:30px;text-align:right">${scoreToGrade(audit.machine_readability_score ?? 0)}</span></div>
+<div class="score-bar"><span class="score-bar-label">Commercial</span><div class="score-bar-track"><div class="score-bar-fill" style="width:${audit.commercial_clarity_score ?? 0}%;background:${getScoreColor(audit.commercial_clarity_score ?? 0)}"></div></div><span style="font-weight:600;width:30px;text-align:right">${scoreToGrade(audit.commercial_clarity_score ?? 0)}</span></div>
+<div class="score-bar"><span class="score-bar-label">Trust</span><div class="score-bar-track"><div class="score-bar-fill" style="width:${audit.trust_clarity_score ?? 0}%;background:${getScoreColor(audit.trust_clarity_score ?? 0)}"></div></div><span style="font-weight:600;width:30px;text-align:right">${scoreToGrade(audit.trust_clarity_score ?? 0)}</span></div>
 </div>
 
 <p>${score >= 80 ? 'Your site has strong AI visibility.' : score >= 60 ? 'Your site has moderate AI visibility with clear areas for improvement.' : score >= 40 ? 'Your site has limited AI visibility. AI systems may struggle to accurately describe or recommend your product.' : 'Your site has poor AI visibility. Immediate action is needed to ensure AI systems can find and reference your content.'} We identified ${highRecs.length} high-priority, ${medRecs.length} medium-priority, and ${lowRecs.length} low-priority findings across ${pages.length} scanned pages.</p>
@@ -770,7 +770,7 @@ export default function AuditResultPage() {
           <div className="space-y-2">
             {crawlerStatuses.map((c) => {
               const isExp = expandedCrawlers.has(c.name);
-              const readColor = c.readinessScore >= 75 ? '#10B981' : c.readinessScore >= 50 ? '#F59E0B' : '#EF4444';
+              const readColor = getScoreColor(c.readinessScore);
               return (
                 <div key={c.name} className="rounded-xl border overflow-hidden" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
                   {/* Collapsed card */}
@@ -794,7 +794,7 @@ export default function AuditResultPage() {
                         <div className="w-12 h-1.5 rounded-full" style={{ background: 'var(--bg-tertiary)' }}>
                           <div className="h-full rounded-full" style={{ width: `${c.readinessScore}%`, background: readColor }} />
                         </div>
-                        <span className="text-xs font-bold w-7 text-right" style={{ color: readColor, fontFamily: 'var(--font-mono)' }}>{c.readinessScore}</span>
+                        <span className="text-xs font-bold w-7 text-right" style={{ color: readColor, fontFamily: 'var(--font-mono)' }}>{scoreToGrade(c.readinessScore)}</span>
                       </div>
                     </div>
                   </button>
@@ -833,7 +833,7 @@ export default function AuditResultPage() {
                             <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>Site Readiness for {c.displayName}</span>
                             <span className="text-xs px-1.5 py-0.5 rounded" style={{ color: '#F59E0B', background: 'rgba(245,158,11,0.08)' }}>Measured + Inferred</span>
                           </div>
-                          <span className="text-sm font-bold" style={{ color: readColor, fontFamily: 'var(--font-mono)' }}>{c.readinessScore}/100</span>
+                          <span className="text-sm font-bold" style={{ color: readColor, fontFamily: 'var(--font-mono)' }}>{scoreToGrade(c.readinessScore)}</span>
                         </div>
                         <div className="w-full h-2 rounded-full mb-3" style={{ background: 'var(--bg-tertiary)' }}>
                           <div className="h-full rounded-full transition-all" style={{ width: `${c.readinessScore}%`, background: readColor }} />
@@ -1057,7 +1057,7 @@ export default function AuditResultPage() {
                     </div>
                     <div className="flex items-center gap-3 shrink-0">
                       {catHigh > 0 && <span className="text-xs px-1.5 py-0.5 rounded font-medium" style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444' }}>{catHigh} high</span>}
-                      <span className="text-sm font-bold" style={{ color: (cs ?? 0) >= 80 ? '#10B981' : (cs ?? 0) >= 50 ? '#F59E0B' : '#EF4444', fontFamily: 'var(--font-mono)' }}>{cs ?? 0}</span>
+                      <span className="text-sm font-bold" style={{ color: getScoreColor(cs ?? 0), fontFamily: 'var(--font-mono)' }}>{scoreToGrade(cs ?? 0)}</span>
                       <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>{catFindings.length} issue{catFindings.length !== 1 ? 's' : ''}</span>
                     </div>
                   </button>
