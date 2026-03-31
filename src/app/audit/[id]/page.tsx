@@ -52,7 +52,7 @@ interface AuditData {
 
 type ViewMode = 'priority' | 'page' | 'category';
 type SeverityFilter = 'all' | 'high' | 'medium' | 'low';
-type ReportTab = 'overview' | 'diagnostics' | 'action-plan' | 'ai-perception' | 'pages';
+type ReportTab = 'overview' | 'findings' | 'ai-perception' | 'pages';
 
 const FREE_RECOMMENDATION_LIMIT = 3;
 
@@ -160,9 +160,9 @@ function generateAiSummary(audit: AuditData['audit'], crawlerStatuses: CrawlerSt
 
   // Next steps
   const steps: string[] = [];
-  if (highCount > 0) steps.push('Review the Diagnostics tab to see all findings by category');
+  if (highCount > 0) steps.push('Review the Findings & Fixes tab to see all issues by category with code snippets');
   if (missing.length > 0) steps.push('Click any missing page above to see what to create and example code');
-  steps.push('Use the Action Plan tab for a prioritized list of fixes with copy-paste code');
+  steps.push('Switch to Priority view in Findings & Fixes to see the most impactful fixes first');
   if (blocked.length > 0) steps.push('Check AI Source Visibility below — some AI systems are blocked and need robots.txt changes');
   steps.push('Export this report to share with your team using the download button');
   parts.push('Next steps: ' + steps.join('. ') + '.');
@@ -348,8 +348,7 @@ export default function AuditResultPage() {
 
   function switchTab(tab: ReportTab) {
     setActiveTab(tab);
-    if (tab === 'diagnostics') setViewMode('category');
-    else if (tab === 'action-plan') setViewMode('priority');
+    if (tab === 'findings') setViewMode('category');
     else if (tab === 'ai-perception' && !perceptionQuestions && !perceptionLoading) loadPerceptionQuestions();
   }
 
@@ -626,8 +625,7 @@ export default function AuditResultPage() {
         <div className="flex items-center gap-1 overflow-x-auto mb-6 pb-1 rounded-lg p-1" style={{ background: 'var(--bg-tertiary)' }}>
           {([
             { id: 'overview' as ReportTab, label: 'Overview', icon: LayoutGrid },
-            { id: 'diagnostics' as ReportTab, label: 'Diagnostics', icon: Wrench },
-            { id: 'action-plan' as ReportTab, label: 'Action Plan', icon: Zap },
+            { id: 'findings' as ReportTab, label: 'Findings & Fixes', icon: Wrench },
             { id: 'ai-perception' as ReportTab, label: 'AI Perception', icon: Eye },
             { id: 'pages' as ReportTab, label: 'Pages', icon: MonitorSmartphone },
           ]).map(tab => (
@@ -1004,13 +1002,13 @@ export default function AuditResultPage() {
       </>
       )}
 
-      {/* ===== DIAGNOSTICS + ACTION PLAN TABS ===== */}
-      {(!isAuthenticated || activeTab === 'diagnostics' || activeTab === 'action-plan') && (
+      {/* ===== FINDINGS & FIXES TAB ===== */}
+      {(!isAuthenticated || activeTab === 'findings') && (
       <>
       {/* 7. DETAILED FINDINGS */}
       <div className="mb-6">
         <div className="flex items-center justify-between mb-2">
-          <h2 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>{isAuthenticated ? 'Detailed Findings' : 'Top Recommendations'}</h2>
+          <h2 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>{isAuthenticated ? 'Findings & Fixes' : 'Top Recommendations'}</h2>
           <div className="flex items-center gap-3 text-xs">
             {highCount > 0 && <span className="px-2 py-0.5 rounded font-medium" style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444', border: '1px solid rgba(239,68,68,0.2)' }}>{highCount} high</span>}
             {medCount > 0 && <span className="px-2 py-0.5 rounded font-medium" style={{ background: 'rgba(245,158,11,0.1)', color: '#F59E0B', border: '1px solid rgba(245,158,11,0.2)' }}>{medCount} medium</span>}
