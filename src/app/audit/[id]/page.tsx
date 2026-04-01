@@ -330,6 +330,7 @@ export default function AuditResultPage() {
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   const [expandedCrawlers, setExpandedCrawlers] = useState<Set<string>>(new Set());
   const [selectedKeyPage, setSelectedKeyPage] = useState<KeyPageStatus | null>(null);
+  const [selectedPerceptionQ, setSelectedPerceptionQ] = useState<number | null>(null);
 
   function handleExportReport() {
     if (!data) return;
@@ -944,9 +945,9 @@ export default function AuditResultPage() {
         )}
 
         {perceptionQuestions && (
-          <div className="space-y-4">
+          <div>
             {/* Score summary */}
-            <div className="flex items-center gap-4 p-4 rounded-lg border" style={{ borderColor: 'var(--border)', background: 'var(--bg-tertiary)' }}>
+            <div className="flex items-center gap-4 p-4 rounded-lg border mb-4" style={{ borderColor: 'var(--border)', background: 'var(--bg-tertiary)' }}>
               <div className="flex items-center gap-6">
                 <div className="text-center">
                   <span className="text-2xl font-bold" style={{ color: '#10B981', fontFamily: 'var(--font-mono)' }}>{perceptionQuestions.filter(q => q.status === 'pass').length}</span>
@@ -962,74 +963,119 @@ export default function AuditResultPage() {
                 </div>
               </div>
               <p className="text-sm ml-4" style={{ color: 'var(--text-secondary)' }}>
-                of {perceptionQuestions.length} questions a buyer might ask AI about your business
+                of {perceptionQuestions.length} questions a buyer might ask AI
               </p>
             </div>
 
-            {/* Individual questions */}
-            {perceptionQuestions.map((q, i) => (
-              <div key={i} className="rounded-xl border overflow-hidden" style={{ borderColor: 'var(--border)', background: 'var(--surface)' }}>
-                <div className="p-4">
-                  <div className="flex items-start gap-3">
-                    <div className="shrink-0 mt-0.5">
-                      {q.status === 'pass' && <CheckCircle className="w-5 h-5 text-emerald-500" />}
-                      {q.status === 'partial' && <AlertTriangle className="w-5 h-5" style={{ color: '#F59E0B' }} />}
-                      {q.status === 'fail' && <XCircle className="w-5 h-5 text-red-500" />}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>{q.question}</p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <span className="text-xs px-1.5 py-0.5 rounded" style={{
+            {/* Compact question cards */}
+            <div className="space-y-2">
+              {perceptionQuestions.map((q, i) => (
+                <button key={i} onClick={() => setSelectedPerceptionQ(i)}
+                  className="w-full flex items-center gap-3 p-3 rounded-lg border text-left transition-all hover:shadow-md"
+                  style={{ borderColor: selectedPerceptionQ === i ? '#6366F1' : 'var(--border)', background: 'var(--surface)' }}>
+                  <div className="shrink-0">
+                    {q.status === 'pass' && <CheckCircle className="w-4 h-4 text-emerald-500" />}
+                    {q.status === 'partial' && <AlertTriangle className="w-4 h-4" style={{ color: '#F59E0B' }} />}
+                    {q.status === 'fail' && <XCircle className="w-4 h-4 text-red-500" />}
+                  </div>
+                  <p className="flex-1 text-sm truncate" style={{ color: 'var(--text-primary)' }}>{q.question}</p>
+                  <span className="text-xs px-1.5 py-0.5 rounded shrink-0" style={{
+                    color: q.status === 'pass' ? '#10B981' : q.status === 'partial' ? '#F59E0B' : '#EF4444',
+                    background: q.status === 'pass' ? 'rgba(16,185,129,0.1)' : q.status === 'partial' ? 'rgba(245,158,11,0.1)' : 'rgba(239,68,68,0.1)',
+                  }}>
+                    {q.status === 'pass' ? 'Can answer' : q.status === 'partial' ? 'Partial' : 'Cannot answer'}
+                  </span>
+                  <ChevronRight className="w-3.5 h-3.5 shrink-0" style={{ color: 'var(--text-tertiary)' }} />
+                </button>
+              ))}
+            </div>
+
+            <p className="text-xs text-center pt-3" style={{ color: 'var(--text-tertiary)' }}>
+              Click any question to see what AI would say and how to improve it.
+            </p>
+          </div>
+        )}
+
+        {/* Perception detail side panel */}
+        {selectedPerceptionQ !== null && perceptionQuestions && perceptionQuestions[selectedPerceptionQ] && (
+          <>
+            <div className="fixed inset-0 z-40" style={{ background: 'rgba(0,0,0,0.4)' }} onClick={() => setSelectedPerceptionQ(null)} />
+            <div className="fixed top-0 right-0 bottom-0 z-50 w-full sm:w-[480px] overflow-y-auto" style={{ background: 'var(--surface)', borderLeft: '1px solid var(--border)' }}>
+              {(() => {
+                const q = perceptionQuestions[selectedPerceptionQ];
+                return (
+                  <div className="p-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-2">
+                        {q.status === 'pass' && <CheckCircle className="w-5 h-5 text-emerald-500" />}
+                        {q.status === 'partial' && <AlertTriangle className="w-5 h-5" style={{ color: '#F59E0B' }} />}
+                        {q.status === 'fail' && <XCircle className="w-5 h-5 text-red-500" />}
+                        <span className="text-xs px-2 py-0.5 rounded font-medium" style={{
                           color: q.status === 'pass' ? '#10B981' : q.status === 'partial' ? '#F59E0B' : '#EF4444',
                           background: q.status === 'pass' ? 'rgba(16,185,129,0.1)' : q.status === 'partial' ? 'rgba(245,158,11,0.1)' : 'rgba(239,68,68,0.1)',
                         }}>
                           {q.status === 'pass' ? 'AI can answer this' : q.status === 'partial' ? 'Partial answer possible' : 'AI cannot answer this'}
                         </span>
-                        <span className="text-xs px-1.5 py-0.5 rounded" style={{ color: 'var(--text-tertiary)', background: 'var(--bg-tertiary)' }}>
-                          {q.intent === 'discovery' ? 'Discovery' : q.intent === 'evaluation' ? 'Evaluation' : 'Use Case'}
-                        </span>
-                        <span className="text-xs px-1.5 py-0.5 rounded" style={{ color: '#818CF8', background: 'rgba(99,102,241,0.08)' }}>Based on scan data</span>
                       </div>
+                      <button onClick={() => setSelectedPerceptionQ(null)} className="p-1.5 rounded-lg" style={{ color: 'var(--text-tertiary)', background: 'var(--bg-tertiary)' }}>
+                        <X className="w-4 h-4" />
+                      </button>
                     </div>
-                  </div>
 
-                  {/* Assessment */}
-                  <div className="mt-3 rounded-lg p-3 border" style={{ borderColor: 'var(--border)', background: 'var(--bg-tertiary)' }}>
-                    <p className="text-xs font-medium mb-1" style={{ color: 'var(--text-primary)' }}>What AI would likely piece together:</p>
-                    <p className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>{q.assessment}</p>
-                  </div>
-
-                  {/* What AI needs */}
-                  <div className="mt-2">
-                    <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}><strong>What AI needs to answer well:</strong> {q.what_ai_needs}</p>
-                  </div>
-
-                  {/* Fix */}
-                  {q.status !== 'pass' && (
-                    <div className="mt-3 rounded-lg p-3 border" style={{ borderColor: 'rgba(99,102,241,0.15)', background: 'rgba(99,102,241,0.04)' }}>
-                      <p className="text-xs font-medium mb-1" style={{ color: '#6366F1' }}>How to fix:</p>
-                      <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>{q.fix}</p>
+                    <h3 className="text-lg font-bold mb-1" style={{ color: 'var(--text-primary)' }}>{q.question}</h3>
+                    <div className="flex items-center gap-2 mb-5">
+                      <span className="text-xs px-1.5 py-0.5 rounded" style={{ color: 'var(--text-tertiary)', background: 'var(--bg-tertiary)' }}>
+                        {q.intent === 'discovery' ? 'Discovery query' : q.intent === 'evaluation' ? 'Evaluation query' : 'Use case query'}
+                      </span>
+                      <span className="text-xs px-1.5 py-0.5 rounded" style={{ color: '#818CF8', background: 'rgba(99,102,241,0.08)' }}>Based on scan data</span>
                     </div>
-                  )}
 
-                  {/* Code snippet */}
-                  {q.codeSnippet && q.status !== 'pass' && (
-                    <div className="mt-2 rounded-lg p-3 overflow-x-auto border" style={{ background: '#0F172A', borderColor: '#1E293B' }}>
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs" style={{ color: '#818CF8' }}>Recommended code:</span>
-                        <CopyButton text={q.codeSnippet} />
+                    <div className="rounded-lg p-4 mb-4 border" style={{ borderColor: 'var(--border)', background: 'var(--bg-tertiary)' }}>
+                      <p className="text-xs font-semibold mb-2" style={{ color: 'var(--text-primary)' }}>What AI would likely piece together</p>
+                      <p className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>{q.assessment}</p>
+                    </div>
+
+                    <div className="rounded-lg p-4 mb-4 border" style={{ borderColor: 'rgba(245,158,11,0.15)', background: 'rgba(245,158,11,0.04)' }}>
+                      <p className="text-xs font-semibold mb-2" style={{ color: '#F59E0B' }}>What AI needs to answer well</p>
+                      <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>{q.what_ai_needs}</p>
+                    </div>
+
+                    {q.status !== 'pass' && (
+                      <div className="rounded-lg p-4 mb-4 border" style={{ borderColor: 'rgba(99,102,241,0.15)', background: 'rgba(99,102,241,0.04)' }}>
+                        <p className="text-xs font-semibold mb-2" style={{ color: '#6366F1' }}>How to fix</p>
+                        <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>{q.fix}</p>
                       </div>
-                      <pre className="text-xs leading-relaxed whitespace-pre-wrap" style={{ color: '#E2E8F0', fontFamily: 'var(--font-mono)' }}>{q.codeSnippet}</pre>
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))}
+                    )}
 
-            <p className="text-xs text-center pt-2" style={{ color: 'var(--text-tertiary)' }}>
-              Assessments are based on scan data analysis. AI behavior varies across ChatGPT, Perplexity, Claude, and other systems.
-            </p>
-          </div>
+                    {q.codeSnippet && q.status !== 'pass' && (
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <p className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>Recommended code</p>
+                          <CopyButton text={q.codeSnippet} />
+                        </div>
+                        <div className="rounded-lg p-3 overflow-x-auto border" style={{ background: '#0F172A', borderColor: '#1E293B' }}>
+                          <pre className="text-xs leading-relaxed whitespace-pre-wrap" style={{ color: '#E2E8F0', fontFamily: 'var(--font-mono)' }}>{q.codeSnippet}</pre>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Nav between questions */}
+                    <div className="flex items-center justify-between mt-6 pt-4 border-t" style={{ borderColor: 'var(--border)' }}>
+                      <button onClick={() => setSelectedPerceptionQ(Math.max(0, selectedPerceptionQ - 1))} disabled={selectedPerceptionQ === 0}
+                        className="text-xs px-3 py-1.5 rounded-lg border" style={{ borderColor: 'var(--border)', color: selectedPerceptionQ === 0 ? 'var(--text-tertiary)' : 'var(--text-secondary)', background: 'var(--bg-tertiary)', opacity: selectedPerceptionQ === 0 ? 0.5 : 1 }}>
+                        ← Previous
+                      </button>
+                      <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>{selectedPerceptionQ + 1} of {perceptionQuestions.length}</span>
+                      <button onClick={() => setSelectedPerceptionQ(Math.min(perceptionQuestions.length - 1, selectedPerceptionQ + 1))} disabled={selectedPerceptionQ === perceptionQuestions.length - 1}
+                        className="text-xs px-3 py-1.5 rounded-lg border" style={{ borderColor: 'var(--border)', color: selectedPerceptionQ === perceptionQuestions.length - 1 ? 'var(--text-tertiary)' : 'var(--text-secondary)', background: 'var(--bg-tertiary)', opacity: selectedPerceptionQ === perceptionQuestions.length - 1 ? 0.5 : 1 }}>
+                        Next →
+                      </button>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          </>
         )}
       </div>
 
