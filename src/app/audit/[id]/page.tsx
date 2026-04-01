@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import ScoreRing, { ScoreBar, scoreToGrade, getScoreColor } from '@/components/ScoreRing';
 import SeverityBadge, { EffortBadge } from '@/components/SeverityBadge';
-import { Lock, ArrowRight, ArrowLeft, CheckCircle, XCircle, ExternalLink, FileText, AlertTriangle, RefreshCw, ChevronDown, ChevronRight, Filter, Shield, Code, Eye, Bot, Copy, Check, Globe, Minus, LayoutGrid, Wrench, Zap, MonitorSmartphone, X, Download } from 'lucide-react';
+import { Lock, ArrowRight, ArrowLeft, CheckCircle, XCircle, ExternalLink, FileText, AlertTriangle, RefreshCw, ChevronDown, ChevronRight, Filter, Shield, Code, Eye, Bot, Copy, Check, Globe, Minus, LayoutGrid, Wrench, Zap, MonitorSmartphone, X, Download, TrendingUp, Target, Users } from 'lucide-react';
 
 // ============================================================
 // Types
@@ -52,7 +52,7 @@ interface AuditData {
 
 type ViewMode = 'priority' | 'page' | 'category';
 type SeverityFilter = 'all' | 'high' | 'medium' | 'low';
-type ReportTab = 'overview' | 'findings' | 'ai-perception' | 'pages';
+type ReportTab = 'overview' | 'findings' | 'ai-perception' | 'growth' | 'pages';
 
 const FREE_RECOMMENDATION_LIMIT = 3;
 
@@ -345,11 +345,14 @@ export default function AuditResultPage() {
   const [activeTab, setActiveTab] = useState<ReportTab>('overview');
   const [perceptionQuestions, setPerceptionQuestions] = useState<Array<{ question: string; intent: string; what_ai_needs: string; status: 'pass' | 'partial' | 'fail'; assessment: string; fix: string; codeSnippet: string | null }> | null>(null);
   const [perceptionLoading, setPerceptionLoading] = useState(false);
+  const [growthData, setGrowthData] = useState<{ competitors: Array<{ domain: string; overall: number; crawl: number; read: number; commercial: number; trust: number; pageTypes: string[] }>; yourScores: { overall: number; crawl: number; read: number; commercial: number; trust: number }; marketingStrategy: { queries: string[]; pages_to_create: Array<{ title: string; why: string }>; content_to_optimize: Array<{ page: string; action: string }>; schema_actions: Array<{ action: string; impact: string }>; trust_actions: Array<{ action: string; impact: string }> } } | null>(null);
+  const [growthLoading, setGrowthLoading] = useState(false);
 
   function switchTab(tab: ReportTab) {
     setActiveTab(tab);
     if (tab === 'findings') setViewMode('category');
     else if (tab === 'ai-perception' && !perceptionQuestions && !perceptionLoading) loadPerceptionQuestions();
+    else if (tab === 'growth' && !growthData && !growthLoading) loadGrowthStrategy();
   }
 
   async function loadPerceptionQuestions() {
@@ -477,6 +480,36 @@ export default function AuditResultPage() {
 
     setPerceptionQuestions(coreQuestions);
     setPerceptionLoading(false);
+  }
+
+  async function loadGrowthStrategy() {
+    if (!data || growthLoading) return;
+    setGrowthLoading(true);
+    try {
+      const { audit, pages, recommendations } = data;
+      const homepage = pages.find((p: { page_type: string }) => p.page_type === 'homepage');
+      const res = await fetch('/api/growth-strategy', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          domain: audit.site?.domain,
+          h1: homepage?.h1_text,
+          metaDescription: homepage?.meta_description,
+          pageTypes: Array.from(new Set(pages.map((p: { page_type: string }) => p.page_type))),
+          scores: {
+            overall: audit.overall_score,
+            crawl: audit.crawlability_score,
+            read: audit.machine_readability_score,
+            commercial: audit.commercial_clarity_score,
+            trust: audit.trust_clarity_score,
+          },
+          recommendations: recommendations.map((r: { severity: string; title: string }) => ({ severity: r.severity, title: r.title })),
+        }),
+      });
+      if (res.ok) {
+        setGrowthData(await res.json());
+      }
+    } catch { /* skip */ }
+    finally { setGrowthLoading(false); }
   }
 
   useEffect(() => {
@@ -627,6 +660,7 @@ export default function AuditResultPage() {
             { id: 'overview' as ReportTab, label: 'Overview', icon: LayoutGrid },
             { id: 'findings' as ReportTab, label: 'Findings & Fixes', icon: Wrench },
             { id: 'ai-perception' as ReportTab, label: 'AI Perception', icon: Eye },
+            { id: 'growth' as ReportTab, label: 'Growth Strategy', icon: TrendingUp },
             { id: 'pages' as ReportTab, label: 'Pages', icon: MonitorSmartphone },
           ]).map(tab => (
             <button key={tab.id} onClick={() => switchTab(tab.id)}
@@ -1122,6 +1156,176 @@ export default function AuditResultPage() {
         )}
       </div>
 
+      </>
+      )}
+
+      {/* ===== GROWTH STRATEGY TAB ===== */}
+      {isAuthenticated && activeTab === 'growth' && (
+      <>
+      <div className="mb-6">
+        {growthLoading && (
+          <div className="card p-8 text-center">
+            <div className="animate-spin w-6 h-6 border-2 rounded-full mx-auto mb-3" style={{ borderColor: '#6366F1', borderTopColor: 'transparent' }} />
+            <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Identifying competitors and generating your growth strategy…</p>
+            <p className="text-xs mt-1" style={{ color: 'var(--text-tertiary)' }}>This may take 10-15 seconds</p>
+          </div>
+        )}
+
+        {!growthData && !growthLoading && (
+          <div className="card p-8 text-center">
+            <TrendingUp className="w-10 h-10 mx-auto mb-3" style={{ color: '#6366F1' }} />
+            <h3 className="font-semibold mb-2" style={{ color: 'var(--text-primary)' }}>AI Growth Strategy</h3>
+            <p className="text-sm mb-4 max-w-md mx-auto" style={{ color: 'var(--text-secondary)' }}>Get a competitive benchmark against 2 peer sites and an AI-powered marketing strategy tailored to your product.</p>
+            <button onClick={loadGrowthStrategy} className="btn-primary px-5 py-2.5 text-sm inline-flex items-center gap-2">
+              <TrendingUp className="w-4 h-4" />Generate Growth Strategy
+            </button>
+          </div>
+        )}
+
+        {growthData && (
+          <div className="space-y-6">
+            {/* Peer Benchmark */}
+            {growthData.competitors.length > 0 && (
+              <div className="card p-6">
+                <div className="flex items-center gap-2 mb-2">
+                  <Users className="w-5 h-5" style={{ color: '#6366F1' }} />
+                  <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>Peer Benchmark</h2>
+                </div>
+                <p className="text-sm mb-4" style={{ color: 'var(--text-tertiary)' }}>How your AI visibility compares to likely competitors. Based on a lightweight scan of their public site.</p>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr style={{ background: 'var(--bg-tertiary)' }}>
+                        <th className="text-left py-3 px-4 font-medium" style={{ color: 'var(--text-tertiary)' }}>Site</th>
+                        <th className="text-center py-3 px-4 font-medium" style={{ color: 'var(--text-tertiary)' }}>Overall</th>
+                        <th className="text-center py-3 px-4 font-medium" style={{ color: 'var(--text-tertiary)' }}>Crawl</th>
+                        <th className="text-center py-3 px-4 font-medium" style={{ color: 'var(--text-tertiary)' }}>Read</th>
+                        <th className="text-center py-3 px-4 font-medium" style={{ color: 'var(--text-tertiary)' }}>Commercial</th>
+                        <th className="text-center py-3 px-4 font-medium" style={{ color: 'var(--text-tertiary)' }}>Trust</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr className="border-t" style={{ borderColor: 'var(--border)', background: 'rgba(99,102,241,0.04)' }}>
+                        <td className="py-3 px-4 font-semibold" style={{ color: '#6366F1' }}>{audit.site?.domain} (you)</td>
+                        {[growthData.yourScores.overall, growthData.yourScores.crawl, growthData.yourScores.read, growthData.yourScores.commercial, growthData.yourScores.trust].map((s, i) => (
+                          <td key={i} className="py-3 px-4 text-center font-bold" style={{ color: getScoreColor(s), fontFamily: 'var(--font-mono)' }}>{scoreToGrade(s)}</td>
+                        ))}
+                      </tr>
+                      {growthData.competitors.map((comp) => (
+                        <tr key={comp.domain} className="border-t" style={{ borderColor: 'var(--border)' }}>
+                          <td className="py-3 px-4" style={{ color: 'var(--text-primary)' }}>{comp.domain}</td>
+                          {[comp.overall, comp.crawl, comp.read, comp.commercial, comp.trust].map((s, i) => {
+                            const yours = [growthData.yourScores.overall, growthData.yourScores.crawl, growthData.yourScores.read, growthData.yourScores.commercial, growthData.yourScores.trust][i];
+                            const ahead = s > yours;
+                            return (
+                              <td key={i} className="py-3 px-4 text-center" style={{ fontFamily: 'var(--font-mono)' }}>
+                                <span className="font-bold" style={{ color: getScoreColor(s) }}>{scoreToGrade(s)}</span>
+                                {ahead && <span className="text-xs ml-1" style={{ color: '#EF4444' }}>▲</span>}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <p className="text-xs mt-3" style={{ color: 'var(--text-tertiary)' }}>Competitor scores are based on a lightweight homepage scan and may not reflect their full AI visibility. ▲ indicates the competitor scores higher than you in that category.</p>
+              </div>
+            )}
+
+            {/* AI Marketing Strategy */}
+            {growthData.marketingStrategy && (
+              <div className="card p-6">
+                <div className="flex items-center gap-2 mb-2">
+                  <Target className="w-5 h-5" style={{ color: '#6366F1' }} />
+                  <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>AI Marketing Strategy</h2>
+                </div>
+                <p className="text-sm mb-6" style={{ color: 'var(--text-tertiary)' }}>Targeted actions to improve how AI systems discover, understand, and recommend your product.</p>
+
+                {/* Queries to Target */}
+                {growthData.marketingStrategy.queries?.length > 0 && (
+                  <div className="mb-6">
+                    <h3 className="text-sm font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>AI-Searchable Queries to Target</h3>
+                    <p className="text-xs mb-3" style={{ color: 'var(--text-tertiary)' }}>These are questions real buyers are asking AI assistants. Creating content that answers them increases your chances of being recommended.</p>
+                    <div className="space-y-2">
+                      {growthData.marketingStrategy.queries.map((q: string, i: number) => (
+                        <div key={i} className="flex items-start gap-3 p-3 rounded-lg border" style={{ borderColor: 'var(--border)', background: 'var(--bg-tertiary)' }}>
+                          <span className="flex items-center justify-center w-5 h-5 rounded-full text-xs font-bold shrink-0 mt-0.5" style={{ background: 'rgba(99,102,241,0.1)', color: '#6366F1' }}>{i + 1}</span>
+                          <p className="text-sm" style={{ color: 'var(--text-primary)' }}>&ldquo;{q}&rdquo;</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Pages to Create */}
+                {growthData.marketingStrategy.pages_to_create?.length > 0 && (
+                  <div className="mb-6">
+                    <h3 className="text-sm font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>Strategic Pages to Create</h3>
+                    <p className="text-xs mb-3" style={{ color: 'var(--text-tertiary)' }}>New pages that would significantly improve your AI discoverability for common buyer queries.</p>
+                    <div className="space-y-2">
+                      {growthData.marketingStrategy.pages_to_create.map((p: { title: string; why: string }, i: number) => (
+                        <div key={i} className="p-3 rounded-lg border" style={{ borderColor: 'var(--border)', background: 'var(--bg-tertiary)' }}>
+                          <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{p.title}</p>
+                          <p className="text-xs mt-1" style={{ color: 'var(--text-tertiary)' }}>{p.why}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Content to Optimize */}
+                {growthData.marketingStrategy.content_to_optimize?.length > 0 && (
+                  <div className="mb-6">
+                    <h3 className="text-sm font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>Content Optimization</h3>
+                    <p className="text-xs mb-3" style={{ color: 'var(--text-tertiary)' }}>Improvements to existing pages that would make them more useful to AI systems.</p>
+                    <div className="space-y-2">
+                      {growthData.marketingStrategy.content_to_optimize.map((c: { page: string; action: string }, i: number) => (
+                        <div key={i} className="flex items-start gap-3 p-3 rounded-lg border" style={{ borderColor: 'var(--border)', background: 'var(--bg-tertiary)' }}>
+                          <span className="text-xs font-bold px-2 py-0.5 rounded shrink-0" style={{ background: 'rgba(99,102,241,0.1)', color: '#6366F1' }}>{c.page}</span>
+                          <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>{c.action}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Schema Actions */}
+                {growthData.marketingStrategy.schema_actions?.length > 0 && (
+                  <div className="mb-6">
+                    <h3 className="text-sm font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>Structured Data Strategy</h3>
+                    <p className="text-xs mb-3" style={{ color: 'var(--text-tertiary)' }}>Schema markup that helps AI systems understand your content in machine-readable format.</p>
+                    <div className="space-y-2">
+                      {growthData.marketingStrategy.schema_actions.map((s: { action: string; impact: string }, i: number) => (
+                        <div key={i} className="p-3 rounded-lg border" style={{ borderColor: 'var(--border)', background: 'var(--bg-tertiary)' }}>
+                          <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{s.action}</p>
+                          <p className="text-xs mt-1" style={{ color: '#6366F1' }}>{s.impact}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Trust Actions */}
+                {growthData.marketingStrategy.trust_actions?.length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>Trust & Authority Building</h3>
+                    <p className="text-xs mb-3" style={{ color: 'var(--text-tertiary)' }}>Actions that help AI systems trust and confidently recommend your product.</p>
+                    <div className="space-y-2">
+                      {growthData.marketingStrategy.trust_actions.map((t: { action: string; impact: string }, i: number) => (
+                        <div key={i} className="p-3 rounded-lg border" style={{ borderColor: 'var(--border)', background: 'var(--bg-tertiary)' }}>
+                          <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{t.action}</p>
+                          <p className="text-xs mt-1" style={{ color: '#6366F1' }}>{t.impact}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
       </>
       )}
 
