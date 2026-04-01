@@ -57,10 +57,43 @@ export async function GET(
       crawlerStatuses,
       keyPagesStatus,
       pagePreviews,
+      perceptionData: audit.perception_data || null,
+      growthData: audit.growth_data || null,
     });
   } catch (error) {
     console.error('Fetch audit error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    const body = await request.json();
+    const supabase = await createServerSupabase();
+
+    const updateData: Record<string, unknown> = {};
+    if (body.userId) updateData.user_id = body.userId;
+    if (body.perceptionData) updateData.perception_data = body.perceptionData;
+    if (body.growthData) updateData.growth_data = body.growthData;
+
+    if (Object.keys(updateData).length > 0) {
+      await supabase.from('audits').update(updateData).eq('id', id);
+    }
+
+    // Also claim the site if userId is being set
+    if (body.userId) {
+      const { data: audit } = await supabase.from('audits').select('site_id').eq('id', id).single();
+      if (audit) { await supabase.from('sites').update({ user_id: body.userId }).eq('id', audit.site_id).is('user_id', null); }
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Patch audit error:', error);
+    return NextResponse.json({ error: 'Failed to update' }, { status: 500 });
   }
 }
 
@@ -155,20 +188,3 @@ function buildKeyPagesFromPages(pages: Record<string, unknown>[]) {
   });
 }
 
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const { id } = await params;
-    const { userId } = await request.json();
-    const supabase = await createServerSupabase();
-    await supabase.from('audits').update({ user_id: userId }).eq('id', id).is('user_id', null);
-    const { data: audit } = await supabase.from('audits').select('site_id').eq('id', id).single();
-    if (audit) { await supabase.from('sites').update({ user_id: userId }).eq('id', audit.site_id).is('user_id', null); }
-    return NextResponse.json({ ok: true });
-  } catch (error) {
-    console.error('Claim audit error:', error);
-    return NextResponse.json({ error: 'Failed to claim audit' }, { status: 500 });
-  }
-}

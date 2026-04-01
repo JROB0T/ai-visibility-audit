@@ -481,6 +481,8 @@ export default function AuditResultPage() {
 
     setPerceptionQuestions(coreQuestions);
     setPerceptionLoading(false);
+    // Save to DB so we don't re-generate on subsequent visits
+    fetch(`/api/audit/${params.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ perceptionData: coreQuestions }) }).catch(() => {});
   }
 
   async function loadGrowthStrategy() {
@@ -507,7 +509,10 @@ export default function AuditResultPage() {
         }),
       });
       if (res.ok) {
-        setGrowthData(await res.json());
+        const gd = await res.json();
+        setGrowthData(gd);
+        // Save to DB so we don't re-generate on subsequent visits
+        fetch(`/api/audit/${params.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ growthData: gd }) }).catch(() => {});
       }
     } catch { /* skip */ }
     finally { setGrowthLoading(false); }
@@ -523,6 +528,9 @@ export default function AuditResultPage() {
         if (!res.ok) { setError('Audit not found'); return; }
         const auditData = await res.json();
         setData(auditData);
+        // Restore previously saved perception and growth data
+        if (auditData.perceptionData) setPerceptionQuestions(auditData.perceptionData);
+        if (auditData.growthData) setGrowthData(auditData.growthData);
         if (user && auditData.audit && !auditData.audit.user_id) {
           await fetch(`/api/audit/${params.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: user.id }) }).catch(() => {});
         }
