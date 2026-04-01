@@ -9,12 +9,25 @@ export function ThemeWrapper({ children }: { children: React.ReactNode }) {
   const [userEmail, setUserEmail] = useState<string | null>(null);
 
   useEffect(() => {
+    const supabase = createClient();
+
+    // Check initial auth state
     async function checkAuth() {
-      const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
       if (user) setUserEmail(user.email || 'User');
     }
     checkAuth();
+
+    // Listen for auth state changes (login, signup, logout)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (session?.user) {
+        setUserEmail(session.user.email || 'User');
+      } else {
+        setUserEmail(null);
+      }
+    });
+
+    return () => { subscription.unsubscribe(); };
   }, []);
 
   async function handleSignOut() {
