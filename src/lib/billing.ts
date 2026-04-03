@@ -10,7 +10,8 @@ export function formatPrice(cents: number): string {
   return `$${(cents / 100).toFixed(2)}`;
 }
 
-export function isRescanBillable(_site: { has_monthly_monitoring?: boolean }): boolean {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export function isRescanBillable(site: { has_monthly_monitoring?: boolean }): boolean {
   return true;
 }
 
