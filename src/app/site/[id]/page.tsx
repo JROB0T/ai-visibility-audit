@@ -3,10 +3,11 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import ScoreRing from '@/components/ScoreRing';
-import { ArrowLeft, Plus, Clock, TrendingUp, ChevronRight, AlertTriangle, BarChart3 } from 'lucide-react';
+import { ArrowLeft, Plus, Clock, TrendingUp, ChevronRight, AlertTriangle, BarChart3, Building2 } from 'lucide-react';
+import { VERTICAL_OPTIONS } from '@/lib/verticals';
 
 interface SiteData {
-  site: { id: string; domain: string; url: string; created_at: string };
+  site: { id: string; domain: string; url: string; vertical: string | null; created_at: string };
   audits: Array<{
     id: string; status: string; overall_score: number | null;
     crawlability_score: number | null; machine_readability_score: number | null;
@@ -24,24 +25,36 @@ export default function SiteDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [scanning, setScanning] = useState(false);
   const [error, setError] = useState('');
+  const [siteVertical, setSiteVertical] = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
       try {
         const res = await fetch(`/api/site/${params.id}`);
         if (!res.ok) { setError('Site not found'); return; }
-        setData(await res.json());
+        const json = await res.json();
+        setData(json);
+        setSiteVertical(json.site.vertical);
       } catch { setError('Failed to load site'); }
       finally { setLoading(false); }
     }
     load();
   }, [params.id]);
 
+  async function handleVerticalChange(newVertical: string) {
+    setSiteVertical(newVertical);
+    await fetch(`/api/site/${params.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ vertical: newVertical }),
+    });
+  }
+
   async function handleRescan() {
     if (!data || scanning) return;
     setScanning(true);
     try {
-      const res = await fetch('/api/audit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: data.site.url }) });
+      const res = await fetch('/api/audit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: data.site.url, vertical: siteVertical }) });
       const result = await res.json();
       if (res.ok) router.push(`/audit/${result.auditId}`);
       else setError(result.error || 'Scan failed');
@@ -77,7 +90,22 @@ export default function SiteDashboardPage() {
         <div>
           <a href="/dashboard" className="text-sm inline-flex items-center gap-1 mb-2" style={{ color: '#6366F1' }}><ArrowLeft className="w-3.5 h-3.5" />All Sites</a>
           <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>{site.domain}</h1>
-          <p className="mt-1 text-sm" style={{ color: 'var(--text-tertiary)' }}>{completedAudits.length} scan{completedAudits.length !== 1 ? 's' : ''} · Added {new Date(site.created_at).toLocaleDateString()}</p>
+          <div className="mt-1 flex items-center gap-2 flex-wrap">
+            <div className="relative inline-flex items-center">
+              <Building2 className="absolute left-2 w-3.5 h-3.5" style={{ color: 'var(--text-tertiary)' }} />
+              <select
+                value={siteVertical || 'other'}
+                onChange={(e) => handleVerticalChange(e.target.value)}
+                className="pl-7 pr-2 py-0.5 rounded text-xs appearance-none"
+                style={{ background: 'var(--bg-tertiary)', color: 'var(--text-secondary)', border: 'none' }}
+              >
+                {VERTICAL_OPTIONS.map((v) => (
+                  <option key={v.value} value={v.value}>{v.label}</option>
+                ))}
+              </select>
+            </div>
+            <span className="text-sm" style={{ color: 'var(--text-tertiary)' }}>{completedAudits.length} scan{completedAudits.length !== 1 ? 's' : ''} · Added {new Date(site.created_at).toLocaleDateString()}</span>
+          </div>
         </div>
         <button onClick={handleRescan} disabled={scanning}
           className="btn-primary px-5 py-2.5 text-sm font-medium inline-flex items-center gap-2" style={{ opacity: scanning ? 0.7 : 1 }}>

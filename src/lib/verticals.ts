@@ -134,6 +134,22 @@ const VERTICAL_CONFIG: Record<VerticalType, VerticalConfig> = {
   },
 };
 
+export const VERTICAL_OPTIONS: { value: VerticalType; label: string }[] = [
+  { value: 'saas', label: 'SaaS / Software' },
+  { value: 'professional_services', label: 'Professional Services' },
+  { value: 'local_service', label: 'Local Service Business' },
+  { value: 'ecommerce', label: 'E-commerce' },
+  { value: 'healthcare', label: 'Healthcare / Clinic' },
+  { value: 'law_firm', label: 'Law Firm' },
+  { value: 'other', label: 'Other' },
+];
+
+export function getVerticalLabel(vertical: string | null): string {
+  if (!vertical) return 'Other';
+  const option = VERTICAL_OPTIONS.find(o => o.value === vertical);
+  return option?.label ?? 'Other';
+}
+
 export function getVerticalConfig(vertical: VerticalType | string | null): VerticalConfig {
   if (vertical && vertical in VERTICAL_CONFIG) {
     return VERTICAL_CONFIG[vertical as VerticalType];

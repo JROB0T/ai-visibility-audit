@@ -66,3 +66,40 @@ export async function GET(
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
+
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    const body = await request.json();
+    const supabase = await createServerSupabase();
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+    }
+
+    const { data: site } = await supabase.from('sites').select('id, user_id').eq('id', id).single();
+    if (!site || site.user_id !== user.id) {
+      return NextResponse.json({ error: 'Site not found' }, { status: 404 });
+    }
+
+    const validVerticals = ['saas', 'professional_services', 'local_service', 'ecommerce', 'healthcare', 'law_firm', 'other'];
+    const updateData: Record<string, string> = {};
+
+    if (body.vertical && validVerticals.includes(body.vertical)) {
+      updateData.vertical = body.vertical;
+    }
+
+    if (Object.keys(updateData).length > 0) {
+      await supabase.from('sites').update(updateData).eq('id', id);
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Site PATCH error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}

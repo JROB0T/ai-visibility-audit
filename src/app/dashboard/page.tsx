@@ -3,13 +3,15 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { Search, Globe, Plus, AlertTriangle, ChevronRight } from 'lucide-react';
+import { Search, Globe, Plus, AlertTriangle, ChevronRight, Building2 } from 'lucide-react';
 import { scoreToGrade, getScoreColor } from '@/components/ScoreRing';
+import { VERTICAL_OPTIONS, getVerticalLabel } from '@/lib/verticals';
 
 interface SiteWithLatest {
   id: string;
   domain: string;
   url: string;
+  vertical: string | null;
   created_at: string;
   latest_audit: {
     id: string; overall_score: number | null;
@@ -24,6 +26,7 @@ export default function DashboardPage() {
   const [sites, setSites] = useState<SiteWithLatest[]>([]);
   const [loading, setLoading] = useState(true);
   const [url, setUrl] = useState('');
+  const [vertical, setVertical] = useState('other');
   const [scanning, setScanning] = useState(false);
   const [error, setError] = useState('');
   const router = useRouter();
@@ -35,7 +38,7 @@ export default function DashboardPage() {
       if (!user) { router.push('/auth/login?redirect=/dashboard'); return; }
 
       const { data: userSites } = await supabase
-        .from('sites').select('id, domain, url, created_at')
+        .from('sites').select('id, domain, url, vertical, created_at')
         .eq('user_id', user.id).order('created_at', { ascending: false });
 
       if (!userSites || userSites.length === 0) { setLoading(false); return; }
@@ -69,7 +72,7 @@ export default function DashboardPage() {
     if (!url.trim()) return;
     setScanning(true); setError('');
     try {
-      const res = await fetch('/api/audit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: url.trim() }) });
+      const res = await fetch('/api/audit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: url.trim(), vertical }) });
       const data = await res.json();
       if (!res.ok) { setError(data.error || 'Scan failed'); return; }
       router.push(`/audit/${data.auditId}`);
@@ -99,6 +102,19 @@ export default function DashboardPage() {
             <input type="text" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="Enter a new website URL to scan…"
               className="w-full pl-10 pr-4 py-2.5 rounded-lg text-sm" style={{ background: 'var(--surface)', color: 'var(--text-primary)', border: '1px solid var(--border)' }} />
           </div>
+          <div className="relative shrink-0">
+            <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--text-tertiary)' }} />
+            <select
+              value={vertical}
+              onChange={(e) => setVertical(e.target.value)}
+              className="pl-9 pr-3 py-2.5 rounded-lg text-sm appearance-none"
+              style={{ background: 'var(--surface)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}
+            >
+              {VERTICAL_OPTIONS.map((v) => (
+                <option key={v.value} value={v.value}>{v.label}</option>
+              ))}
+            </select>
+          </div>
           <button type="submit" disabled={scanning} className="btn-primary px-5 py-2.5 text-sm font-medium inline-flex items-center gap-2" style={{ opacity: scanning ? 0.7 : 1 }}>
             {scanning ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Scanning…</> : <><Plus className="w-4 h-4" />Scan Site</>}
           </button>
@@ -123,7 +139,9 @@ export default function DashboardPage() {
                 <div className="flex items-start justify-between mb-3">
                   <div className="min-w-0">
                     <h3 className="font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{site.domain}</h3>
-                    <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>{site.audit_count} scan{site.audit_count !== 1 ? 's' : ''}{la && ` · Last: ${new Date(la.created_at).toLocaleDateString()}`}</p>
+                    <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>
+                      {getVerticalLabel(site.vertical)} · {site.audit_count} scan{site.audit_count !== 1 ? 's' : ''}{la && ` · ${new Date(la.created_at).toLocaleDateString()}`}
+                    </p>
                   </div>
                   <ChevronRight className="w-4 h-4 shrink-0 mt-1 opacity-0 group-hover:opacity-100 transition-opacity" style={{ color: '#6366F1' }} />
                 </div>

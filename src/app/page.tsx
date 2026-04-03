@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, CheckCircle, ArrowRight, Shield, FileText, Globe, Zap, AlertTriangle, Sparkles, Eye, Target, BarChart3 } from 'lucide-react';
+import { Search, CheckCircle, ArrowRight, Shield, FileText, Globe, Zap, AlertTriangle, Sparkles, Eye, Target, BarChart3, Building2 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { VERTICAL_OPTIONS } from '@/lib/verticals';
 
 const SCAN_STEPS = [
   { label: 'Checking robots.txt & crawler access' },
@@ -20,6 +21,7 @@ export default function HomePage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [scanStep, setScanStep] = useState(0);
+  const [vertical, setVertical] = useState('other');
   const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
   const router = useRouter();
 
@@ -48,7 +50,7 @@ export default function HomePage() {
       const res = await fetch('/api/audit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: url.trim() }),
+        body: JSON.stringify({ url: url.trim(), vertical }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -128,6 +130,19 @@ export default function HomePage() {
                         <>Audit <ArrowRight className="w-4 h-4" /></>
                       )}
                     </button>
+                  </div>
+                  <div className="relative mt-3">
+                    <Building2 className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: '#64748B' }} />
+                    <select
+                      value={vertical}
+                      onChange={(e) => setVertical(e.target.value)}
+                      className="w-full pl-10 pr-4 py-3 input-field appearance-none text-sm"
+                      disabled={loading}
+                    >
+                      {VERTICAL_OPTIONS.map((v) => (
+                        <option key={v.value} value={v.value}>{v.label}</option>
+                      ))}
+                    </select>
                   </div>
                   {error && (
                     <p className="mt-3 text-sm text-red-400 flex items-center gap-1.5">
@@ -324,6 +339,16 @@ export default function HomePage() {
                     {loading ? 'Scanning…' : 'Audit'}
                   </button>
                 </div>
+                <select
+                  value={vertical}
+                  onChange={(e) => setVertical(e.target.value)}
+                  className="w-full mt-3 px-4 py-3 input-light appearance-none text-sm"
+                  disabled={loading}
+                >
+                  {VERTICAL_OPTIONS.map((v) => (
+                    <option key={v.value} value={v.value}>{v.label}</option>
+                  ))}
+                </select>
               </form>
             ) : (
               <div className="mt-6 flex flex-col sm:flex-row gap-3 justify-center">
