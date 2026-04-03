@@ -651,6 +651,19 @@ export default function AuditResultPage() {
     return map;
   }, [filteredFindings]);
 
+  const auditDelta = useMemo(() => {
+    if (!data?.previousAudit) return null;
+    return compareAudits(
+      { overall_score: data.audit.overall_score, crawlability_score: data.audit.crawlability_score, machine_readability_score: data.audit.machine_readability_score, commercial_clarity_score: data.audit.commercial_clarity_score, trust_clarity_score: data.audit.trust_clarity_score, findings: data.findings, pages: data.pages },
+      { overall_score: data.previousAudit.overall_score, crawlability_score: data.previousAudit.crawlability_score, machine_readability_score: data.previousAudit.machine_readability_score, commercial_clarity_score: data.previousAudit.commercial_clarity_score, trust_clarity_score: data.previousAudit.trust_clarity_score, findings: data.previousAudit.findings, pages: data.previousAudit.pages }
+    );
+  }, [data]);
+
+  const monthlyActions = useMemo(() => {
+    if (!auditDelta || !data) return null;
+    return generateMonthlyActions(data.findings, auditDelta);
+  }, [data, auditDelta]);
+
   function togglePage(url: string) { setExpandedPages(prev => { const n = new Set(prev); if (n.has(url)) n.delete(url); else n.add(url); return n; }); }
   function toggleCategory(cat: string) { setExpandedCategories(prev => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; }); }
   function toggleCrawler(name: string) { setExpandedCrawlers(prev => { const n = new Set(prev); if (n.has(name)) n.delete(name); else n.add(name); return n; }); }
@@ -666,20 +679,6 @@ export default function AuditResultPage() {
   const highCount = allFindings.filter(f => f.severity === 'high').length;
   const medCount = allFindings.filter(f => f.severity === 'medium').length;
   const lowCount = allFindings.filter(f => f.severity === 'low').length;
-
-  const auditDelta = useMemo(() => {
-    if (!data?.previousAudit) return null;
-    return compareAudits(
-      { overall_score: data.audit.overall_score, crawlability_score: data.audit.crawlability_score, machine_readability_score: data.audit.machine_readability_score, commercial_clarity_score: data.audit.commercial_clarity_score, trust_clarity_score: data.audit.trust_clarity_score, findings: data.findings, pages: data.pages },
-      { overall_score: data.previousAudit.overall_score, crawlability_score: data.previousAudit.crawlability_score, machine_readability_score: data.previousAudit.machine_readability_score, commercial_clarity_score: data.previousAudit.commercial_clarity_score, trust_clarity_score: data.previousAudit.trust_clarity_score, findings: data.previousAudit.findings, pages: data.previousAudit.pages }
-    );
-  }, [data]);
-
-  const monthlyActions = useMemo(() => {
-    if (!auditDelta) return null;
-    if (!data) return null;
-    return generateMonthlyActions(data.findings, auditDelta);
-  }, [data, auditDelta]);
 
   function getFindingStateBadge(finding: typeof allFindings[0]) {
     if (!data?.previousAudit) return null;
