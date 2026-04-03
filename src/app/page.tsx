@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Search, CheckCircle, ArrowRight, Shield, FileText, Globe, Zap, AlertTriangle, Sparkles, Eye, Target, BarChart3 } from 'lucide-react';
+import { createClient } from '@/lib/supabase/client';
 
 const SCAN_STEPS = [
   { label: 'Checking robots.txt & crawler access' },
@@ -19,7 +20,15 @@ export default function HomePage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [scanStep, setScanStep] = useState(0);
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
   const router = useRouter();
+
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setIsLoggedIn(!!user);
+    });
+  }, []);
 
   useEffect(() => {
     if (!loading) { setScanStep(0); return; }
@@ -42,7 +51,11 @@ export default function HomePage() {
         body: JSON.stringify({ url: url.trim() }),
       });
       const data = await res.json();
-      if (!res.ok) { setError(data.error || 'Something went wrong.'); return; }
+      if (!res.ok) {
+        if (res.status === 401) { router.push('/auth/login'); return; }
+        setError(data.error || 'Something went wrong.');
+        return;
+      }
       router.push(`/audit/${data.auditId}`);
     } catch {
       setError('Could not connect. Please check the URL and try again.');
@@ -78,63 +91,78 @@ export default function HomePage() {
             <div className="flex-1 text-center lg:text-left">
               <div className="inline-flex items-center gap-2 text-xs font-medium px-3 py-1.5 rounded-full mb-6 border" style={{ color: '#818CF8', borderColor: 'rgba(99,102,241,0.2)', background: 'rgba(99,102,241,0.08)' }}>
                 <Sparkles className="w-3 h-3" />
-                AI Visibility Audit for SaaS
+                AI Visibility Audit
               </div>
               <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-white leading-[1.1] tracking-tight">
-                Can AI find{' '}
-                <span className="text-gradient">your site?</span>
+                See how AI finds{' '}
+                <span className="text-gradient">your business</span>
               </h1>
               <p className="mt-5 text-base sm:text-lg max-w-lg leading-relaxed" style={{ color: '#94A3B8' }}>
-                AI-powered search and assistants are reshaping discovery.
-                Find out if your key pages are visible — and get a prioritized fix list.
+                AI-powered search is how customers discover businesses today.
+                Find out if your site is visible — and get a clear plan to fix it.
               </p>
 
-              {/* Audit form */}
-              <form onSubmit={handleAudit} className="mt-8 max-w-md mx-auto lg:mx-0">
-                <div className="flex gap-2">
-                  <div className="relative flex-1">
-                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: '#64748B' }} />
-                    <input
-                      type="text"
-                      value={url}
-                      onChange={(e) => setUrl(e.target.value)}
-                      placeholder="yoursite.com"
-                      className="w-full pl-10 pr-4 py-3.5 input-field"
-                      disabled={loading}
-                    />
-                  </div>
-                  <button type="submit" disabled={loading || !url.trim()} className="px-6 py-3.5 btn-primary flex items-center gap-2 whitespace-nowrap">
-                    {loading ? (
-                      <><svg className="animate-spin w-4 h-4" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>Scanning…</>
-                    ) : (
-                      <>Audit <ArrowRight className="w-4 h-4" /></>
-                    )}
-                  </button>
+              {/* Auth-gated: scan form for logged-in, CTAs for logged-out */}
+              {isLoggedIn === null ? (
+                <div className="mt-8 max-w-md mx-auto lg:mx-0">
+                  <div className="h-14 rounded-xl animate-pulse" style={{ background: 'rgba(99,102,241,0.1)' }} />
                 </div>
-                {error && (
-                  <p className="mt-3 text-sm text-red-400 flex items-center gap-1.5">
-                    <AlertTriangle className="w-4 h-4 shrink-0" />{error}
-                  </p>
-                )}
-                {loading && (
-                  <div className="mt-4 card-dark p-4">
-                    <div className="space-y-2">
-                      {SCAN_STEPS.map((step, i) => (
-                        <div key={i} className={`flex items-center gap-2.5 text-sm transition-all duration-300 ${i < scanStep ? 'text-emerald-400' : i === scanStep ? 'text-indigo-300 font-medium' : 'text-slate-600'}`}>
-                          {i < scanStep ? (
-                            <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
-                          ) : i === scanStep ? (
-                            <svg className="animate-spin w-4 h-4 text-indigo-400 shrink-0" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
-                          ) : (
-                            <div className="w-4 h-4 rounded-full border shrink-0" style={{ borderColor: '#1E293B' }} />
-                          )}
-                          <span>{step.label}</span>
-                        </div>
-                      ))}
+              ) : isLoggedIn ? (
+                <form onSubmit={handleAudit} className="mt-8 max-w-md mx-auto lg:mx-0">
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: '#64748B' }} />
+                      <input
+                        type="text"
+                        value={url}
+                        onChange={(e) => setUrl(e.target.value)}
+                        placeholder="yoursite.com"
+                        className="w-full pl-10 pr-4 py-3.5 input-field"
+                        disabled={loading}
+                      />
                     </div>
+                    <button type="submit" disabled={loading || !url.trim()} className="px-6 py-3.5 btn-primary flex items-center gap-2 whitespace-nowrap">
+                      {loading ? (
+                        <><svg className="animate-spin w-4 h-4" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>Scanning…</>
+                      ) : (
+                        <>Audit <ArrowRight className="w-4 h-4" /></>
+                      )}
+                    </button>
                   </div>
-                )}
-              </form>
+                  {error && (
+                    <p className="mt-3 text-sm text-red-400 flex items-center gap-1.5">
+                      <AlertTriangle className="w-4 h-4 shrink-0" />{error}
+                    </p>
+                  )}
+                  {loading && (
+                    <div className="mt-4 card-dark p-4">
+                      <div className="space-y-2">
+                        {SCAN_STEPS.map((step, i) => (
+                          <div key={i} className={`flex items-center gap-2.5 text-sm transition-all duration-300 ${i < scanStep ? 'text-emerald-400' : i === scanStep ? 'text-indigo-300 font-medium' : 'text-slate-600'}`}>
+                            {i < scanStep ? (
+                              <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
+                            ) : i === scanStep ? (
+                              <svg className="animate-spin w-4 h-4 text-indigo-400 shrink-0" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+                            ) : (
+                              <div className="w-4 h-4 rounded-full border shrink-0" style={{ borderColor: '#1E293B' }} />
+                            )}
+                            <span>{step.label}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </form>
+              ) : (
+                <div className="mt-8 max-w-md mx-auto lg:mx-0 flex flex-col sm:flex-row gap-3">
+                  <a href="/auth/signup" className="px-6 py-3.5 btn-primary flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium">
+                    Start Your Free Scan <ArrowRight className="w-4 h-4" />
+                  </a>
+                  <a href="/auth/login" className="px-6 py-3.5 rounded-xl border text-sm font-medium flex items-center justify-center gap-2 whitespace-nowrap transition-colors" style={{ color: '#94A3B8', borderColor: 'rgba(148,163,184,0.2)' }}>
+                    Sign In
+                  </a>
+                </div>
+              )}
             </div>
 
             {/* Right: Demo score card */}
@@ -184,17 +212,17 @@ export default function HomePage() {
           <div className="text-center mb-14">
             <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: '#6366F1' }}>The Problem</span>
             <h2 className="mt-3 text-3xl sm:text-4xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>
-              AI is the new front door for buyers
+              AI is the new front door for your customers
             </h2>
             <p className="mt-4 text-lg max-w-2xl mx-auto leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-              If your site isn&apos;t structured for AI crawlers and AI-powered search, you&apos;re invisible to a growing share of your market.
+              If your site isn&apos;t structured for AI crawlers and AI-powered search, potential customers won&apos;t find you.
             </p>
           </div>
           <div className="grid sm:grid-cols-3 gap-5">
             {[
-              { icon: <Eye className="w-5 h-5" />, iconBg: '#FEE2E2', iconColor: '#EF4444', title: "AI can't find key pages", desc: 'Missing sitemaps, blocked crawlers, or poor structure means AI never indexes your pricing, product, or demo pages.' },
-              { icon: <FileText className="w-5 h-5" />, iconBg: '#FEF3C7', iconColor: '#F59E0B', title: "Content isn't machine-readable", desc: 'Without structured data and semantic HTML, AI struggles to understand what your pages actually offer.' },
-              { icon: <Target className="w-5 h-5" />, iconBg: '#E0E7FF', iconColor: '#6366F1', title: 'Competitors get recommended', desc: "When AI can't confidently reference your product, it recommends whoever has better-structured content." },
+              { icon: <Eye className="w-5 h-5" />, iconBg: '#FEE2E2', iconColor: '#EF4444', title: "AI can't find your pages", desc: 'Missing sitemaps, blocked crawlers, or poor structure means AI never indexes your most important pages.' },
+              { icon: <FileText className="w-5 h-5" />, iconBg: '#FEF3C7', iconColor: '#F59E0B', title: "Your content isn't machine-readable", desc: 'Without structured data and clear page structure, AI struggles to understand what your business offers.' },
+              { icon: <Target className="w-5 h-5" />, iconBg: '#E0E7FF', iconColor: '#6366F1', title: 'Your competitors get recommended', desc: "When AI can't confidently reference your business, it recommends whoever has better-structured content." },
             ].map((item, i) => (
               <div key={i} className="card-glow p-6 anim-in" style={{ animationDelay: `${i * 0.1}s` }}>
                 <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-4" style={{ background: item.iconBg, color: item.iconColor }}>{item.icon}</div>
@@ -270,12 +298,12 @@ export default function HomePage() {
       <section className="py-20 sm:py-28 border-y" style={{ background: 'var(--bg-secondary)', borderColor: 'var(--border)' }}>
         <div className="max-w-5xl mx-auto px-4 sm:px-6 text-center">
           <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: '#6366F1' }}>Who It&apos;s For</span>
-          <h2 className="mt-3 text-3xl sm:text-4xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>Built for B2B SaaS teams</h2>
+          <h2 className="mt-3 text-3xl sm:text-4xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>Built for businesses that want to be found</h2>
           <p className="mt-4 text-lg max-w-2xl mx-auto leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-            Marketing leads, founders, and growth teams who need their site discoverable by AI-powered search and assistants.
+            Business owners, marketing leads, and growth teams who want their site discoverable by AI-powered search and assistants.
           </p>
           <div className="mt-8 flex flex-wrap justify-center gap-2.5">
-            {['Cybersecurity', 'Dev Tools', 'Martech', 'HR Tech', 'Fintech', 'Analytics', 'Data Platforms', 'Infrastructure'].map((tag) => (
+            {['Local Services', 'Professional Services', 'SaaS', 'E-commerce', 'Healthcare', 'Law Firms', 'Agencies', 'Consulting'].map((tag) => (
               <span key={tag} className="px-4 py-2 text-sm rounded-full border font-medium" style={{ color: 'var(--text-secondary)', borderColor: 'var(--border)', background: 'var(--surface)' }}>{tag}</span>
             ))}
           </div>
@@ -286,16 +314,27 @@ export default function HomePage() {
       <section className="py-20 sm:py-28" style={{ background: 'var(--bg)' }}>
         <div className="max-w-lg mx-auto px-4 sm:px-6 text-center">
           <div className="card-glow p-8 sm:p-10" style={{ boxShadow: '0 0 40px -10px rgba(99,102,241,0.1)' }}>
-            <h2 className="text-2xl sm:text-3xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>Get your AI Visibility Score</h2>
-            <p className="mt-3" style={{ color: 'var(--text-secondary)' }}>See how AI systems perceive your site. Takes about 30 seconds.</p>
-            <form onSubmit={handleAudit} className="mt-6">
-              <div className="flex gap-2">
-                <input type="text" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="yoursite.com" className="flex-1 px-4 py-3.5 input-light" disabled={loading} />
-                <button type="submit" disabled={loading || !url.trim()} className="px-6 py-3.5 btn-primary flex items-center gap-2 whitespace-nowrap">
-                  {loading ? 'Scanning…' : 'Audit'}
-                </button>
+            <h2 className="text-2xl sm:text-3xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>See how AI systems find your business</h2>
+            <p className="mt-3" style={{ color: 'var(--text-secondary)' }}>Get your AI Visibility Score and a clear action plan. Takes about 30 seconds.</p>
+            {isLoggedIn ? (
+              <form onSubmit={handleAudit} className="mt-6">
+                <div className="flex gap-2">
+                  <input type="text" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="yoursite.com" className="flex-1 px-4 py-3.5 input-light" disabled={loading} />
+                  <button type="submit" disabled={loading || !url.trim()} className="px-6 py-3.5 btn-primary flex items-center gap-2 whitespace-nowrap">
+                    {loading ? 'Scanning…' : 'Audit'}
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <div className="mt-6 flex flex-col sm:flex-row gap-3 justify-center">
+                <a href="/auth/signup" className="px-6 py-3.5 btn-primary flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium">
+                  Start Your Free Scan <ArrowRight className="w-4 h-4" />
+                </a>
+                <a href="/auth/login" className="px-6 py-3.5 rounded-xl border text-sm font-medium flex items-center justify-center gap-2 whitespace-nowrap transition-colors" style={{ color: 'var(--text-secondary)', borderColor: 'var(--border)' }}>
+                  Sign In
+                </a>
               </div>
-            </form>
+            )}
           </div>
         </div>
       </section>

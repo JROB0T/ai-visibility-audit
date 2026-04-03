@@ -60,8 +60,8 @@ export function ThemeWrapper({ children }: { children: React.ReactNode }) {
               </>
             ) : (
               <>
-                <a href="/dashboard" className="text-sm px-3 py-1.5 rounded-lg transition-colors" style={{ color: 'var(--text-secondary)' }}>Dashboard</a>
-                <a href="/auth/login" className="text-sm font-medium px-3.5 py-1.5 rounded-lg border transition-colors" style={{ color: '#6366F1', borderColor: 'rgba(99,102,241,0.2)' }}>Sign in</a>
+                <a href="/auth/login" className="text-sm px-3 py-1.5 rounded-lg transition-colors font-medium" style={{ color: 'var(--text-secondary)' }}>Sign In</a>
+                <a href="/auth/signup" className="text-sm font-medium px-3.5 py-1.5 rounded-lg transition-colors text-white" style={{ background: '#6366F1' }}>Get Started</a>
               </>
             )}
             <ThemeToggle />

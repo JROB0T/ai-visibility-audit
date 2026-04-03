@@ -26,25 +26,27 @@ export async function POST(request: NextRequest) {
     const supabase = await createServerSupabase();
     const { data: { user } } = await supabase.auth.getUser();
 
+    if (!user) {
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+    }
+
     // Reuse existing site record for the same domain + user
     let site;
-    if (user) {
-      const { data: existingSite } = await supabase
-        .from('sites')
-        .select()
-        .eq('domain', domain)
-        .eq('user_id', user.id)
-        .single();
-      
-      if (existingSite) {
-        site = existingSite;
-      }
+    const { data: existingSite } = await supabase
+      .from('sites')
+      .select()
+      .eq('domain', domain)
+      .eq('user_id', user.id)
+      .single();
+
+    if (existingSite) {
+      site = existingSite;
     }
 
     if (!site) {
       const { data: newSite, error: siteError } = await supabase
         .from('sites')
-        .insert({ domain, url: siteUrl, user_id: user?.id || null })
+        .insert({ domain, url: siteUrl, user_id: user.id })
         .select()
         .single();
 
@@ -58,7 +60,7 @@ export async function POST(request: NextRequest) {
     // Create audit record
     const { data: audit, error: auditError } = await supabase
       .from('audits')
-      .insert({ site_id: site.id, user_id: user?.id || null, status: 'running' })
+      .insert({ site_id: site.id, user_id: user.id, status: 'running' })
       .select()
       .single();
 
