@@ -7,6 +7,7 @@ import ScoreRing, { ScoreBar, scoreToGrade, getScoreColor } from '@/components/S
 import SeverityBadge, { EffortBadge } from '@/components/SeverityBadge';
 import { Lock, ArrowRight, ArrowLeft, CheckCircle, XCircle, ExternalLink, FileText, AlertTriangle, RefreshCw, ChevronDown, ChevronRight, Filter, Shield, Code, Eye, Bot, Copy, Check, Globe, Minus, LayoutGrid, Wrench, Zap, MonitorSmartphone, X, Download, TrendingUp, Target, Users, CalendarCheck } from 'lucide-react';
 import { compareAudits, classifyFinding, generateMonthlyActions } from '@/lib/deltas';
+import { getExpectedPages, getVerticalConfig } from '@/lib/verticals';
 
 // ============================================================
 // Types
@@ -29,7 +30,7 @@ interface AuditData {
     crawlability_score: number | null; machine_readability_score: number | null;
     commercial_clarity_score: number | null; trust_clarity_score: number | null;
     pages_scanned: number; summary: string | null; created_at: string;
-    completed_at: string | null; site: { domain: string; url: string };
+    completed_at: string | null; site: { domain: string; url: string; vertical?: string | null };
   };
   pages: Array<{
     id: string; url: string; page_type: string; title: string | null;
@@ -257,6 +258,9 @@ function getKeyPageDetail(type: string, domain: string): { title: string; whyItM
     privacy: { title: 'Privacy Policy', whyItMatters: 'A privacy policy is a baseline trust signal. Its absence signals to AI systems that the business may not be established or trustworthy.', whatToInclude: ['What data you collect', 'How data is used', 'Data retention policies', 'User rights (access, deletion)', 'Cookie policy', 'Contact for privacy inquiries', 'Last updated date'], exampleCode: `<!-- ${url}/privacy -->\n<title>Privacy Policy — ${cap}</title>\n<meta name="description" content="${cap} privacy policy. How we collect, use, and protect your data.">\n<h1>Privacy Policy</h1>\n<p>Last updated: ${new Date().toLocaleDateString()}</p>` },
     comparison: { title: 'Comparison Pages', whyItMatters: 'When users ask AI "X vs Y" or "alternatives to Z", comparison pages make you part of that conversation. Without them, competitors with comparison pages win those queries.', whatToInclude: ['Feature-by-feature comparison table', 'Honest pros/cons', 'Pricing comparison', 'Use case fit analysis', 'Clear CTA for your product'], exampleCode: `<!-- ${url}/compare/competitor -->\n<title>${cap} vs [Competitor] — Feature Comparison</title>\n<meta name="description" content="Compare ${cap} and [Competitor]. See features, pricing, and which is right for your team.">\n<h1>${cap} vs [Competitor]</h1>` },
     integrations: { title: 'Integrations', whyItMatters: 'AI uses integration data to recommend products that work with a user\'s existing tools. "Does X integrate with Slack?" is a common AI query.', whatToInclude: ['List of all integrations', 'Category grouping (CRM, messaging, analytics)', 'Setup instructions per integration', 'API/webhook documentation', 'Logos of integration partners'], exampleCode: `<!-- ${url}/integrations -->\n<title>${cap} Integrations — Connect Your Tools</title>\n<meta name="description" content="${cap} integrates with Slack, Salesforce, HubSpot, and 50+ other tools.">\n<h1>Integrations</h1>` },
+    'use-case': { title: 'Services / Use Cases', whyItMatters: 'Service and use case pages help AI match your business to specific customer needs and queries.', whatToInclude: ['Clear description of each service or use case', 'Who it\'s for and what problem it solves', 'Pricing or next steps', 'Testimonials or case study excerpts', 'Internal links to related pages'], exampleCode: `<!-- ${url}/services/[service-name] -->\n<title>[Service Name] — ${cap}</title>\n<meta name="description" content="${cap} offers [service]. Learn how we help [audience] with [problem].">\n<h1>[Service Name]</h1>` },
+    resource: { title: 'Resources / Case Studies', whyItMatters: 'Case studies and resource pages give AI concrete evidence of your work and expertise to reference when recommending your business.', whatToInclude: ['Client name and industry', 'Problem description', 'Your solution and approach', 'Measurable results', 'Testimonial or quote'], exampleCode: `<!-- ${url}/case-studies/[client] -->\n<title>[Client] Case Study — ${cap}</title>\n<meta name="description" content="See how ${cap} helped [client] achieve [result].">\n<h1>Case Study: [Client Name]</h1>` },
+    changelog: { title: 'Changelog / Updates', whyItMatters: 'A changelog signals active development to AI systems. It helps AI confirm your product is maintained and evolving.', whatToInclude: ['Dated entries for each release', 'New features and improvements', 'Bug fixes', 'Clear version numbers', 'Links to documentation'], exampleCode: `<!-- ${url}/changelog -->\n<title>Changelog — ${cap}</title>\n<meta name="description" content="See the latest updates and improvements to ${cap}.">\n<h1>${cap} Changelog</h1>` },
   };
 
   return details[type] || { title: type, whyItMatters: 'This page type helps AI systems better understand your site.', whatToInclude: ['Clear page title and meta description', 'Relevant structured data', 'Internal links to other key pages'], exampleCode: `<title>[Page Title] — ${cap}</title>\n<meta name="description" content="[Page description]">` };
@@ -397,6 +401,7 @@ export default function AuditResultPage() {
   const [expandedCrawlers, setExpandedCrawlers] = useState<Set<string>>(new Set());
   const [selectedKeyPage, setSelectedKeyPage] = useState<KeyPageStatus | null>(null);
   const [selectedPerceptionQ, setSelectedPerceptionQ] = useState<number | null>(null);
+  const [showAllMissing, setShowAllMissing] = useState(false);
 
   function handleExportReport() {
     if (!data) return;
@@ -995,29 +1000,86 @@ export default function AuditResultPage() {
         </div>
       )}
 
-      {/* 4. KEY PAGES STATUS */}
-      {isAuthenticated && keyPagesStatus && keyPagesStatus.length > 0 && (
-        <div className="card p-6 mb-6">
-          <div className="flex items-center gap-2 mb-4">
-            <Globe className="w-5 h-5" style={{ color: '#6366F1' }} />
-            <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>Key Pages Status</h2>
+      {/* 4. KEY PAGES STATUS (vertical-aware) */}
+      {isAuthenticated && (() => {
+        const siteVertical = audit.site?.vertical || 'other';
+        const expectedPages = getExpectedPages(siteVertical);
+        const verticalConfig = getVerticalConfig(siteVertical);
+        const verticalKeyPages = expectedPages.map((ep) => {
+          const scannedPage = pages.find((p) => p.page_type === ep.type);
+          return { type: ep.type, label: ep.label, found: !!scannedPage, url: scannedPage?.url || null, why: ep.why };
+        });
+        const missingPages = verticalKeyPages.filter((kp) => !kp.found);
+        return (<>
+          <div className="card p-6 mb-6">
+            <div className="flex items-center gap-2 mb-4">
+              <Globe className="w-5 h-5" style={{ color: '#6366F1' }} />
+              <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>Key Pages for Your {verticalConfig.label} Site</h2>
+            </div>
+            <p className="text-sm mb-4" style={{ color: 'var(--text-tertiary)' }}>These are the pages AI needs to accurately describe and recommend your business. Click any page for details.</p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {verticalKeyPages.map((kp) => (
+                <button key={kp.type} onClick={() => setSelectedKeyPage(kp)}
+                  className="rounded-lg p-3 border text-left transition-all hover:shadow-md" style={{ borderColor: kp.found ? 'rgba(16,185,129,0.2)' : 'rgba(239,68,68,0.2)', background: kp.found ? 'rgba(16,185,129,0.05)' : 'rgba(239,68,68,0.05)', cursor: 'pointer' }}>
+                  <p className="text-xs font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>{kp.label}</p>
+                  {kp.found ? (
+                    <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-500"><CheckCircle className="w-3.5 h-3.5" />Found</span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 text-xs font-semibold text-red-500"><XCircle className="w-3.5 h-3.5" />Missing</span>
+                  )}
+                </button>
+              ))}
+            </div>
           </div>
-          <p className="text-sm mb-4" style={{ color: 'var(--text-tertiary)' }}>Can AI find the pages that matter most? Click any missing page for details and recommended code.</p>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {keyPagesStatus.map((kp) => (
-              <button key={kp.type} onClick={() => setSelectedKeyPage(kp)}
-                className="rounded-lg p-3 border text-left transition-all hover:shadow-md" style={{ borderColor: kp.found ? 'rgba(16,185,129,0.2)' : 'rgba(239,68,68,0.2)', background: kp.found ? 'rgba(16,185,129,0.05)' : 'rgba(239,68,68,0.05)', cursor: 'pointer' }}>
-                <p className="text-xs font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>{kp.label}</p>
-                {kp.found ? (
-                  <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-500"><CheckCircle className="w-3.5 h-3.5" />Found</span>
-                ) : (
-                  <span className="inline-flex items-center gap-1 text-xs font-semibold text-red-500"><XCircle className="w-3.5 h-3.5" />Missing</span>
+
+          {/* 4b. MISSING PAGES BLUEPRINT */}
+          {missingPages.length > 0 && (
+            <div className="card p-6 mb-6">
+              <div className="flex items-center gap-2 mb-1">
+                <FileText className="w-5 h-5" style={{ color: '#F59E0B' }} />
+                <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>Pages Your {verticalConfig.label} Site Needs</h2>
+              </div>
+              <p className="text-sm mb-4" style={{ color: 'var(--text-tertiary)' }}>{missingPages.length} key page{missingPages.length !== 1 ? 's are' : ' is'} missing. Here&apos;s why each matters and what to include.</p>
+              <div className="space-y-3">
+                {missingPages.slice(0, showAllMissing ? undefined : 3).map((mp) => {
+                  const detail = getKeyPageDetail(mp.type, audit.site?.domain || 'example.com');
+                  return (
+                    <div key={mp.type} className="rounded-lg border p-4" style={{ borderColor: 'rgba(239,68,68,0.15)', background: 'rgba(239,68,68,0.03)' }}>
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <XCircle className="w-4 h-4 shrink-0 text-red-400" />
+                            <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{mp.label}</h3>
+                          </div>
+                          <p className="text-xs mb-2" style={{ color: 'var(--text-secondary)' }}>{mp.why}</p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {detail.whatToInclude.slice(0, 3).map((item, i) => (
+                              <span key={i} className="text-xs px-2 py-0.5 rounded" style={{ color: 'var(--text-tertiary)', background: 'var(--bg-tertiary)' }}>{item}</span>
+                            ))}
+                          </div>
+                        </div>
+                        <button onClick={() => setSelectedKeyPage(mp)} className="shrink-0 text-xs font-medium px-2 py-1 rounded" style={{ color: '#6366F1', background: 'rgba(99,102,241,0.08)' }}>
+                          View Details
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+                {missingPages.length > 3 && !showAllMissing && (
+                  <button onClick={() => setShowAllMissing(true)} className="text-xs font-medium flex items-center gap-1" style={{ color: '#6366F1' }}>
+                    <ChevronDown className="w-3.5 h-3.5" />Show {missingPages.length - 3} more missing page{missingPages.length - 3 !== 1 ? 's' : ''}
+                  </button>
                 )}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
+                {missingPages.length > 3 && showAllMissing && (
+                  <button onClick={() => setShowAllMissing(false)} className="text-xs font-medium flex items-center gap-1" style={{ color: '#6366F1' }}>
+                    Show fewer
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+        </>);
+      })()}
 
       {/* KEY PAGE DETAIL SIDE PANEL */}
       {selectedKeyPage && (
@@ -1088,7 +1150,7 @@ export default function AuditResultPage() {
             <Shield className="w-5 h-5" style={{ color: '#6366F1' }} />
             <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>AI Source Visibility</h2>
           </div>
-          <p className="text-sm mb-4" style={{ color: 'var(--text-tertiary)' }}>How visible and useful your site is to each AI system. Click any source for details.</p>
+          <p className="text-sm mb-4" style={{ color: 'var(--text-tertiary)' }}>Which AI systems can access your site and recommend your business? Click any to learn more.</p>
           <div className="space-y-2">
             {crawlerStatuses.map((c) => {
               const isExp = expandedCrawlers.has(c.name);
@@ -1105,7 +1167,7 @@ export default function AuditResultPage() {
                           <span className="text-xs px-1.5 py-0.5 rounded" style={{ color: 'var(--text-tertiary)', background: 'var(--bg-tertiary)' }}>{c.operator}</span>
                           <span className="text-xs px-1.5 py-0.5 rounded" style={{ color: c.visibilityValue === 'search_citation' ? '#6366F1' : c.visibilityValue === 'assistant_browsing' ? '#F59E0B' : '#64748B', background: c.visibilityValue === 'search_citation' ? 'rgba(99,102,241,0.1)' : c.visibilityValue === 'assistant_browsing' ? 'rgba(245,158,11,0.1)' : 'var(--bg-tertiary)' }}>{c.visibilityLabel}</span>
                         </div>
-                        {c.barriers.length > 0 && !isExp && <p className="text-xs mt-0.5 truncate" style={{ color: 'var(--text-tertiary)' }}>{c.barriers[0]}</p>}
+                        {!isExp && <p className="text-xs mt-0.5 truncate" style={{ color: 'var(--text-tertiary)' }}>{c.description}</p>}
                       </div>
                     </div>
                     <div className="flex items-center gap-3 shrink-0">

@@ -128,16 +128,16 @@ export async function PATCH(
 
 function buildCrawlerStatusesFromFindings(findings: Record<string, unknown>[], recommendations: Record<string, unknown>[]) {
   const CRAWLERS = [
-    { name: 'GPTBot', displayName: 'GPTBot', operator: 'OpenAI', visibilityValue: 'search_citation', visibilityLabel: 'Search & Citation', description: 'OpenAI\'s web crawler that indexes content for ChatGPT and other OpenAI products.', focuses: ['structured_data', 'clear_content', 'product_pages'] },
-    { name: 'ChatGPT-User', displayName: 'ChatGPT User', operator: 'OpenAI', visibilityValue: 'assistant_browsing', visibilityLabel: 'Assistant Browsing', description: 'Fetches pages in real-time when ChatGPT users browse the web.', focuses: ['fast_loading', 'clear_content', 'pricing'] },
-    { name: 'Google-Extended', displayName: 'Google AI', operator: 'Google', visibilityValue: 'search_citation', visibilityLabel: 'Search & Citation', description: 'Google\'s crawler for AI products including Gemini.', focuses: ['structured_data', 'schema', 'open_graph'] },
-    { name: 'ClaudeBot', displayName: 'ClaudeBot', operator: 'Anthropic', visibilityValue: 'search_citation', visibilityLabel: 'Search & Citation', description: 'Anthropic\'s web crawler used to help Claude access and reference web content.', focuses: ['clear_content', 'trust_signals'] },
-    { name: 'PerplexityBot', displayName: 'PerplexityBot', operator: 'Perplexity AI', visibilityValue: 'search_citation', visibilityLabel: 'Search & Citation', description: 'Perplexity\'s crawler for its AI search engine. Directly cites sources in answers.', focuses: ['clear_content', 'pricing', 'comparison'] },
-    { name: 'Anthropic', displayName: 'Anthropic', operator: 'Anthropic', visibilityValue: 'training_corpus', visibilityLabel: 'Training & Corpus', description: 'Anthropic\'s general crawler for building Claude\'s capabilities.', focuses: ['clear_content', 'trust_signals'] },
-    { name: 'CCBot', displayName: 'CCBot', operator: 'Common Crawl', visibilityValue: 'training_corpus', visibilityLabel: 'Training & Corpus', description: 'Common Crawl\'s web crawler that builds a free, open web archive used by many AI companies.', focuses: ['clear_content'] },
-    { name: 'Amazonbot', displayName: 'Amazonbot', operator: 'Amazon', visibilityValue: 'assistant_browsing', visibilityLabel: 'Assistant Browsing', description: 'Amazon\'s crawler for Alexa AI and product recommendation systems.', focuses: ['product_pages', 'pricing'] },
-    { name: 'Meta-ExternalAgent', displayName: 'Meta AI', operator: 'Meta', visibilityValue: 'search_citation', visibilityLabel: 'Search & Citation', description: 'Meta\'s crawler for AI products including Meta AI assistant.', focuses: ['open_graph', 'social_signals'] },
-    { name: 'Bytespider', displayName: 'Bytespider', operator: 'ByteDance', visibilityValue: 'unknown', visibilityLabel: 'Unknown', description: 'ByteDance\'s web crawler for various AI features.', focuses: ['clear_content'] },
+    { name: 'GPTBot', displayName: 'GPTBot', operator: 'OpenAI', visibilityValue: 'search_citation', visibilityLabel: 'Search & Citation', description: 'Helps your business show up when people ask ChatGPT questions.', focuses: ['structured_data', 'clear_content', 'product_pages'] },
+    { name: 'ChatGPT-User', displayName: 'ChatGPT User', operator: 'OpenAI', visibilityValue: 'assistant_browsing', visibilityLabel: 'Assistant Browsing', description: 'Lets ChatGPT visit your site in real-time to answer user questions.', focuses: ['fast_loading', 'clear_content', 'pricing'] },
+    { name: 'Google-Extended', displayName: 'Google AI', operator: 'Google', visibilityValue: 'search_citation', visibilityLabel: 'Search & Citation', description: 'Controls whether Google\'s AI features can reference your content.', focuses: ['structured_data', 'schema', 'open_graph'] },
+    { name: 'ClaudeBot', displayName: 'ClaudeBot', operator: 'Anthropic', visibilityValue: 'search_citation', visibilityLabel: 'Search & Citation', description: 'Helps your business appear in Claude AI answers.', focuses: ['clear_content', 'trust_signals'] },
+    { name: 'PerplexityBot', displayName: 'PerplexityBot', operator: 'Perplexity AI', visibilityValue: 'search_citation', visibilityLabel: 'Search & Citation', description: 'Gets your site cited in Perplexity search results.', focuses: ['clear_content', 'pricing', 'comparison'] },
+    { name: 'Anthropic', displayName: 'Anthropic', operator: 'Anthropic', visibilityValue: 'training_corpus', visibilityLabel: 'Training & Corpus', description: 'Helps Claude learn about businesses like yours to give better recommendations.', focuses: ['clear_content', 'trust_signals'] },
+    { name: 'CCBot', displayName: 'CCBot', operator: 'Common Crawl', visibilityValue: 'training_corpus', visibilityLabel: 'Training & Corpus', description: 'Builds a public web archive that many AI systems use to learn about businesses.', focuses: ['clear_content'] },
+    { name: 'Amazonbot', displayName: 'Amazonbot', operator: 'Amazon', visibilityValue: 'assistant_browsing', visibilityLabel: 'Assistant Browsing', description: 'Powers Alexa AI and Amazon product recommendations.', focuses: ['product_pages', 'pricing'] },
+    { name: 'Meta-ExternalAgent', displayName: 'Meta AI', operator: 'Meta', visibilityValue: 'search_citation', visibilityLabel: 'Search & Citation', description: 'Helps your business appear in Meta AI assistant answers across Facebook and Instagram.', focuses: ['open_graph', 'social_signals'] },
+    { name: 'Bytespider', displayName: 'Bytespider', operator: 'ByteDance', visibilityValue: 'unknown', visibilityLabel: 'Unknown', description: 'Used by ByteDance for AI-powered content discovery.', focuses: ['clear_content'] },
   ];
 
   const allItems = [...findings, ...recommendations];
@@ -150,31 +150,31 @@ function buildCrawlerStatusesFromFindings(findings: Record<string, unknown>[], r
   return CRAWLERS.map((meta) => {
     let status: string = 'no_rule';
     let statusBasis = 'default';
-    let statusDetail = 'No specific rule found — allowed by default';
+    let statusDetail = 'Allowed — no blocking rules found';
 
     if (noRobots) {
-      statusDetail = 'No robots.txt found — all crawlers allowed by default';
+      statusDetail = 'Allowed — no robots.txt file found, so all AI systems can access your site';
     } else if (blockedNames.some((b: string) => meta.name.toLowerCase().includes(b) || b.includes(meta.name.toLowerCase()))) {
       status = 'blocked'; statusBasis = 'explicit_rule';
-      statusDetail = `Blocked via robots.txt rule for ${meta.name}`;
+      statusDetail = `Blocked — your robots.txt file prevents ${meta.displayName} from accessing your site`;
     } else if (!blockFinding) {
       status = 'allowed'; statusBasis = 'default';
-      statusDetail = 'No blocking rules found — allowed by default';
+      statusDetail = 'Allowed — no blocking rules found';
     }
 
     // Map findings to barriers for this source
     const barriers: string[] = [];
     const sourceRecs: string[] = [];
-    if (status === 'blocked') { barriers.push('Crawler is blocked by robots.txt'); sourceRecs.push(`Allow ${meta.name} in your robots.txt`); }
+    if (status === 'blocked') { barriers.push(`Your site blocks ${meta.displayName} from reading your pages`); sourceRecs.push(`Update your robots.txt to allow ${meta.displayName}`); }
 
     for (const focus of meta.focuses) {
-      if (focus === 'structured_data' && findingTitles.some(t => t.includes('structured data'))) { barriers.push('Missing structured data'); sourceRecs.push('Add JSON-LD schema to key pages'); }
-      if (focus === 'open_graph' && findingTitles.some(t => t.includes('Open Graph'))) { barriers.push('Missing Open Graph tags'); sourceRecs.push('Add og:title, og:description, og:image'); }
-      if (focus === 'pricing' && findingTitles.some(t => t.includes('pricing'))) { barriers.push('No pricing page found'); sourceRecs.push('Create a pricing page with clear plans'); }
-      if (focus === 'product_pages' && findingTitles.some(t => t.includes('product'))) { barriers.push('No product pages found'); sourceRecs.push('Create product/feature pages'); }
-      if (focus === 'trust_signals' && findingTitles.some(t => t.includes('social') || t.includes('review') || t.includes('customer'))) { barriers.push('Weak trust signals'); sourceRecs.push('Add customer logos and review platform links'); }
-      if (focus === 'clear_content' && findingTitles.some(t => t.includes('thin content'))) { barriers.push('Thin content on some pages'); }
-      if (focus === 'comparison' && findingTitles.some(t => t.includes('comparison'))) { barriers.push('No comparison content'); sourceRecs.push('Create comparison pages for competitors'); }
+      if (focus === 'structured_data' && findingTitles.some(t => t.includes('structured data'))) { barriers.push('Missing structured data that helps AI understand your pages'); sourceRecs.push('Add structured data (JSON-LD) to your key pages'); }
+      if (focus === 'open_graph' && findingTitles.some(t => t.includes('Open Graph'))) { barriers.push('Missing social sharing tags that AI systems also use'); sourceRecs.push('Add social sharing tags (Open Graph) to your pages'); }
+      if (focus === 'pricing' && findingTitles.some(t => t.includes('pricing'))) { barriers.push('No pricing page — AI can\'t answer "how much does it cost?"'); sourceRecs.push('Create a pricing page with clear plans and prices'); }
+      if (focus === 'product_pages' && findingTitles.some(t => t.includes('product'))) { barriers.push('No product or service pages found'); sourceRecs.push('Create pages that explain what you offer'); }
+      if (focus === 'trust_signals' && findingTitles.some(t => t.includes('social') || t.includes('review') || t.includes('customer'))) { barriers.push('Few trust signals like reviews or customer logos'); sourceRecs.push('Add customer logos, reviews, or testimonials to your site'); }
+      if (focus === 'clear_content' && findingTitles.some(t => t.includes('thin content'))) { barriers.push('Some pages have too little content for AI to understand'); }
+      if (focus === 'comparison' && findingTitles.some(t => t.includes('comparison'))) { barriers.push('No comparison content — competitors may win "vs" queries'); sourceRecs.push('Create pages comparing your business to alternatives'); }
     }
 
     // Compute readiness from barrier count
