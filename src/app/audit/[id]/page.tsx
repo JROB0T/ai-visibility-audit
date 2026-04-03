@@ -140,34 +140,89 @@ function generateAiSummary(audit: AuditData['audit'], crawlerStatuses: CrawlerSt
   const parts: string[] = [];
 
   // Overall assessment
-  if (score >= 80) parts.push(`${domain} has strong AI visibility with a score of ${score}/100. AI systems can likely find and reference most of your key content.`);
-  else if (score >= 60) parts.push(`${domain} has moderate AI visibility with a score of ${score}/100. AI systems can find your site, but several improvements would help them better understand and recommend your product.`);
-  else if (score >= 40) parts.push(`${domain} has limited AI visibility with a score of ${score}/100. AI systems may struggle to accurately describe your product or recommend it to users.`);
-  else parts.push(`${domain} has poor AI visibility with a score of ${score}/100. AI systems likely cannot find or accurately reference most of your key content. Immediate action is needed.`);
+  if (score >= 80) parts.push(`${domain} has strong AI visibility with a score of ${score}/100. AI systems can find your site, explain what you do, and recommend you to potential customers.`);
+  else if (score >= 60) parts.push(`${domain} has moderate AI visibility with a score of ${score}/100. AI systems can find your site, but there are gaps in how well they can explain and recommend your business.`);
+  else if (score >= 40) parts.push(`${domain} has limited AI visibility with a score of ${score}/100. AI systems may struggle to accurately describe your business or recommend you to potential customers.`);
+  else parts.push(`${domain} has poor AI visibility with a score of ${score}/100. AI systems likely cannot find or accurately describe your business. Immediate action is needed.`);
+
+  // Category breakdown in friendly language
+  const crawl = audit.crawlability_score ?? 0;
+  const read = audit.machine_readability_score ?? 0;
+  const comm = audit.commercial_clarity_score ?? 0;
+  const trust = audit.trust_clarity_score ?? 0;
+
+  const weakest = Math.min(crawl, read, comm, trust);
+  if (weakest === crawl && crawl < 60) parts.push(`Findability is your biggest gap — AI crawlers are having trouble accessing or navigating your site.`);
+  else if (weakest === read && read < 60) parts.push(`Explainability is your biggest gap — even when AI finds your site, it struggles to understand what you offer.`);
+  else if (weakest === comm && comm < 60) parts.push(`Buyability is your biggest gap — AI can find you, but can't easily help someone purchase from you or take the next step.`);
+  else if (weakest === trust && trust < 60) parts.push(`Trustworthiness is your biggest gap — AI doesn't see enough signals to confidently recommend your business.`);
 
   // Crawler access
   const blocked = crawlerStatuses?.filter(c => c.status === 'blocked') || [];
   const allowed = crawlerStatuses?.filter(c => c.status === 'allowed') || [];
-  if (blocked.length > 0) parts.push(`${blocked.length} AI crawler(s) are actively blocked, including ${blocked.slice(0, 3).map(b => b.displayName).join(', ')}. These systems cannot access your site at all.`);
-  else if (allowed.length > 0) parts.push(`AI crawlers have access to your site, which is good.`);
+  if (blocked.length > 0) parts.push(`${blocked.length} AI system(s) are blocked from accessing your site, including ${blocked.slice(0, 3).map(b => b.displayName).join(', ')}.`);
+  else if (allowed.length > 0) parts.push(`AI systems can access your site, which is a good start.`);
 
   // Missing pages
   const missing = keyPagesStatus?.filter(kp => !kp.found) || [];
-  if (missing.length > 0) parts.push(`Key pages missing: ${missing.map(m => m.label).join(', ')}. Without these, AI cannot answer common buyer questions about your product.`);
+  if (missing.length > 0) parts.push(`Key pages missing: ${missing.map(m => m.label).join(', ')}. Without these, AI can't answer common questions about your business.`);
 
   // Issues
-  if (highCount > 0) parts.push(`There are ${highCount} high-priority issues that should be addressed first to significantly improve how AI systems perceive and recommend ${domain}.`);
+  if (highCount > 0) parts.push(`We found ${findingsCount} issues total, ${highCount} of which are high-priority fixes that would significantly improve how AI systems find and recommend ${domain}.`);
 
   // Next steps
   const steps: string[] = [];
-  if (highCount > 0) steps.push('Review the Findings & Fixes tab to see all issues by category with code snippets');
-  if (missing.length > 0) steps.push('Click any missing page above to see what to create and example code');
-  steps.push('Switch to Priority view in Findings & Fixes to see the most impactful fixes first');
-  if (blocked.length > 0) steps.push('Check AI Source Visibility below — some AI systems are blocked and need robots.txt changes');
-  steps.push('Export this report to share with your team using the download button');
+  if (highCount > 0) steps.push('Start with the Top 5 Fixes above — they have the biggest impact');
+  if (missing.length > 0) steps.push('Click any missing page to see what to create');
+  steps.push('Use the Findings & Fixes tab for the full list of improvements');
+  steps.push('Export this report to share with your team');
   parts.push('Next steps: ' + steps.join('. ') + '.');
 
   return parts.join('\n\n');
+}
+
+// ============================================================
+// Helper: get owner label for a recommendation
+// ============================================================
+function getFixOwner(title: string, category: string): { label: string; color: string } {
+  const t = title.toLowerCase();
+  if (t.includes('robots.txt') || t.includes('sitemap') || t.includes('schema') || t.includes('json-ld') || t.includes('canonical') || t.includes('structured data') || t.includes('heading') || t.includes('meta') || t.includes('noindex') || t.includes('lang') || category === 'crawlability') {
+    return { label: 'Developer', color: '#6366F1' };
+  }
+  if (t.includes('content') || t.includes('copy') || t.includes('page') || t.includes('pricing') || t.includes('comparison') || t.includes('blog') || t.includes('description') || t.includes('title') || category === 'commercial_clarity') {
+    return { label: 'Marketing', color: '#F59E0B' };
+  }
+  if (t.includes('review') || t.includes('trust') || t.includes('social') || t.includes('customer') || t.includes('testimonial') || t.includes('logo') || category === 'trust_clarity') {
+    return { label: 'Business Owner', color: '#10B981' };
+  }
+  return { label: 'Team', color: '#64748B' };
+}
+
+// ============================================================
+// Helper: interpret a category score as plain English
+// ============================================================
+function getCategoryInterpretation(score: number, category: 'findability' | 'explainability' | 'buyability' | 'trustworthiness'): string {
+  const good: Record<string, string> = {
+    findability: 'AI systems can find your site easily.',
+    explainability: 'AI can clearly explain what you do.',
+    buyability: 'AI can help someone buy from you.',
+    trustworthiness: 'AI sees strong trust signals.',
+  };
+  const partial: Record<string, string> = {
+    findability: 'Some AI systems have trouble finding your site.',
+    explainability: 'AI only partially understands what you offer.',
+    buyability: 'AI struggles to guide buyers to your business.',
+    trustworthiness: 'Trust signals are present but incomplete.',
+  };
+  const poor: Record<string, string> = {
+    findability: 'Most AI systems cannot find your site.',
+    explainability: 'AI cannot explain what your business does.',
+    buyability: 'AI cannot help someone buy from you.',
+    trustworthiness: 'AI lacks confidence to recommend you.',
+  };
+  if (score >= 80) return good[category];
+  if (score >= 60) return partial[category];
+  return poor[category];
 }
 
 // ============================================================
@@ -683,7 +738,77 @@ export default function AuditResultPage() {
 
       {/* ===== OVERVIEW TAB ===== */}
       {(!isAuthenticated || activeTab === 'overview') && (<>
-      {/* 2. SCORE OVERVIEW (graph) */}
+
+      {/* 1. BUSINESS-FRIENDLY SUMMARY */}
+      {isAuthenticated && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+          {([
+            { question: 'Can AI find you?', score: audit.crawlability_score ?? 0, category: 'findability' as const },
+            { question: 'Can AI explain what you do?', score: audit.machine_readability_score ?? 0, category: 'explainability' as const },
+            { question: 'Can AI help someone buy from you?', score: audit.commercial_clarity_score ?? 0, category: 'buyability' as const },
+            { question: 'Can AI trust you?', score: audit.trust_clarity_score ?? 0, category: 'trustworthiness' as const },
+          ]).map((item) => {
+            const grade = scoreToGrade(item.score);
+            const color = getScoreColor(item.score);
+            return (
+              <div key={item.category} className="card p-5">
+                <div className="flex items-start justify-between mb-2">
+                  <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{item.question}</p>
+                  <span className="text-lg font-bold shrink-0 ml-3" style={{ color, fontFamily: 'var(--font-mono)' }}>{grade}</span>
+                </div>
+                <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>{getCategoryInterpretation(item.score, item.category)}</p>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* 2. TOP 5 FIXES */}
+      {isAuthenticated && allFindings.length > 0 && (() => {
+        const severityOrder: Record<string, number> = { high: 0, medium: 1, low: 2 };
+        const effortOrder: Record<string, number> = { easy: 0, medium: 1, harder: 2 };
+        const top5 = [...allFindings]
+          .sort((a, b) => (severityOrder[a.severity] ?? 9) - (severityOrder[b.severity] ?? 9) || (effortOrder[a.effort] ?? 9) - (effortOrder[b.effort] ?? 9))
+          .slice(0, 5);
+        return (
+          <div className="card p-6 mb-6">
+            <div className="flex items-center gap-2 mb-1">
+              <Wrench className="w-5 h-5" style={{ color: '#6366F1' }} />
+              <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>Top 5 Fixes</h2>
+            </div>
+            <p className="text-sm mb-4" style={{ color: 'var(--text-tertiary)' }}>The highest-impact improvements for your AI visibility, sorted by priority.</p>
+            <div className="space-y-3">
+              {top5.map((fix, i) => {
+                const owner = getFixOwner(fix.title, fix.category);
+                return (
+                  <div key={fix.id} className="flex gap-3 p-3 rounded-lg border" style={{ background: 'var(--bg-tertiary)', borderColor: 'var(--border)' }}>
+                    <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 text-sm font-bold" style={{ background: 'rgba(99,102,241,0.1)', color: '#6366F1' }}>{i + 1}</div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{fix.title}</p>
+                      <p className="text-xs mt-0.5 line-clamp-1" style={{ color: 'var(--text-secondary)' }}>{fix.why}</p>
+                      <div className="flex items-center gap-2 mt-2 flex-wrap">
+                        <SeverityBadge severity={fix.severity} />
+                        <EffortBadge effort={fix.effort} />
+                        <span className="text-xs px-1.5 py-0.5 rounded font-medium" style={{ color: owner.color, background: `${owner.color}15` }}>{owner.label}</span>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => { setActiveTab('findings'); setViewMode('priority'); }}
+                      className="shrink-0 self-center p-1.5 rounded-lg transition-colors"
+                      style={{ color: '#6366F1' }}
+                      title="View in Findings & Fixes"
+                    >
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* 3. SCORE OVERVIEW (graph) */}
       <div className="card p-6 sm:p-8 mb-6">
         <div className="flex flex-col sm:flex-row items-center gap-8">
           <ScoreRing score={audit.overall_score ?? 0} label="Overall Score" size={160} />
