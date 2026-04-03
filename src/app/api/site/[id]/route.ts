@@ -23,7 +23,7 @@ export async function GET(
     // Fetch all audits for this site, ordered by date
     const { data: audits } = await supabase
       .from('audits')
-      .select('id, status, overall_score, crawlability_score, machine_readability_score, commercial_clarity_score, trust_clarity_score, pages_scanned, summary, created_at, completed_at')
+      .select('id, status, overall_score, crawlability_score, machine_readability_score, commercial_clarity_score, trust_clarity_score, pages_scanned, summary, run_type, created_at, completed_at')
       .eq('site_id', id)
       .order('created_at', { ascending: false });
 

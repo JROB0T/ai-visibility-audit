@@ -49,6 +49,34 @@ export async function GET(
       hasSchema: p.has_schema,
     }));
 
+    // Fetch previous audit data for delta comparison
+    let previousAudit = null;
+    if (audit.previous_audit_id) {
+      const { data: prevAuditData } = await supabase
+        .from('audits')
+        .select('id, overall_score, crawlability_score, machine_readability_score, commercial_clarity_score, trust_clarity_score')
+        .eq('id', audit.previous_audit_id)
+        .single();
+
+      if (prevAuditData) {
+        const { data: prevFindings } = await supabase
+          .from('audit_findings')
+          .select('id, category, severity, title, description, affected_urls')
+          .eq('audit_id', prevAuditData.id);
+
+        const { data: prevPages } = await supabase
+          .from('audit_pages')
+          .select('url')
+          .eq('audit_id', prevAuditData.id);
+
+        previousAudit = {
+          ...prevAuditData,
+          findings: prevFindings || [],
+          pages: prevPages || [],
+        };
+      }
+    }
+
     return NextResponse.json({
       audit,
       pages: pages || [],
@@ -59,6 +87,7 @@ export async function GET(
       pagePreviews,
       perceptionData: audit.perception_data || null,
       growthData: audit.growth_data || null,
+      previousAudit,
     });
   } catch (error) {
     console.error('Fetch audit error:', error);

@@ -5,7 +5,8 @@ import { useParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import ScoreRing, { ScoreBar, scoreToGrade, getScoreColor } from '@/components/ScoreRing';
 import SeverityBadge, { EffortBadge } from '@/components/SeverityBadge';
-import { Lock, ArrowRight, ArrowLeft, CheckCircle, XCircle, ExternalLink, FileText, AlertTriangle, RefreshCw, ChevronDown, ChevronRight, Filter, Shield, Code, Eye, Bot, Copy, Check, Globe, Minus, LayoutGrid, Wrench, Zap, MonitorSmartphone, X, Download, TrendingUp, Target, Users } from 'lucide-react';
+import { Lock, ArrowRight, ArrowLeft, CheckCircle, XCircle, ExternalLink, FileText, AlertTriangle, RefreshCw, ChevronDown, ChevronRight, Filter, Shield, Code, Eye, Bot, Copy, Check, Globe, Minus, LayoutGrid, Wrench, Zap, MonitorSmartphone, X, Download, TrendingUp, Target, Users, CalendarCheck } from 'lucide-react';
+import { compareAudits, classifyFinding, generateMonthlyActions } from '@/lib/deltas';
 
 // ============================================================
 // Types
@@ -48,6 +49,16 @@ interface AuditData {
   crawlerStatuses: CrawlerStatus[];
   keyPagesStatus: KeyPageStatus[];
   pagePreviews: PagePreview[];
+  previousAudit: {
+    id: string;
+    overall_score: number | null;
+    crawlability_score: number | null;
+    machine_readability_score: number | null;
+    commercial_clarity_score: number | null;
+    trust_clarity_score: number | null;
+    findings: Array<{ id: string; category: string; severity: string; title: string; description: string; affected_urls: string[] }>;
+    pages: Array<{ url: string }>;
+  } | null;
 }
 
 type ViewMode = 'priority' | 'page' | 'category';
@@ -656,15 +667,44 @@ export default function AuditResultPage() {
   const medCount = allFindings.filter(f => f.severity === 'medium').length;
   const lowCount = allFindings.filter(f => f.severity === 'low').length;
 
+  const auditDelta = useMemo(() => {
+    if (!data?.previousAudit) return null;
+    return compareAudits(
+      { overall_score: data.audit.overall_score, crawlability_score: data.audit.crawlability_score, machine_readability_score: data.audit.machine_readability_score, commercial_clarity_score: data.audit.commercial_clarity_score, trust_clarity_score: data.audit.trust_clarity_score, findings: data.findings, pages: data.pages },
+      { overall_score: data.previousAudit.overall_score, crawlability_score: data.previousAudit.crawlability_score, machine_readability_score: data.previousAudit.machine_readability_score, commercial_clarity_score: data.previousAudit.commercial_clarity_score, trust_clarity_score: data.previousAudit.trust_clarity_score, findings: data.previousAudit.findings, pages: data.previousAudit.pages }
+    );
+  }, [data]);
+
+  const monthlyActions = useMemo(() => {
+    if (!auditDelta) return null;
+    if (!data) return null;
+    return generateMonthlyActions(data.findings, auditDelta);
+  }, [data, auditDelta]);
+
+  function getFindingStateBadge(finding: typeof allFindings[0]) {
+    if (!data?.previousAudit) return null;
+    const state = classifyFinding(
+      { id: finding.id, category: finding.category, severity: finding.severity, title: finding.title, description: finding.why, affected_urls: finding.affectedUrls },
+      data.previousAudit.findings
+    );
+    if (state === 'new') return <span className="text-xs px-1.5 py-0.5 rounded font-medium" style={{ color: '#3B82F6', background: 'rgba(59,130,246,0.1)' }}>New</span>;
+    if (state === 'regressed') return <span className="text-xs px-1.5 py-0.5 rounded font-medium" style={{ color: '#EF4444', background: 'rgba(239,68,68,0.1)' }}>Regressed</span>;
+    return <span className="text-xs px-1.5 py-0.5 rounded font-medium" style={{ color: 'var(--text-tertiary)', background: 'var(--bg-tertiary)' }}>Ongoing</span>;
+  }
+
   function renderFindingCard(finding: typeof allFindings[0], index?: number) {
     const hasSnippet = !!finding.codeSnippet;
+    const stateBadge = getFindingStateBadge(finding);
     return (
       <div key={finding.id} className={`rounded-xl border p-5 finding-${finding.severity}`} style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-start gap-3 min-w-0">
             {index !== undefined && <span className="flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold shrink-0 mt-0.5" style={{ background: 'var(--bg-tertiary)', color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>{index + 1}</span>}
             <div className="min-w-0">
-              <h3 className="font-semibold" style={{ color: 'var(--text-primary)' }}>{finding.title}</h3>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="font-semibold" style={{ color: 'var(--text-primary)' }}>{finding.title}</h3>
+                {stateBadge}
+              </div>
               <div className="mt-2 rounded-lg p-3 border" style={{ background: 'rgba(245,158,11,0.06)', borderColor: 'rgba(245,158,11,0.15)' }}>
                 <p className="text-sm font-medium" style={{ color: '#F59E0B' }}>Why it matters</p>
                 <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>{finding.why}</p>
@@ -807,6 +847,121 @@ export default function AuditResultPage() {
           </div>
         );
       })()}
+
+      {/* 2b. CHANGES SINCE LAST SCAN */}
+      {isAuthenticated && (
+        <div className="card p-6 mb-6">
+          <div className="flex items-center gap-2 mb-1">
+            <RefreshCw className="w-5 h-5" style={{ color: '#6366F1' }} />
+            <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>Changes Since Last Scan</h2>
+          </div>
+          {auditDelta ? (
+            <>
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mt-4">
+                <div className="text-center p-3 rounded-lg" style={{ background: 'var(--bg-tertiary)' }}>
+                  <p className="text-xs font-medium mb-1" style={{ color: 'var(--text-tertiary)' }}>Overall</p>
+                  <span className="text-xl font-bold" style={{ color: auditDelta.overallDelta > 0 ? '#10B981' : auditDelta.overallDelta < 0 ? '#EF4444' : 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>
+                    {auditDelta.overallDelta > 0 ? '+' : ''}{auditDelta.overallDelta}
+                  </span>
+                </div>
+                {([
+                  { label: 'Find', delta: auditDelta.categoryDeltas.crawlability },
+                  { label: 'Explain', delta: auditDelta.categoryDeltas.machine_readability },
+                  { label: 'Buy', delta: auditDelta.categoryDeltas.commercial_clarity },
+                  { label: 'Trust', delta: auditDelta.categoryDeltas.trust_clarity },
+                ]).map((c) => (
+                  <div key={c.label} className="text-center p-3 rounded-lg" style={{ background: 'var(--bg-tertiary)' }}>
+                    <p className="text-xs font-medium mb-1" style={{ color: 'var(--text-tertiary)' }}>{c.label}</p>
+                    <span className="text-lg font-bold" style={{ color: c.delta > 0 ? '#10B981' : c.delta < 0 ? '#EF4444' : 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>
+                      {c.delta > 0 ? '+' : ''}{c.delta}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <div className="flex flex-wrap gap-3 mt-3">
+                {auditDelta.newFindings.length > 0 && (
+                  <span className="text-xs px-2 py-1 rounded font-medium" style={{ color: '#3B82F6', background: 'rgba(59,130,246,0.1)' }}>{auditDelta.newFindings.length} new issue{auditDelta.newFindings.length !== 1 ? 's' : ''}</span>
+                )}
+                {auditDelta.resolvedFindings.length > 0 && (
+                  <span className="text-xs px-2 py-1 rounded font-medium" style={{ color: '#10B981', background: 'rgba(16,185,129,0.1)' }}>{auditDelta.resolvedFindings.length} resolved</span>
+                )}
+                {auditDelta.regressedFindings.length > 0 && (
+                  <span className="text-xs px-2 py-1 rounded font-medium" style={{ color: '#EF4444', background: 'rgba(239,68,68,0.1)' }}>{auditDelta.regressedFindings.length} regressed</span>
+                )}
+                {auditDelta.ongoingFindings.length > 0 && (
+                  <span className="text-xs px-2 py-1 rounded font-medium" style={{ color: 'var(--text-tertiary)', background: 'var(--bg-tertiary)' }}>{auditDelta.ongoingFindings.length} ongoing</span>
+                )}
+              </div>
+            </>
+          ) : (
+            <p className="text-sm mt-2" style={{ color: 'var(--text-tertiary)' }}>This is your first scan for this site. Future scans will show changes here.</p>
+          )}
+        </div>
+      )}
+
+      {/* 2c. WHAT TO DO THIS MONTH */}
+      {isAuthenticated && monthlyActions && (monthlyActions.quickWins.length > 0 || monthlyActions.mediumEffort.length > 0 || monthlyActions.strategic.length > 0) && (
+        <div className="card p-6 mb-6">
+          <div className="flex items-center gap-2 mb-1">
+            <CalendarCheck className="w-5 h-5" style={{ color: '#6366F1' }} />
+            <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>What to Do This Month</h2>
+          </div>
+          <p className="text-sm mb-4" style={{ color: 'var(--text-tertiary)' }}>Prioritized actions based on what changed and what has the most impact.</p>
+          <div className="space-y-4">
+            {monthlyActions.quickWins.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: '#10B981' }}>Quick Wins</p>
+                <div className="space-y-2">
+                  {monthlyActions.quickWins.map((f) => (
+                    <div key={f.id} className="flex items-center gap-3 p-2.5 rounded-lg" style={{ background: 'var(--bg-tertiary)' }}>
+                      <Zap className="w-4 h-4 shrink-0" style={{ color: '#10B981' }} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>{f.title}</p>
+                        <p className="text-xs truncate" style={{ color: 'var(--text-secondary)' }}>{f.description}</p>
+                      </div>
+                      <SeverityBadge severity={f.severity} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {monthlyActions.mediumEffort.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: '#F59E0B' }}>Medium Effort</p>
+                <div className="space-y-2">
+                  {monthlyActions.mediumEffort.map((f) => (
+                    <div key={f.id} className="flex items-center gap-3 p-2.5 rounded-lg" style={{ background: 'var(--bg-tertiary)' }}>
+                      <Wrench className="w-4 h-4 shrink-0" style={{ color: '#F59E0B' }} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>{f.title}</p>
+                        <p className="text-xs truncate" style={{ color: 'var(--text-secondary)' }}>{f.description}</p>
+                      </div>
+                      <SeverityBadge severity={f.severity} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {monthlyActions.strategic.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: '#6366F1' }}>Strategic</p>
+                <div className="space-y-2">
+                  {monthlyActions.strategic.map((f) => (
+                    <div key={f.id} className="flex items-center gap-3 p-2.5 rounded-lg" style={{ background: 'var(--bg-tertiary)' }}>
+                      <Target className="w-4 h-4 shrink-0" style={{ color: '#6366F1' }} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>{f.title}</p>
+                        <p className="text-xs truncate" style={{ color: 'var(--text-secondary)' }}>{f.description}</p>
+                      </div>
+                      <SeverityBadge severity={f.severity} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* 3. SCORE OVERVIEW (graph) */}
       <div className="card p-6 sm:p-8 mb-6">

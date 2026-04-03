@@ -64,10 +64,22 @@ export async function POST(request: NextRequest) {
       site = newSite;
     }
 
+    // Look up previous completed audit for delta tracking
+    let previousAuditId: string | null = null;
+    const { data: prevAudit } = await supabase
+      .from('audits')
+      .select('id')
+      .eq('site_id', site.id)
+      .eq('status', 'completed')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+    if (prevAudit) previousAuditId = prevAudit.id;
+
     // Create audit record
     const { data: audit, error: auditError } = await supabase
       .from('audits')
-      .insert({ site_id: site.id, user_id: user.id, status: 'running' })
+      .insert({ site_id: site.id, user_id: user.id, status: 'running', run_type: 'paid_initial', previous_audit_id: previousAuditId })
       .select()
       .single();
 

@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client';
 import { Search, Globe, Plus, AlertTriangle, ChevronRight, Building2 } from 'lucide-react';
 import { scoreToGrade, getScoreColor } from '@/components/ScoreRing';
 import { VERTICAL_OPTIONS, getVerticalLabel } from '@/lib/verticals';
+import { getRunTypeLabel } from '@/lib/entitlements';
 
 interface SiteWithLatest {
   id: string;
@@ -17,7 +18,7 @@ interface SiteWithLatest {
     id: string; overall_score: number | null;
     crawlability_score: number | null; machine_readability_score: number | null;
     commercial_clarity_score: number | null; trust_clarity_score: number | null;
-    pages_scanned: number; status: string; created_at: string;
+    pages_scanned: number; status: string; run_type: string | null; created_at: string;
   } | null;
   audit_count: number;
 }
@@ -47,7 +48,7 @@ export default function DashboardPage() {
       for (const site of userSites) {
         const { data: audits } = await supabase
           .from('audits')
-          .select('id, overall_score, crawlability_score, machine_readability_score, commercial_clarity_score, trust_clarity_score, pages_scanned, status, created_at')
+          .select('id, overall_score, crawlability_score, machine_readability_score, commercial_clarity_score, trust_clarity_score, pages_scanned, status, run_type, created_at')
           .eq('site_id', site.id).order('created_at', { ascending: false });
 
         const existing = sitesWithAudits.find(s => s.domain === site.domain);
@@ -150,6 +151,10 @@ export default function DashboardPage() {
                     <div className="flex items-center gap-3 mb-3">
                       <span className="text-3xl font-bold" style={{ color: scoreColor(score ?? null), fontFamily: 'var(--font-mono)' }}>{scoreToGrade(score ?? 0)}</span>
                       <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>{score}/100</span>
+                      {la.run_type && (() => {
+                        const rtColor = la.run_type === 'paid_initial' ? '#6366F1' : la.run_type === 'free_preview' ? '#64748B' : la.run_type === 'monthly_auto_rerun' ? '#10B981' : '#F59E0B';
+                        return <span className="text-xs px-1.5 py-0.5 rounded font-medium" style={{ color: rtColor, background: `${rtColor}15` }}>{getRunTypeLabel(la.run_type)}</span>;
+                      })()}
                     </div>
                     <div className="space-y-1.5">
                       {[{ label: 'Crawl', s: la.crawlability_score }, { label: 'Read', s: la.machine_readability_score }, { label: 'Commercial', s: la.commercial_clarity_score }, { label: 'Trust', s: la.trust_clarity_score }].map(({ label, s }) => (

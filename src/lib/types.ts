@@ -277,6 +277,15 @@ export interface BillingEvent {
   created_at: string;
 }
 
+export interface FindingLike {
+  id: string;
+  category: string;
+  severity: string;
+  title: string;
+  description: string;
+  affected_urls: string[];
+}
+
 export interface AuditDelta {
   overallDelta: number;
   categoryDeltas: {
@@ -285,18 +294,18 @@ export interface AuditDelta {
     commercial_clarity: number;
     trust_clarity: number;
   };
-  newFindings: AuditFinding[];
-  resolvedFindings: AuditFinding[];
-  regressedFindings: AuditFinding[];
-  ongoingFindings: AuditFinding[];
+  newFindings: FindingLike[];
+  resolvedFindings: FindingLike[];
+  regressedFindings: FindingLike[];
+  ongoingFindings: FindingLike[];
   pagesAdded: string[];
   pagesRemoved: string[];
 }
 
 export interface MonthlyActions {
-  quickWins: AuditFinding[];
-  mediumEffort: AuditFinding[];
-  strategic: AuditFinding[];
+  quickWins: FindingLike[];
+  mediumEffort: FindingLike[];
+  strategic: FindingLike[];
 }
 
 export interface BotActivityData {

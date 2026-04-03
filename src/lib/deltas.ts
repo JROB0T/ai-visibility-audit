@@ -1,4 +1,19 @@
-import type { AuditFinding, AuditPage, AuditDelta, FindingState, MonthlyActions } from '@/lib/types';
+import type { AuditDelta, FindingState, MonthlyActions } from '@/lib/types';
+
+// Loose finding shape that works with both typed AuditFinding and API response objects
+interface FindingLike {
+  id: string;
+  category: string;
+  severity: string;
+  title: string;
+  description: string;
+  affected_urls: string[];
+}
+
+// Loose page shape
+interface PageLike {
+  url: string;
+}
 
 interface AuditWithRelations {
   overall_score: number | null;
@@ -6,8 +21,8 @@ interface AuditWithRelations {
   machine_readability_score: number | null;
   commercial_clarity_score: number | null;
   trust_clarity_score: number | null;
-  findings: AuditFinding[];
-  pages: AuditPage[];
+  findings: FindingLike[];
+  pages: PageLike[];
 }
 
 export function compareAudits(
@@ -26,10 +41,10 @@ export function compareAudits(
   const currentFindings = current.findings;
   const previousFindings = previous.findings;
 
-  const newFindings: AuditFinding[] = [];
-  const resolvedFindings: AuditFinding[] = [];
-  const regressedFindings: AuditFinding[] = [];
-  const ongoingFindings: AuditFinding[] = [];
+  const newFindings: FindingLike[] = [];
+  const resolvedFindings: FindingLike[] = [];
+  const regressedFindings: FindingLike[] = [];
+  const ongoingFindings: FindingLike[] = [];
 
   for (const finding of currentFindings) {
     const state = classifyFinding(finding, previousFindings);
@@ -68,8 +83,8 @@ export function compareAudits(
 }
 
 export function classifyFinding(
-  finding: AuditFinding,
-  previousFindings: AuditFinding[]
+  finding: FindingLike,
+  previousFindings: FindingLike[]
 ): FindingState {
   const match = previousFindings.find(
     (pf) => pf.category === finding.category && pf.title === finding.title
@@ -77,9 +92,8 @@ export function classifyFinding(
 
   if (!match) return 'new';
 
-  // If severity worsened, it's a regression
-  const severityOrder = { low: 0, medium: 1, high: 2 };
-  if (severityOrder[finding.severity] > severityOrder[match.severity]) {
+  const severityOrder: Record<string, number> = { low: 0, medium: 1, high: 2 };
+  if ((severityOrder[finding.severity] ?? 0) > (severityOrder[match.severity] ?? 0)) {
     return 'regressed';
   }
 
@@ -87,14 +101,13 @@ export function classifyFinding(
 }
 
 export function generateMonthlyActions(
-  findings: AuditFinding[],
+  findings: FindingLike[],
   deltas: AuditDelta
 ): MonthlyActions {
   const highFindings = findings.filter((f) => f.severity === 'high');
   const medFindings = findings.filter((f) => f.severity === 'medium');
   const lowFindings = findings.filter((f) => f.severity === 'low');
 
-  // Quick wins: pick from new or regressed findings with low/medium severity
   const quickWinCandidates = [
     ...deltas.regressedFindings.filter((f) => f.severity !== 'high'),
     ...deltas.newFindings.filter((f) => f.severity === 'low'),
@@ -102,7 +115,6 @@ export function generateMonthlyActions(
   ];
   const quickWins = dedup(quickWinCandidates).slice(0, 3);
 
-  // Medium effort: high-severity ongoing or new medium findings
   const mediumCandidates = [
     ...deltas.newFindings.filter((f) => f.severity === 'medium'),
     ...highFindings.filter((f) => deltas.ongoingFindings.some((o) => o.title === f.title)),
@@ -112,7 +124,6 @@ export function generateMonthlyActions(
     .filter((f) => !quickWins.some((q) => q.title === f.title))
     .slice(0, 2);
 
-  // Strategic: highest-impact remaining findings
   const strategicCandidates = [
     ...highFindings,
     ...deltas.newFindings.filter((f) => f.severity === 'high'),
@@ -124,7 +135,7 @@ export function generateMonthlyActions(
   return { quickWins, mediumEffort, strategic };
 }
 
-function dedup(findings: AuditFinding[]): AuditFinding[] {
+function dedup(findings: FindingLike[]): FindingLike[] {
   const seen = new Set<string>();
   return findings.filter((f) => {
     const key = `${f.category}:${f.title}`;

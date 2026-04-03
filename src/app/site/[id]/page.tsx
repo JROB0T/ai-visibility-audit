@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import ScoreRing from '@/components/ScoreRing';
 import { ArrowLeft, Plus, Clock, TrendingUp, ChevronRight, AlertTriangle, BarChart3, Building2 } from 'lucide-react';
 import { VERTICAL_OPTIONS } from '@/lib/verticals';
+import { getRunTypeLabel } from '@/lib/entitlements';
 
 interface SiteData {
   site: { id: string; domain: string; url: string; vertical: string | null; created_at: string };
@@ -12,7 +13,7 @@ interface SiteData {
     id: string; status: string; overall_score: number | null;
     crawlability_score: number | null; machine_readability_score: number | null;
     commercial_clarity_score: number | null; trust_clarity_score: number | null;
-    pages_scanned: number; summary: string | null; created_at: string;
+    pages_scanned: number; summary: string | null; run_type: string | null; created_at: string;
   }>;
   latestFindings: { high: number; medium: number; low: number };
   trendData: Array<{ date: string; overall: number | null; crawlability: number | null; readability: number | null; commercial: number | null; trust: number | null }>;
@@ -194,7 +195,14 @@ export default function SiteDashboardPage() {
                     {new Date(audit.created_at).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })}
                     {' · '}{new Date(audit.created_at).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
                   </p>
-                  <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>{audit.pages_scanned} pages scanned</p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>{audit.pages_scanned} pages scanned</p>
+                    {audit.run_type && (() => {
+                      const label = getRunTypeLabel(audit.run_type);
+                      const color = audit.run_type === 'paid_initial' ? '#6366F1' : audit.run_type === 'free_preview' ? '#64748B' : audit.run_type === 'monthly_auto_rerun' ? '#10B981' : '#F59E0B';
+                      return <span className="text-xs px-1.5 py-0.5 rounded font-medium" style={{ color, background: `${color}15` }}>{label}</span>;
+                    })()}
+                  </div>
                 </div>
               </div>
               <div className="flex items-center gap-3">
