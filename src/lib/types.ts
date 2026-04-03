@@ -237,3 +237,77 @@ export interface RecommendationInput {
   codeSnippet: string | null;
   affectedUrls: string[];
 }
+
+// ============================================================
+// Monetization & billing types
+// ============================================================
+
+export type RunType = 'free_preview' | 'paid_initial' | 'manual_paid_rescan' | 'monthly_auto_rerun';
+export type RunScope = 'free' | 'core' | 'core_plus_premium';
+export type PlanStatus = 'free' | 'core' | 'core_premium';
+export type VerticalType = 'saas' | 'professional_services' | 'local_service' | 'ecommerce' | 'healthcare' | 'law_firm' | 'other';
+export type FindingState = 'new' | 'ongoing' | 'resolved' | 'regressed';
+export type BillingEventType = 'initial_scan' | 'premium_addon' | 'bundle' | 'manual_rescan' | 'monthly_subscription' | 'monthly_renewal';
+
+export interface Entitlement {
+  id: string;
+  user_id: string;
+  site_id: string;
+  can_view_core: boolean;
+  can_view_growth_strategy: boolean;
+  can_view_marketing_perception: boolean;
+  can_export: boolean;
+  has_monthly_monitoring: boolean;
+  monthly_scope: string | null;
+  stripe_customer_id: string | null;
+  stripe_subscription_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BillingEvent {
+  id: string;
+  user_id: string;
+  site_id: string | null;
+  audit_id: string | null;
+  event_type: BillingEventType;
+  stripe_session_id: string | null;
+  stripe_invoice_id: string | null;
+  amount_cents: number;
+  created_at: string;
+}
+
+export interface AuditDelta {
+  overallDelta: number;
+  categoryDeltas: {
+    crawlability: number;
+    machine_readability: number;
+    commercial_clarity: number;
+    trust_clarity: number;
+  };
+  newFindings: AuditFinding[];
+  resolvedFindings: AuditFinding[];
+  regressedFindings: AuditFinding[];
+  ongoingFindings: AuditFinding[];
+  pagesAdded: string[];
+  pagesRemoved: string[];
+}
+
+export interface MonthlyActions {
+  quickWins: AuditFinding[];
+  mediumEffort: AuditFinding[];
+  strategic: AuditFinding[];
+}
+
+export interface BotActivityData {
+  sources: {
+    name: string;
+    lastSeen: string | null;
+    frequency: 'daily' | 'weekly' | 'monthly' | 'rare' | 'never';
+    pagesIndexed: number;
+    trend: 'increasing' | 'stable' | 'decreasing' | 'unknown';
+  }[];
+  totalCrawlsLast30Days: number;
+  mostActiveCrawler: string | null;
+  dataAsOf: string;
+}
