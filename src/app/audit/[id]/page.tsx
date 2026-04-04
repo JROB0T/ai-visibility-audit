@@ -447,7 +447,7 @@ export default function AuditResultPage() {
   const [activeTab, setActiveTab] = useState<ReportTab>('overview');
   const [perceptionQuestions, setPerceptionQuestions] = useState<Array<{ question: string; intent: string; what_ai_needs: string; status: 'pass' | 'partial' | 'fail'; assessment: string; fix: string; codeSnippet: string | null }> | null>(null);
   const [perceptionLoading, setPerceptionLoading] = useState(false);
-  const [growthData, setGrowthData] = useState<{ competitors: Array<{ domain: string; overall: number; crawl: number; read: number; commercial: number; trust: number; pageTypes: string[] }>; yourScores: { overall: number; crawl: number; read: number; commercial: number; trust: number }; marketingStrategy: { queries: string[]; pages_to_create: Array<{ title: string; why: string }>; content_to_optimize: Array<{ page: string; action: string }>; schema_actions: Array<{ action: string; impact: string }>; trust_actions: Array<{ action: string; impact: string }> } } | null>(null);
+  const [growthData, setGrowthData] = useState<{ competitors: Array<{ domain: string; overall: number; crawl: number; read: number; commercial: number; trust: number; rationale?: string }>; yourScores: { overall: number; crawl: number; read: number; commercial: number; trust: number }; marketingStrategy: { queries: string[]; pages_to_create: Array<{ title: string; why: string }>; content_to_optimize: Array<{ page: string; action: string }>; schema_actions: Array<{ action: string; impact: string }>; trust_actions: Array<{ action: string; impact: string }> } } | null>(null);
   const [growthLoading, setGrowthLoading] = useState(false);
 
   function switchTab(tab: ReportTab) {
@@ -1645,7 +1645,7 @@ export default function AuditResultPage() {
                   <Users className="w-5 h-5" style={{ color: '#6366F1' }} />
                   <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>Peer Benchmark</h2>
                 </div>
-                <p className="text-sm mb-4" style={{ color: 'var(--text-tertiary)' }}>How your AI visibility compares to likely competitors. Based on a lightweight scan of their public site.</p>
+                <p className="text-sm mb-4" style={{ color: 'var(--text-tertiary)' }}>How your AI visibility compares to likely competitors. Competitor scores are AI-estimated based on public knowledge.</p>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
@@ -1667,7 +1667,10 @@ export default function AuditResultPage() {
                       </tr>
                       {growthData.competitors.map((comp) => (
                         <tr key={comp.domain} className="border-t" style={{ borderColor: 'var(--border)' }}>
-                          <td className="py-3 px-4" style={{ color: 'var(--text-primary)' }}>{comp.domain}</td>
+                          <td className="py-3 px-4" style={{ color: 'var(--text-primary)' }}>
+                            <span>{comp.domain}</span>
+                            {comp.rationale && <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>{comp.rationale}</p>}
+                          </td>
                           {[comp.overall, comp.crawl, comp.read, comp.commercial, comp.trust].map((s, i) => {
                             const yours = [growthData.yourScores.overall, growthData.yourScores.crawl, growthData.yourScores.read, growthData.yourScores.commercial, growthData.yourScores.trust][i];
                             const ahead = s > yours;
@@ -1683,7 +1686,7 @@ export default function AuditResultPage() {
                     </tbody>
                   </table>
                 </div>
-                <p className="text-xs mt-3" style={{ color: 'var(--text-tertiary)' }}>Competitor scores are based on a lightweight homepage scan and may not reflect their full AI visibility. ▲ indicates the competitor scores higher than you in that category.</p>
+                <p className="text-xs mt-3" style={{ color: 'var(--text-tertiary)' }}>Competitor scores are AI-estimated based on public knowledge, not from a direct scan. ▲ indicates the competitor is estimated to score higher than you.</p>
               </div>
             )}
 

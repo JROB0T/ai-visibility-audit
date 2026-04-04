@@ -1,115 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabase } from '@/lib/supabase/server';
-import * as cheerio from 'cheerio';
 
 export const maxDuration = 60;
 
-const FETCH_TIMEOUT = 8000;
-const USER_AGENT = 'AIVisibilityAudit/1.0';
-
-async function safeFetch(url: string): Promise<Response> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT);
-  try { return await fetch(url, { headers: { 'User-Agent': USER_AGENT }, signal: controller.signal, redirect: 'follow' }); }
-  finally { clearTimeout(timeout); }
-}
-
-// Lightweight scan — just enough for a benchmark score
-async function lightScan(siteUrl: string): Promise<{ domain: string; overall: number; crawl: number; read: number; commercial: number; trust: number; pageTypes: string[] } | null> {
-  try {
-    const baseUrl = siteUrl.startsWith('http') ? siteUrl : `https://${siteUrl}`;
-    const domain = new URL(baseUrl).hostname;
-
-    // Check robots.txt
-    let hasRobots = false;
-    let hasSitemap = false;
-    try {
-      const robotsRes = await safeFetch(`${baseUrl}/robots.txt`);
-      if (robotsRes.ok) {
-        hasRobots = true;
-        const content = await robotsRes.text();
-        hasSitemap = content.toLowerCase().includes('sitemap:');
-      }
-    } catch { /* skip */ }
-
-    // Scan homepage
-    const homeRes = await safeFetch(baseUrl);
-    if (!homeRes.ok) return null;
-    const html = await homeRes.text();
-    const $ = cheerio.load(html);
-
-    const hasTitle = !!$('title').text().trim();
-    const hasMeta = !!$('meta[name="description"]').attr('content');
-    const hasCanonical = !!$('link[rel="canonical"]').attr('href');
-    const hasSchema = $('script[type="application/ld+json"]').length > 0;
-    const hasOG = !!$('meta[property="og:title"]').attr('content');
-    const hasH1 = !!$('h1').first().text().trim();
-    const hasNav = $('nav').length > 0;
-    const wordCount = $('body').text().replace(/\s+/g, ' ').trim().split(' ').length;
-    const hasPrivacy = $('a[href*="privacy"]').length > 0;
-    const hasSocial = $('a[href*="twitter.com"], a[href*="linkedin.com"], a[href*="x.com"]').length > 0;
-    const bodyHtml = $('body').html()?.toLowerCase() || '';
-    const hasTrust = bodyHtml.includes('trusted by') || bodyHtml.includes('customer') || $('[class*="logo"]').length > 3;
-    const hasCta = $('a[href*="signup"], a[href*="demo"], a[href*="trial"], a:contains("Start"), a:contains("Try")').length > 0;
-
-    // Discover key pages from links
-    const links: string[] = [];
-    $('a[href]').each((_, el) => {
-      const href = $(el).attr('href') || '';
-      try {
-        const u = new URL(href, baseUrl);
-        if (u.hostname === domain) links.push(u.pathname.toLowerCase());
-      } catch { /* skip */ }
-    });
-    const pageTypes: string[] = ['homepage'];
-    if (links.some(l => l.includes('pricing') || l.includes('plans'))) pageTypes.push('pricing');
-    if (links.some(l => l.includes('product') || l.includes('features') || l.includes('platform'))) pageTypes.push('product');
-    if (links.some(l => l.includes('contact') || l.includes('demo'))) pageTypes.push('contact');
-    if (links.some(l => l.includes('blog') || l.includes('resources') || l.includes('articles'))) pageTypes.push('blog');
-    if (links.some(l => l.includes('docs') || l.includes('documentation') || l.includes('api'))) pageTypes.push('docs');
-    if (links.some(l => l.includes('about') || l.includes('team') || l.includes('company'))) pageTypes.push('about');
-    if (links.some(l => l.includes('security') || l.includes('compliance'))) pageTypes.push('security');
-    if (links.some(l => l.includes('integrat'))) pageTypes.push('integrations');
-
-    // Compute scores
-    let crawl = 100;
-    if (!hasRobots) crawl -= 15;
-    if (!hasSitemap) crawl -= 15;
-    if (!hasNav) crawl -= 8;
-    crawl = Math.max(30, crawl);
-
-    let read = 100;
-    if (!hasTitle) read -= 12;
-    if (!hasMeta) read -= 10;
-    if (!hasCanonical) read -= 6;
-    if (!hasSchema) read -= 12;
-    if (!hasOG) read -= 8;
-    if (!hasH1) read -= 6;
-    if (wordCount < 100) read -= 8;
-    read = Math.max(30, read);
-
-    let commercial = 100;
-    if (!pageTypes.includes('pricing')) commercial -= 15;
-    if (!pageTypes.includes('product')) commercial -= 12;
-    if (!pageTypes.includes('contact')) commercial -= 15;
-    if (!hasCta) commercial -= 8;
-    commercial = Math.max(25, commercial);
-
-    let trust = 100;
-    if (!pageTypes.includes('blog') && !pageTypes.includes('docs')) trust -= 10;
-    if (!pageTypes.includes('about')) trust -= 6;
-    if (!hasSchema) trust -= 8;
-    if (!hasPrivacy) trust -= 8;
-    if (!hasSocial) trust -= 8;
-    if (!hasTrust) trust -= 6;
-    trust = Math.max(30, trust);
-
-    const overall = Math.round(crawl * 0.3 + read * 0.25 + commercial * 0.3 + trust * 0.15);
-
-    return { domain, overall, crawl, read, commercial, trust, pageTypes };
-  } catch {
-    return null;
-  }
+interface CompetitorEstimate {
+  domain: string;
+  overall: number;
+  crawl: number;
+  read: number;
+  commercial: number;
+  trust: number;
+  rationale: string;
 }
 
 export async function POST(request: NextRequest) {
@@ -138,69 +39,81 @@ export async function POST(request: NextRequest) {
     const apiKey = process.env.ANTHROPIC_API_KEY;
     const name = domain.replace(/\.(com|io|co|org|net)$/, '').replace(/^www\./, '');
 
-    // Step 1: Identify competitors via AI
-    let competitors: string[] = [];
+    // Step 1: Identify competitors + estimate their AI visibility via AI
+    let competitorEstimates: CompetitorEstimate[] = [];
     if (apiKey) {
       try {
-        const compPrompt = `Based on this website info, identify exactly 2 likely direct competitors. Return ONLY a JSON array of 2 domain names (e.g., ["competitor1.com", "competitor2.com"]). No explanation.
+        const compPrompt = `Based on this website info, identify exactly 2 likely direct competitors. For each competitor, estimate their AI visibility scores based on your knowledge of their web presence.
 
 Domain: ${domain}
 Homepage heading: "${h1 || 'unknown'}"
 Meta description: "${metaDescription || 'unknown'}"
 Page types found: ${(pageTypes || []).join(', ')}
 
+Return ONLY a JSON array of 2 objects, each with these fields:
+- "domain": the competitor's domain name
+- "overall": estimated AI visibility score 0-100
+- "crawl": estimated crawlability score 0-100
+- "read": estimated machine readability score 0-100
+- "commercial": estimated commercial clarity score 0-100
+- "trust": estimated trust score 0-100
+- "rationale": one sentence explaining why you picked this competitor and how you estimated their scores
+
 Rules:
 - Pick real, well-known companies in the same category
-- These should be direct competitors, not tangentially related
-- Return actual domains that exist
+- Base scores on what you know about their website structure, content quality, and AI readiness
+- Large established companies typically score 70-90, smaller ones 40-70
 - No markdown, no backticks, just the JSON array`;
 
-        console.log('Growth strategy: requesting competitors for', domain);
+        console.log('Growth strategy: requesting competitor estimates for', domain);
         const compRes = await fetch('https://api.anthropic.com/v1/messages', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
-          body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 100, messages: [{ role: 'user', content: compPrompt }] }),
+          body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 500, messages: [{ role: 'user', content: compPrompt }] }),
         });
 
         if (!compRes.ok) {
           const errorBody = await compRes.text();
-          console.error('Competitor API request failed:', { status: compRes.status, statusText: compRes.statusText, body: errorBody });
+          console.error('Competitor API failed:', { status: compRes.status, body: errorBody });
         } else {
           const compData = await compRes.json();
           const compText = compData.content?.[0]?.text || '';
-          console.log('Competitor API raw response text:', compText);
+          console.log('Competitor API raw response:', compText);
           try {
             const cleaned = compText.replace(/```json|```/g, '').trim();
             const parsed = JSON.parse(cleaned);
             if (Array.isArray(parsed)) {
-              competitors = parsed.slice(0, 2).map((c: string) => c.replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/.*$/, ''));
-              console.log('Parsed competitors:', competitors);
+              competitorEstimates = parsed.slice(0, 2).map((c: Record<string, unknown>) => ({
+                domain: String(c.domain || '').replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/.*$/, ''),
+                overall: Number(c.overall) || 0,
+                crawl: Number(c.crawl) || 0,
+                read: Number(c.read) || 0,
+                commercial: Number(c.commercial) || 0,
+                trust: Number(c.trust) || 0,
+                rationale: String(c.rationale || ''),
+              }));
+              console.log('Parsed competitor estimates:', competitorEstimates.map(c => c.domain));
             } else {
-              console.error('Competitor response not an array:', parsed);
+              console.error('Competitor response not an array:', typeof parsed);
             }
           } catch (parseErr) {
-            console.error('Failed to parse competitor response:', { compText, error: parseErr instanceof Error ? parseErr.message : parseErr });
+            console.error('Failed to parse competitor response:', { text: compText.substring(0, 300), error: parseErr instanceof Error ? parseErr.message : parseErr });
           }
         }
       } catch (fetchErr) {
         console.error('Competitor fetch error:', fetchErr instanceof Error ? fetchErr.message : fetchErr);
       }
-    } else {
-      console.log('Growth strategy: no ANTHROPIC_API_KEY, skipping competitor detection');
     }
 
-    // Step 2: Lightweight scan of competitors
-    const benchmarks = [];
-    for (const comp of competitors) {
-      const result = await lightScan(`https://${comp}`);
-      if (result) benchmarks.push(result);
-    }
-
-    // Step 3: Generate marketing strategy via AI
+    // Step 2: Generate marketing strategy via AI
     let marketingStrategy = null;
     if (apiKey) {
       try {
         const highRecs = (recommendations || []).filter((r: { severity: string }) => r.severity === 'high').slice(0, 5);
+        const compContext = competitorEstimates.length > 0
+          ? `Competitors (AI-estimated): ${competitorEstimates.map(c => `${c.domain} (${c.overall}/100)`).join(', ')}`
+          : '';
+
         const stratPrompt = `You are an AI visibility marketing strategist. Based on this scan data, generate a marketing strategy.
 
 Site: ${domain}
@@ -210,7 +123,7 @@ Overall grade: ${scores?.overall || 'unknown'}/100
 Scores: Crawl ${scores?.crawl || '?'}, Read ${scores?.read || '?'}, Commercial ${scores?.commercial || '?'}, Trust ${scores?.trust || '?'}
 Page types found: ${(pageTypes || []).join(', ')}
 Top issues: ${highRecs.map((r: { title: string }) => r.title).join('; ')}
-${benchmarks.length > 0 ? `Competitors: ${benchmarks.map(b => b.domain + ' (' + b.overall + '/100)').join(', ')}` : ''}
+${compContext}
 
 Return ONLY a JSON object with these fields:
 {
@@ -232,11 +145,10 @@ No markdown, no backticks, just the JSON.`;
         });
         if (!stratRes.ok) {
           const errorBody = await stratRes.text();
-          console.error('Strategy API request failed:', { status: stratRes.status, body: errorBody });
+          console.error('Strategy API failed:', { status: stratRes.status, body: errorBody });
         } else {
           const stratData = await stratRes.json();
           const stratText = stratData.content?.[0]?.text || '';
-          console.log('Strategy API raw response length:', stratText.length);
           try {
             marketingStrategy = JSON.parse(stratText.replace(/```json|```/g, '').trim());
           } catch (parseErr) {
@@ -248,7 +160,7 @@ No markdown, no backticks, just the JSON.`;
       }
     }
 
-    // Fallback marketing strategy from scan data if no API
+    // Fallback marketing strategy if API unavailable
     if (!marketingStrategy) {
       marketingStrategy = {
         queries: [
@@ -279,7 +191,7 @@ No markdown, no backticks, just the JSON.`;
     }
 
     return NextResponse.json({
-      competitors: benchmarks,
+      competitors: competitorEstimates,
       yourScores: scores || { overall: 0, crawl: 0, read: 0, commercial: 0, trust: 0 },
       marketingStrategy,
     });

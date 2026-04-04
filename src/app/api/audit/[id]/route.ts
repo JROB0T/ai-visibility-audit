@@ -138,8 +138,8 @@ export async function PATCH(
 
     const updateData: Record<string, unknown> = {};
     if (body.userId) updateData.user_id = body.userId;
-    if (body.perceptionData) updateData.perception_data = body.perceptionData;
-    if (body.growthData) updateData.growth_data = body.growthData;
+    if ('perceptionData' in body) updateData.perception_data = body.perceptionData;
+    if ('growthData' in body) updateData.growth_data = body.growthData;
 
     if (Object.keys(updateData).length > 0) {
       await supabase.from('audits').update(updateData).eq('id', id);
