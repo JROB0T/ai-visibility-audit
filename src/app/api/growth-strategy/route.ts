@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createServerSupabase } from '@/lib/supabase/server';
 import * as cheerio from 'cheerio';
 
 export const maxDuration = 60;
@@ -113,8 +114,26 @@ async function lightScan(siteUrl: string): Promise<{ domain: string; overall: nu
 
 export async function POST(request: NextRequest) {
   try {
-    const { domain, h1, metaDescription, pageTypes, scores, recommendations } = await request.json();
+    const body = await request.json();
+    const { domain, h1, metaDescription, pageTypes, scores, recommendations, siteId } = body;
     if (!domain) return NextResponse.json({ error: 'Domain required' }, { status: 400 });
+
+    // Entitlement check
+    const supabase = await createServerSupabase();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user && siteId) {
+      const { data: entitlement } = await supabase
+        .from('entitlements')
+        .select('can_view_growth_strategy')
+        .eq('user_id', user.id)
+        .eq('site_id', siteId)
+        .single();
+      if (!entitlement?.can_view_growth_strategy) {
+        return NextResponse.json({ error: 'Premium feature — purchase required' }, { status: 403 });
+      }
+    } else {
+      return NextResponse.json({ error: 'Premium feature — purchase required' }, { status: 403 });
+    }
 
     const apiKey = process.env.ANTHROPIC_API_KEY;
     const name = domain.replace(/\.(com|io|co|org|net)$/, '').replace(/^www\./, '');

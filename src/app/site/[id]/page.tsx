@@ -1,14 +1,14 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { Suspense, useEffect, useState } from 'react';
+import { useParams, useSearchParams } from 'next/navigation';
 import ScoreRing from '@/components/ScoreRing';
-import { ArrowLeft, Plus, Clock, TrendingUp, ChevronRight, AlertTriangle, BarChart3, Building2 } from 'lucide-react';
+import { ArrowLeft, Clock, TrendingUp, ChevronRight, AlertTriangle, BarChart3, Building2, RefreshCw, CalendarCheck, X } from 'lucide-react';
 import { VERTICAL_OPTIONS } from '@/lib/verticals';
 import { getRunTypeLabel } from '@/lib/entitlements';
 
 interface SiteData {
-  site: { id: string; domain: string; url: string; vertical: string | null; created_at: string };
+  site: { id: string; domain: string; url: string; vertical: string | null; has_monthly_monitoring?: boolean; next_scheduled_scan_at?: string | null; last_auto_rerun_at?: string | null; plan_status?: string; created_at: string };
   audits: Array<{
     id: string; status: string; overall_score: number | null;
     crawlability_score: number | null; machine_readability_score: number | null;
@@ -19,14 +19,16 @@ interface SiteData {
   trendData: Array<{ date: string; overall: number | null; crawlability: number | null; readability: number | null; commercial: number | null; trust: number | null }>;
 }
 
-export default function SiteDashboardPage() {
+function SiteDashboardContent() {
   const params = useParams();
-  const router = useRouter();
   const [data, setData] = useState<SiteData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [scanning, setScanning] = useState(false);
   const [error, setError] = useState('');
   const [siteVertical, setSiteVertical] = useState<string | null>(null);
+  const [showRescanModal, setShowRescanModal] = useState(false);
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [checkoutSuccess, setCheckoutSuccess] = useState(false);
+  const searchParams = useSearchParams();
 
   useEffect(() => {
     async function load() {
@@ -42,6 +44,28 @@ export default function SiteDashboardPage() {
     load();
   }, [params.id]);
 
+  useEffect(() => {
+    if (searchParams.get('checkout') === 'success') setCheckoutSuccess(true);
+  }, [searchParams]);
+
+  async function handleCheckout(priceType: 'initial_scan' | 'rescan' | 'monthly') {
+    if (!data) return;
+    setCheckoutLoading(true);
+    try {
+      const res = await fetch('/api/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ siteId: data.site.id, priceType }),
+      });
+      const result = await res.json();
+      if (result.url) window.location.href = result.url;
+    } catch (err) {
+      console.error('Checkout error:', err);
+    } finally {
+      setCheckoutLoading(false);
+    }
+  }
+
   async function handleVerticalChange(newVertical: string) {
     setSiteVertical(newVertical);
     await fetch(`/api/site/${params.id}`, {
@@ -49,18 +73,6 @@ export default function SiteDashboardPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ vertical: newVertical }),
     });
-  }
-
-  async function handleRescan() {
-    if (!data || scanning) return;
-    setScanning(true);
-    try {
-      const res = await fetch('/api/audit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: data.site.url, vertical: siteVertical }) });
-      const result = await res.json();
-      if (res.ok) router.push(`/audit/${result.auditId}`);
-      else setError(result.error || 'Scan failed');
-    } catch { setError('Could not connect'); }
-    finally { setScanning(false); }
   }
 
   function scoreColor(s: number | null) {
@@ -108,11 +120,64 @@ export default function SiteDashboardPage() {
             <span className="text-sm" style={{ color: 'var(--text-tertiary)' }}>{completedAudits.length} scan{completedAudits.length !== 1 ? 's' : ''} · Added {new Date(site.created_at).toLocaleDateString()}</span>
           </div>
         </div>
-        <button onClick={handleRescan} disabled={scanning}
-          className="btn-primary px-5 py-2.5 text-sm font-medium inline-flex items-center gap-2" style={{ opacity: scanning ? 0.7 : 1 }}>
-          {scanning ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Scanning…</> : <><Plus className="w-4 h-4" />New Scan</>}
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={() => setShowRescanModal(true)} className="btn-primary px-5 py-2.5 text-sm font-medium inline-flex items-center gap-2">
+            <RefreshCw className="w-4 h-4" />Rescan
+          </button>
+          {!site.has_monthly_monitoring && (
+            <button onClick={() => handleCheckout('monthly')} disabled={checkoutLoading}
+              className="px-4 py-2.5 text-sm font-medium rounded-lg border inline-flex items-center gap-2 transition-colors" style={{ color: '#10B981', borderColor: 'rgba(16,185,129,0.3)', background: 'rgba(16,185,129,0.05)' }}>
+              <CalendarCheck className="w-4 h-4" />{checkoutLoading ? 'Loading…' : 'Monthly — $25/mo'}
+            </button>
+          )}
+        </div>
       </div>
+
+      {/* Checkout success banner */}
+      {checkoutSuccess && (
+        <div className="mb-6 p-4 rounded-xl border flex items-center justify-between" style={{ background: 'rgba(16,185,129,0.05)', borderColor: 'rgba(16,185,129,0.2)' }}>
+          <p className="text-sm font-medium" style={{ color: '#10B981' }}>Payment successful! Your scan is being processed.</p>
+          <button onClick={() => setCheckoutSuccess(false)} style={{ color: 'var(--text-tertiary)' }}><X className="w-4 h-4" /></button>
+        </div>
+      )}
+
+      {/* Monthly monitoring info */}
+      {site.has_monthly_monitoring && (
+        <div className="mb-6 p-4 rounded-xl border flex items-center gap-3" style={{ background: 'rgba(16,185,129,0.05)', borderColor: 'rgba(16,185,129,0.2)' }}>
+          <CalendarCheck className="w-5 h-5 shrink-0" style={{ color: '#10B981' }} />
+          <div>
+            <p className="text-sm font-medium" style={{ color: '#10B981' }}>Monthly Monitoring Active</p>
+            <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
+              {site.next_scheduled_scan_at && `Next scan: ${new Date(site.next_scheduled_scan_at).toLocaleDateString()}`}
+              {site.last_auto_rerun_at && ` · Last auto-scan: ${new Date(site.last_auto_rerun_at).toLocaleDateString()}`}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Rescan confirmation modal */}
+      {showRescanModal && (
+        <>
+          <div className="fixed inset-0 z-40" style={{ background: 'rgba(0,0,0,0.4)' }} onClick={() => setShowRescanModal(false)} />
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="rounded-xl border p-6 max-w-sm w-full shadow-xl" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
+              <h3 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>Rescan This Site</h3>
+              <p className="mt-2 text-sm" style={{ color: 'var(--text-secondary)' }}>
+                This is an on-demand rescan and costs $35. Monthly plans include automatic monthly rescans at no extra charge.
+              </p>
+              <div className="flex gap-3 mt-6">
+                <button onClick={() => { setShowRescanModal(false); handleCheckout('rescan'); }} disabled={checkoutLoading}
+                  className="btn-primary flex-1 py-2.5 text-sm font-medium">
+                  {checkoutLoading ? 'Redirecting…' : 'Confirm & Pay — $35'}
+                </button>
+                <button onClick={() => setShowRescanModal(false)} className="flex-1 py-2.5 text-sm font-medium rounded-lg border" style={{ color: 'var(--text-secondary)', borderColor: 'var(--border)' }}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Latest score overview */}
       {latest && latest.status === 'completed' && (
@@ -226,5 +291,13 @@ export default function SiteDashboardPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function SiteDashboardPage() {
+  return (
+    <Suspense fallback={<div className="max-w-5xl mx-auto px-4 py-20 text-center"><div className="animate-spin w-8 h-8 border-2 rounded-full mx-auto" style={{ borderColor: '#6366F1', borderTopColor: 'transparent' }} /></div>}>
+      <SiteDashboardContent />
+    </Suspense>
   );
 }

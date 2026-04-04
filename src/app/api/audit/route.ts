@@ -64,6 +64,15 @@ export async function POST(request: NextRequest) {
       site = newSite;
     }
 
+    // Check if user has paid entitlements for this site
+    const { data: entitlement } = await supabase
+      .from('entitlements')
+      .select('can_view_core')
+      .eq('user_id', user.id)
+      .eq('site_id', site.id)
+      .single();
+    const hasPaidEntitlement = !!entitlement?.can_view_core;
+
     // Look up previous completed audit for delta tracking
     let previousAuditId: string | null = null;
     const { data: prevAudit } = await supabase
@@ -76,10 +85,14 @@ export async function POST(request: NextRequest) {
       .single();
     if (prevAudit) previousAuditId = prevAudit.id;
 
+    // Set run type based on entitlement status
+    const runType = hasPaidEntitlement ? 'paid_initial' : 'free_preview';
+    const runScope = hasPaidEntitlement ? 'core_plus_premium' : 'free';
+
     // Create audit record
     const { data: audit, error: auditError } = await supabase
       .from('audits')
-      .insert({ site_id: site.id, user_id: user.id, status: 'running', run_type: 'paid_initial', previous_audit_id: previousAuditId })
+      .insert({ site_id: site.id, user_id: user.id, status: 'running', run_type: runType, run_scope: runScope, previous_audit_id: previousAuditId })
       .select()
       .single();
 

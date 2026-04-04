@@ -1,11 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createServerSupabase } from '@/lib/supabase/server';
 
 export async function POST(request: NextRequest) {
   try {
-    const { domain, homepageH1, homepageDescription, pageTypes, hasSchema, hasPricing, hasComparison, industryHints } = await request.json();
+    const body = await request.json();
+    const { domain, homepageH1, homepageDescription, pageTypes, hasSchema, hasPricing, hasComparison, industryHints, siteId } = body;
 
     if (!domain) {
       return NextResponse.json({ error: 'Domain required' }, { status: 400 });
+    }
+
+    // Entitlement check
+    const supabase = await createServerSupabase();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user && siteId) {
+      const { data: entitlement } = await supabase
+        .from('entitlements')
+        .select('can_view_marketing_perception')
+        .eq('user_id', user.id)
+        .eq('site_id', siteId)
+        .single();
+      if (!entitlement?.can_view_marketing_perception) {
+        return NextResponse.json({ error: 'Premium feature — purchase required' }, { status: 403 });
+      }
+    } else {
+      return NextResponse.json({ error: 'Premium feature — purchase required' }, { status: 403 });
     }
 
     const apiKey = process.env.ANTHROPIC_API_KEY;

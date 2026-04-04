@@ -77,17 +77,49 @@ export async function GET(
       }
     }
 
+    // Check entitlements for this user + site
+    const { data: { user } } = await supabase.auth.getUser();
+    let hasEntitlement = false;
+    if (user && audit.site_id) {
+      const { data: entitlement } = await supabase
+        .from('entitlements')
+        .select('can_view_core')
+        .eq('user_id', user.id)
+        .eq('site_id', audit.site_id)
+        .single();
+      hasEntitlement = !!entitlement?.can_view_core;
+    }
+
+    if (hasEntitlement) {
+      return NextResponse.json({
+        audit,
+        pages: pages || [],
+        findings: findings || [],
+        recommendations: recommendations || [],
+        crawlerStatuses,
+        keyPagesStatus,
+        pagePreviews,
+        perceptionData: audit.perception_data || null,
+        growthData: audit.growth_data || null,
+        previousAudit,
+        hasEntitlement: true,
+      });
+    }
+
+    // Free tier: limited response
+    const limitedRecs = (recommendations || []).slice(0, 3);
     return NextResponse.json({
       audit,
-      pages: pages || [],
+      pages: [],
       findings: findings || [],
-      recommendations: recommendations || [],
+      recommendations: limitedRecs,
       crawlerStatuses,
       keyPagesStatus,
-      pagePreviews,
-      perceptionData: audit.perception_data || null,
-      growthData: audit.growth_data || null,
+      pagePreviews: [],
+      perceptionData: null,
+      growthData: null,
       previousAudit,
+      hasEntitlement: false,
     });
   } catch (error) {
     console.error('Fetch audit error:', error);

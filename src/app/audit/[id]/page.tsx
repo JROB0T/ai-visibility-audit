@@ -26,11 +26,11 @@ interface PagePreview { url: string; title: string; metaDescription: string; h1:
 
 interface AuditData {
   audit: {
-    id: string; status: string; overall_score: number | null;
+    id: string; site_id: string; status: string; overall_score: number | null;
     crawlability_score: number | null; machine_readability_score: number | null;
     commercial_clarity_score: number | null; trust_clarity_score: number | null;
     pages_scanned: number; summary: string | null; created_at: string;
-    completed_at: string | null; site: { domain: string; url: string; vertical?: string | null };
+    completed_at: string | null; site: { id?: string; domain: string; url: string; vertical?: string | null };
   };
   pages: Array<{
     id: string; url: string; page_type: string; title: string | null;
@@ -60,6 +60,7 @@ interface AuditData {
     findings: Array<{ id: string; category: string; severity: string; title: string; description: string; affected_urls: string[] }>;
     pages: Array<{ url: string }>;
   } | null;
+  hasEntitlement?: boolean;
 }
 
 type ViewMode = 'priority' | 'page' | 'category';
@@ -394,6 +395,8 @@ export default function AuditResultPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [hasPaid, setHasPaid] = useState(false);
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('category');
   const [severityFilter, setSeverityFilter] = useState<SeverityFilter>('all');
   const [expandedPages, setExpandedPages] = useState<Set<string>>(new Set());
@@ -413,6 +416,25 @@ export default function AuditResultPage() {
     a.download = `ai-visibility-report-${data.audit.site?.domain}-${new Date(data.audit.created_at).toISOString().split('T')[0]}.html`;
     a.click();
     URL.revokeObjectURL(url);
+  }
+
+  async function handleCheckout(priceType: 'initial_scan' | 'rescan' | 'monthly') {
+    if (!data) return;
+    setCheckoutLoading(true);
+    try {
+      const res = await fetch('/api/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ siteId: data.audit.site_id || data.audit.site?.id, priceType }),
+      });
+      const result = await res.json();
+      if (result.url) window.location.href = result.url;
+      else console.error('No checkout URL returned');
+    } catch (err) {
+      console.error('Checkout error:', err);
+    } finally {
+      setCheckoutLoading(false);
+    }
   }
   const [activeTab, setActiveTab] = useState<ReportTab>('overview');
   const [perceptionQuestions, setPerceptionQuestions] = useState<Array<{ question: string; intent: string; what_ai_needs: string; status: 'pass' | 'partial' | 'fail'; assessment: string; fix: string; codeSnippet: string | null }> | null>(null);
@@ -531,7 +553,7 @@ export default function AuditResultPage() {
         body: JSON.stringify({
           domain, homepageH1: h1, homepageDescription: metaDesc,
           pageTypes, hasSchema, hasPricing: hasPricingPage, hasComparison,
-          industryHints: h1,
+          industryHints: h1, siteId: audit.site_id,
         }),
       });
       const result = await res.json();
@@ -577,6 +599,7 @@ export default function AuditResultPage() {
             trust: audit.trust_clarity_score,
           },
           recommendations: recommendations.map((r: { severity: string; title: string }) => ({ severity: r.severity, title: r.title })),
+          siteId: audit.site_id,
         }),
       });
       if (res.ok) {
@@ -599,6 +622,7 @@ export default function AuditResultPage() {
         if (!res.ok) { setError('Audit not found'); return; }
         const auditData = await res.json();
         setData(auditData);
+        setHasPaid(!!auditData.hasEntitlement);
         // Restore previously saved perception and growth data
         if (auditData.perceptionData) setPerceptionQuestions(auditData.perceptionData);
         if (auditData.growthData) setGrowthData(auditData.growthData);
@@ -679,7 +703,7 @@ export default function AuditResultPage() {
   const { audit, pages, recommendations, crawlerStatuses, keyPagesStatus } = data;
   if (audit.status === 'failed') return (<div className="max-w-4xl mx-auto px-4 py-20 text-center"><AlertTriangle className="w-10 h-10 text-red-500 mx-auto" /><h2 className="mt-4 text-xl font-semibold" style={{ color: 'var(--text-primary)' }}>Scan failed</h2><p className="mt-2" style={{ color: 'var(--text-secondary)' }}>{audit.summary || 'The site could not be scanned.'}</p><a href="/" className="mt-6 inline-block" style={{ color: '#6366F1' }}>← Try another URL</a></div>);
 
-  const visibleRecs = isAuthenticated ? recommendations : recommendations.slice(0, FREE_RECOMMENDATION_LIMIT);
+  const visibleRecs = (isAuthenticated && hasPaid) ? recommendations : recommendations.slice(0, FREE_RECOMMENDATION_LIMIT);
   const gatedCount = recommendations.length - FREE_RECOMMENDATION_LIMIT;
   const highCount = allFindings.filter(f => f.severity === 'high').length;
   const medCount = allFindings.filter(f => f.severity === 'medium').length;
@@ -756,7 +780,7 @@ export default function AuditResultPage() {
           <p className="mt-1" style={{ color: 'var(--text-tertiary)' }}>{audit.site?.domain} · {new Date(audit.created_at).toLocaleDateString()}{audit.pages_scanned > 0 && ` · ${audit.pages_scanned} pages`}</p>
         </div>
         <div className="flex items-center gap-2">
-          {isAuthenticated && <button onClick={handleExportReport} className="btn-secondary inline-flex items-center gap-2 px-4 py-2 text-sm"><Download className="w-4 h-4" />Export Report</button>}
+          {isAuthenticated && hasPaid && <button onClick={handleExportReport} className="btn-secondary inline-flex items-center gap-2 px-4 py-2 text-sm"><Download className="w-4 h-4" />Export Report</button>}
           <a href="/" className="btn-secondary inline-flex items-center gap-2 px-4 py-2 text-sm"><RefreshCw className="w-4 h-4" />New Audit</a>
         </div>
       </div>
@@ -1267,7 +1291,18 @@ export default function AuditResultPage() {
       </>)}
 
       {/* ===== AI PERCEPTION TAB ===== */}
-      {isAuthenticated && activeTab === 'ai-perception' && (
+      {isAuthenticated && activeTab === 'ai-perception' && !hasPaid && (
+        <div className="card p-12 text-center mb-6">
+          <Lock className="w-10 h-10 mx-auto" style={{ color: '#6366F1' }} />
+          <h2 className="mt-4 text-xl font-bold" style={{ color: 'var(--text-primary)' }}>AI Perception Check</h2>
+          <p className="mt-2 text-sm max-w-md mx-auto" style={{ color: 'var(--text-secondary)' }}>See how AI assistants actually describe your business when customers ask. Find out if AI can answer key buyer questions about your product.</p>
+          <button onClick={() => handleCheckout('initial_scan')} disabled={checkoutLoading} className="mt-6 btn-primary inline-flex items-center gap-2 px-6 py-3 text-sm">
+            {checkoutLoading ? 'Redirecting…' : 'Unlock Full Report — $50'} <ArrowRight className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      {isAuthenticated && activeTab === 'ai-perception' && hasPaid && (
       <>
       <div className="card p-6 mb-6">
         <div className="flex items-center gap-2 mb-2">
@@ -1534,16 +1569,22 @@ export default function AuditResultPage() {
           </div>
         )}
 
-        {/* Gate for unauthenticated */}
-        {!isAuthenticated && gatedCount > 0 && (
+        {/* Gate for unpaid users */}
+        {(!isAuthenticated || !hasPaid) && gatedCount > 0 && (
           <div className="mt-6 relative">
             <div className="rounded-xl border p-5 opacity-40 blur-[2px] pointer-events-none" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}><div className="flex items-start gap-3"><span className="flex items-center justify-center w-6 h-6 rounded-full text-xs font-semibold" style={{ background: 'var(--bg-tertiary)', color: 'var(--text-tertiary)' }}>{FREE_RECOMMENDATION_LIMIT + 1}</span><div><div className="h-4 w-64 rounded" style={{ background: 'var(--bg-tertiary)' }} /><div className="h-3 w-96 rounded mt-2" style={{ background: 'var(--bg-tertiary)' }} /></div></div></div>
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="rounded-xl border-2 p-6 text-center shadow-lg max-w-sm" style={{ background: 'var(--surface)', borderColor: 'rgba(99,102,241,0.3)' }}>
                 <Lock className="w-8 h-8 mx-auto" style={{ color: '#6366F1' }} />
                 <h3 className="mt-3 font-semibold" style={{ color: 'var(--text-primary)' }}>{gatedCount} more finding{gatedCount > 1 ? 's' : ''} available</h3>
-                <p className="mt-2 text-sm" style={{ color: 'var(--text-secondary)' }}>Sign up free to unlock crawler status, page analysis, code snippets, and full report.</p>
-                <a href={`/auth/signup?redirect=/audit/${audit.id}`} className="mt-4 btn-primary inline-flex items-center gap-2 px-5 py-2.5 text-sm">Unlock Full Report <ArrowRight className="w-4 h-4" /></a>
+                <p className="mt-2 text-sm" style={{ color: 'var(--text-secondary)' }}>Unlock your full report with all findings, code snippets, AI perception, and growth strategy.</p>
+                {isAuthenticated ? (
+                  <button onClick={() => handleCheckout('initial_scan')} disabled={checkoutLoading} className="mt-4 btn-primary inline-flex items-center gap-2 px-5 py-2.5 text-sm">
+                    {checkoutLoading ? 'Redirecting…' : 'Unlock Full Report — $50'} <ArrowRight className="w-4 h-4" />
+                  </button>
+                ) : (
+                  <a href={`/auth/signup?redirect=/audit/${audit.id}`} className="mt-4 btn-primary inline-flex items-center gap-2 px-5 py-2.5 text-sm">Sign Up to Unlock <ArrowRight className="w-4 h-4" /></a>
+                )}
               </div>
             </div>
           </div>
@@ -1554,7 +1595,18 @@ export default function AuditResultPage() {
       )}
 
       {/* ===== GROWTH STRATEGY TAB ===== */}
-      {isAuthenticated && activeTab === 'growth' && (
+      {isAuthenticated && activeTab === 'growth' && !hasPaid && (
+        <div className="card p-12 text-center mb-6">
+          <Lock className="w-10 h-10 mx-auto" style={{ color: '#6366F1' }} />
+          <h2 className="mt-4 text-xl font-bold" style={{ color: 'var(--text-primary)' }}>Growth Strategy</h2>
+          <p className="mt-2 text-sm max-w-md mx-auto" style={{ color: 'var(--text-secondary)' }}>Get a competitive analysis comparing your AI visibility against competitors, plus a custom action plan to improve your rankings.</p>
+          <button onClick={() => handleCheckout('initial_scan')} disabled={checkoutLoading} className="mt-6 btn-primary inline-flex items-center gap-2 px-6 py-3 text-sm">
+            {checkoutLoading ? 'Redirecting…' : 'Unlock Full Report — $50'} <ArrowRight className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      {isAuthenticated && activeTab === 'growth' && hasPaid && (
       <>
       <div className="mb-6">
         {growthLoading && (
@@ -1727,7 +1779,17 @@ export default function AuditResultPage() {
       {(!isAuthenticated || activeTab === 'pages') && (
       <>
       {/* 8. PAGES ANALYZED */}
-      {isAuthenticated && pages.length > 0 && (
+      {isAuthenticated && !hasPaid && activeTab === 'pages' && (
+        <div className="card p-12 text-center mb-6">
+          <Lock className="w-10 h-10 mx-auto" style={{ color: '#6366F1' }} />
+          <h2 className="mt-4 text-xl font-bold" style={{ color: 'var(--text-primary)' }}>Detailed Page Analysis</h2>
+          <p className="mt-2 text-sm max-w-md mx-auto" style={{ color: 'var(--text-secondary)' }}>See how each of your pages performs for AI visibility — with title quality, schema data, and page-level issues.</p>
+          <button onClick={() => handleCheckout('initial_scan')} disabled={checkoutLoading} className="mt-6 btn-primary inline-flex items-center gap-2 px-6 py-3 text-sm">
+            {checkoutLoading ? 'Redirecting…' : 'Unlock Full Report — $50'} <ArrowRight className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+      {isAuthenticated && hasPaid && pages.length > 0 && (
         <div className="mb-6">
           <h2 className="text-xl font-bold mb-4" style={{ color: 'var(--text-primary)' }}>Pages Analyzed</h2>
           <div className="rounded-xl border overflow-hidden" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>

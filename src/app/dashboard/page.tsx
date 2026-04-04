@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { Search, Globe, Plus, AlertTriangle, ChevronRight, Building2 } from 'lucide-react';
+import { Search, Globe, Plus, AlertTriangle, ChevronRight, Building2, X, CheckCircle } from 'lucide-react';
 import { scoreToGrade, getScoreColor } from '@/components/ScoreRing';
 import { VERTICAL_OPTIONS, getVerticalLabel } from '@/lib/verticals';
 import { getRunTypeLabel } from '@/lib/entitlements';
@@ -13,6 +13,8 @@ interface SiteWithLatest {
   domain: string;
   url: string;
   vertical: string | null;
+  plan_status: string | null;
+  has_monthly_monitoring: boolean;
   created_at: string;
   latest_audit: {
     id: string; overall_score: number | null;
@@ -23,14 +25,20 @@ interface SiteWithLatest {
   audit_count: number;
 }
 
-export default function DashboardPage() {
+function DashboardContent() {
   const [sites, setSites] = useState<SiteWithLatest[]>([]);
   const [loading, setLoading] = useState(true);
   const [url, setUrl] = useState('');
   const [vertical, setVertical] = useState('other');
   const [scanning, setScanning] = useState(false);
   const [error, setError] = useState('');
+  const [checkoutSuccess, setCheckoutSuccess] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    if (searchParams.get('checkout') === 'success') setCheckoutSuccess(true);
+  }, [searchParams]);
 
   useEffect(() => {
     async function load() {
@@ -39,7 +47,7 @@ export default function DashboardPage() {
       if (!user) { router.push('/auth/login?redirect=/dashboard'); return; }
 
       const { data: userSites } = await supabase
-        .from('sites').select('id, domain, url, vertical, created_at')
+        .from('sites').select('id, domain, url, vertical, plan_status, has_monthly_monitoring, created_at')
         .eq('user_id', user.id).order('created_at', { ascending: false });
 
       if (!userSites || userSites.length === 0) { setLoading(false); return; }
@@ -89,6 +97,15 @@ export default function DashboardPage() {
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
+      {checkoutSuccess && (
+        <div className="mb-6 p-4 rounded-xl border flex items-center justify-between" style={{ background: 'rgba(16,185,129,0.05)', borderColor: 'rgba(16,185,129,0.2)' }}>
+          <div className="flex items-center gap-2">
+            <CheckCircle className="w-5 h-5" style={{ color: '#10B981' }} />
+            <p className="text-sm font-medium" style={{ color: '#10B981' }}>Payment successful! Your full report is now available.</p>
+          </div>
+          <button onClick={() => setCheckoutSuccess(false)} style={{ color: 'var(--text-tertiary)' }}><X className="w-4 h-4" /></button>
+        </div>
+      )}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
         <div>
           <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>Your Sites</h1>
@@ -140,9 +157,17 @@ export default function DashboardPage() {
                 <div className="flex items-start justify-between mb-3">
                   <div className="min-w-0">
                     <h3 className="font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{site.domain}</h3>
-                    <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>
-                      {getVerticalLabel(site.vertical)} · {site.audit_count} scan{site.audit_count !== 1 ? 's' : ''}{la && ` · ${new Date(la.created_at).toLocaleDateString()}`}
-                    </p>
+                    <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                      <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>{getVerticalLabel(site.vertical)}</span>
+                      {site.plan_status === 'core_premium' ? (
+                        <span className="text-xs px-1.5 py-0.5 rounded font-medium" style={{ color: '#6366F1', background: 'rgba(99,102,241,0.1)' }}>Paid</span>
+                      ) : site.has_monthly_monitoring ? (
+                        <span className="text-xs px-1.5 py-0.5 rounded font-medium" style={{ color: '#10B981', background: 'rgba(16,185,129,0.1)' }}>Monthly</span>
+                      ) : (
+                        <span className="text-xs px-1.5 py-0.5 rounded font-medium" style={{ color: 'var(--text-tertiary)', background: 'var(--bg-tertiary)' }}>Free</span>
+                      )}
+                      <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>· {site.audit_count} scan{site.audit_count !== 1 ? 's' : ''}{la && ` · ${new Date(la.created_at).toLocaleDateString()}`}</span>
+                    </div>
                   </div>
                   <ChevronRight className="w-4 h-4 shrink-0 mt-1 opacity-0 group-hover:opacity-100 transition-opacity" style={{ color: '#6366F1' }} />
                 </div>
@@ -177,5 +202,13 @@ export default function DashboardPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function DashboardPage() {
+  return (
+    <Suspense fallback={<div className="max-w-5xl mx-auto px-4 py-20 text-center"><div className="animate-spin w-8 h-8 border-2 rounded-full mx-auto" style={{ borderColor: '#6366F1', borderTopColor: 'transparent' }} /><p className="mt-4" style={{ color: 'var(--text-tertiary)' }}>Loading…</p></div>}>
+      <DashboardContent />
+    </Suspense>
   );
 }
