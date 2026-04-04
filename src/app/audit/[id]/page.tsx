@@ -420,18 +420,26 @@ export default function AuditResultPage() {
 
   async function handleCheckout(priceType: 'initial_scan' | 'rescan' | 'monthly') {
     if (!data) return;
+    const siteId = data.audit.site_id || data.audit.site?.id;
+    if (!siteId) {
+      console.error('No siteId available for checkout. audit:', { site_id: data.audit.site_id, site: data.audit.site });
+      return;
+    }
     setCheckoutLoading(true);
     try {
       const res = await fetch('/api/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ siteId: data.audit.site_id || data.audit.site?.id, priceType }),
+        body: JSON.stringify({ siteId, priceType }),
       });
       const result = await res.json();
-      if (result.url) window.location.href = result.url;
-      else console.error('No checkout URL returned');
+      if (result.url) {
+        window.location.href = result.url;
+      } else {
+        console.error('Checkout failed:', result);
+      }
     } catch (err) {
-      console.error('Checkout error:', err);
+      console.error('Checkout network error:', err);
     } finally {
       setCheckoutLoading(false);
     }
