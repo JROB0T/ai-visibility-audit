@@ -155,20 +155,38 @@ Rules:
 - Return actual domains that exist
 - No markdown, no backticks, just the JSON array`;
 
+        console.log('Growth strategy: requesting competitors for', domain);
         const compRes = await fetch('https://api.anthropic.com/v1/messages', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
           body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 100, messages: [{ role: 'user', content: compPrompt }] }),
         });
-        if (compRes.ok) {
+
+        if (!compRes.ok) {
+          const errorBody = await compRes.text();
+          console.error('Competitor API request failed:', { status: compRes.status, statusText: compRes.statusText, body: errorBody });
+        } else {
           const compData = await compRes.json();
           const compText = compData.content?.[0]?.text || '';
+          console.log('Competitor API raw response text:', compText);
           try {
-            const parsed = JSON.parse(compText.replace(/```json|```/g, '').trim());
-            if (Array.isArray(parsed)) competitors = parsed.slice(0, 2).map((c: string) => c.replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/.*$/, ''));
-          } catch { /* skip */ }
+            const cleaned = compText.replace(/```json|```/g, '').trim();
+            const parsed = JSON.parse(cleaned);
+            if (Array.isArray(parsed)) {
+              competitors = parsed.slice(0, 2).map((c: string) => c.replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/.*$/, ''));
+              console.log('Parsed competitors:', competitors);
+            } else {
+              console.error('Competitor response not an array:', parsed);
+            }
+          } catch (parseErr) {
+            console.error('Failed to parse competitor response:', { compText, error: parseErr instanceof Error ? parseErr.message : parseErr });
+          }
         }
-      } catch { /* skip */ }
+      } catch (fetchErr) {
+        console.error('Competitor fetch error:', fetchErr instanceof Error ? fetchErr.message : fetchErr);
+      }
+    } else {
+      console.log('Growth strategy: no ANTHROPIC_API_KEY, skipping competitor detection');
     }
 
     // Step 2: Lightweight scan of competitors
@@ -206,19 +224,28 @@ Return ONLY a JSON object with these fields:
 Make queries specific to their business category. Make recommendations actionable and specific.
 No markdown, no backticks, just the JSON.`;
 
+        console.log('Growth strategy: requesting marketing strategy for', domain);
         const stratRes = await fetch('https://api.anthropic.com/v1/messages', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
           body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 1000, messages: [{ role: 'user', content: stratPrompt }] }),
         });
-        if (stratRes.ok) {
+        if (!stratRes.ok) {
+          const errorBody = await stratRes.text();
+          console.error('Strategy API request failed:', { status: stratRes.status, body: errorBody });
+        } else {
           const stratData = await stratRes.json();
           const stratText = stratData.content?.[0]?.text || '';
+          console.log('Strategy API raw response length:', stratText.length);
           try {
             marketingStrategy = JSON.parse(stratText.replace(/```json|```/g, '').trim());
-          } catch { /* skip */ }
+          } catch (parseErr) {
+            console.error('Failed to parse strategy response:', { text: stratText.substring(0, 200), error: parseErr instanceof Error ? parseErr.message : parseErr });
+          }
         }
-      } catch { /* skip */ }
+      } catch (fetchErr) {
+        console.error('Strategy fetch error:', fetchErr instanceof Error ? fetchErr.message : fetchErr);
+      }
     }
 
     // Fallback marketing strategy from scan data if no API
