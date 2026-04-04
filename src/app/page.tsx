@@ -2,69 +2,23 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, CheckCircle, ArrowRight, Shield, FileText, Globe, Zap, AlertTriangle, Sparkles, Eye, Target, BarChart3, Building2 } from 'lucide-react';
+import { Search, CheckCircle, ArrowRight, Shield, FileText, Sparkles, Eye, BarChart3, RefreshCw } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
-import { VERTICAL_OPTIONS } from '@/lib/verticals';
-
-const SCAN_STEPS = [
-  { label: 'Checking robots.txt & crawler access' },
-  { label: 'Parsing sitemap for key pages' },
-  { label: 'Discovering product & pricing pages' },
-  { label: 'Analyzing structured data & metadata' },
-  { label: 'Evaluating commercial page clarity' },
-  { label: 'Scoring trust & authority signals' },
-  { label: 'Calculating your AI Visibility Score' },
-];
 
 export default function HomePage() {
-  const [url, setUrl] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [scanStep, setScanStep] = useState(0);
-  const [vertical, setVertical] = useState('other');
   const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
   const router = useRouter();
 
   useEffect(() => {
     const supabase = createClient();
     supabase.auth.getUser().then(({ data: { user } }) => {
-      setIsLoggedIn(!!user);
-    });
-  }, []);
-
-  useEffect(() => {
-    if (!loading) { setScanStep(0); return; }
-    const interval = setInterval(() => {
-      setScanStep((prev) => (prev < SCAN_STEPS.length - 1 ? prev + 1 : prev));
-    }, 3500);
-    return () => clearInterval(interval);
-  }, [loading]);
-
-  async function handleAudit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!url.trim()) return;
-    setLoading(true);
-    setError('');
-    setScanStep(0);
-    try {
-      const res = await fetch('/api/audit', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: url.trim(), vertical }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        if (res.status === 401) { router.push('/auth/login'); return; }
-        setError(data.error || 'Something went wrong.');
-        return;
+      if (user) {
+        router.push('/dashboard');
+      } else {
+        setIsLoggedIn(false);
       }
-      router.push(`/audit/${data.auditId}`);
-    } catch {
-      setError('Could not connect. Please check the URL and try again.');
-    } finally {
-      setLoading(false);
-    }
-  }
+    });
+  }, [router]);
 
   // Animated demo score
   const [demoScore, setDemoScore] = useState(0);
@@ -83,13 +37,17 @@ export default function HomePage() {
 
   const scoreColor = demoScore >= 70 ? '#10B981' : demoScore >= 50 ? '#F59E0B' : '#EF4444';
 
+  // Show nothing while checking auth (prevents flash)
+  if (isLoggedIn === null) {
+    return <div className="min-h-screen" style={{ background: 'var(--bg)' }} />;
+  }
+
   return (
     <div>
-      {/* ===== DARK HERO ===== */}
+      {/* ===== HERO ===== */}
       <section className="hero-dark relative">
         <div className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 py-20 sm:py-28">
           <div className="flex flex-col lg:flex-row items-center gap-12 lg:gap-20">
-            {/* Left copy */}
             <div className="flex-1 text-center lg:text-left">
               <div className="inline-flex items-center gap-2 text-xs font-medium px-3 py-1.5 rounded-full mb-6 border" style={{ color: '#818CF8', borderColor: 'rgba(99,102,241,0.2)', background: 'rgba(99,102,241,0.08)' }}>
                 <Sparkles className="w-3 h-3" />
@@ -100,87 +58,19 @@ export default function HomePage() {
                 <span className="text-gradient">your business</span>
               </h1>
               <p className="mt-5 text-base sm:text-lg max-w-lg leading-relaxed" style={{ color: '#94A3B8' }}>
-                AI-powered search is how customers discover businesses today.
-                Find out if your site is visible — and get a clear plan to fix it.
+                AI systems like ChatGPT, Perplexity, and Claude are how customers discover products now. Find out if they can find yours.
               </p>
-
-              {/* Auth-gated: scan form for logged-in, CTAs for logged-out */}
-              {isLoggedIn === null ? (
-                <div className="mt-8 max-w-md mx-auto lg:mx-0">
-                  <div className="h-14 rounded-xl animate-pulse" style={{ background: 'rgba(99,102,241,0.1)' }} />
-                </div>
-              ) : isLoggedIn ? (
-                <form onSubmit={handleAudit} className="mt-8 max-w-md mx-auto lg:mx-0">
-                  <div className="flex gap-2">
-                    <div className="relative flex-1">
-                      <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: '#64748B' }} />
-                      <input
-                        type="text"
-                        value={url}
-                        onChange={(e) => setUrl(e.target.value)}
-                        placeholder="yoursite.com"
-                        className="w-full pl-10 pr-4 py-3.5 input-field"
-                        disabled={loading}
-                      />
-                    </div>
-                    <button type="submit" disabled={loading || !url.trim()} className="px-6 py-3.5 btn-primary flex items-center gap-2 whitespace-nowrap">
-                      {loading ? (
-                        <><svg className="animate-spin w-4 h-4" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>Scanning…</>
-                      ) : (
-                        <>Audit <ArrowRight className="w-4 h-4" /></>
-                      )}
-                    </button>
-                  </div>
-                  <div className="relative mt-3">
-                    <Building2 className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: '#64748B' }} />
-                    <select
-                      value={vertical}
-                      onChange={(e) => setVertical(e.target.value)}
-                      className="w-full pl-10 pr-4 py-3 input-field appearance-none text-sm"
-                      disabled={loading}
-                    >
-                      {VERTICAL_OPTIONS.map((v) => (
-                        <option key={v.value} value={v.value}>{v.label}</option>
-                      ))}
-                    </select>
-                  </div>
-                  {error && (
-                    <p className="mt-3 text-sm text-red-400 flex items-center gap-1.5">
-                      <AlertTriangle className="w-4 h-4 shrink-0" />{error}
-                    </p>
-                  )}
-                  {loading && (
-                    <div className="mt-4 card-dark p-4">
-                      <div className="space-y-2">
-                        {SCAN_STEPS.map((step, i) => (
-                          <div key={i} className={`flex items-center gap-2.5 text-sm transition-all duration-300 ${i < scanStep ? 'text-emerald-400' : i === scanStep ? 'text-indigo-300 font-medium' : 'text-slate-600'}`}>
-                            {i < scanStep ? (
-                              <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
-                            ) : i === scanStep ? (
-                              <svg className="animate-spin w-4 h-4 text-indigo-400 shrink-0" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
-                            ) : (
-                              <div className="w-4 h-4 rounded-full border shrink-0" style={{ borderColor: '#1E293B' }} />
-                            )}
-                            <span>{step.label}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </form>
-              ) : (
-                <div className="mt-8 max-w-md mx-auto lg:mx-0 flex flex-col sm:flex-row gap-3">
-                  <a href="/auth/signup" className="px-6 py-3.5 btn-primary flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium">
-                    Start Your Free Scan <ArrowRight className="w-4 h-4" />
-                  </a>
-                  <a href="/auth/login" className="px-6 py-3.5 rounded-xl border text-sm font-medium flex items-center justify-center gap-2 whitespace-nowrap transition-colors" style={{ color: '#94A3B8', borderColor: 'rgba(148,163,184,0.2)' }}>
-                    Sign In
-                  </a>
-                </div>
-              )}
+              <div className="mt-8 max-w-md mx-auto lg:mx-0 flex flex-col sm:flex-row gap-3">
+                <a href="/auth/signup" className="px-6 py-3.5 btn-primary flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium">
+                  Start Your Free Scan <ArrowRight className="w-4 h-4" />
+                </a>
+                <a href="/auth/login" className="px-6 py-3.5 rounded-xl border text-sm font-medium flex items-center justify-center gap-2 whitespace-nowrap transition-colors" style={{ color: '#94A3B8', borderColor: 'rgba(148,163,184,0.2)' }}>
+                  Sign In
+                </a>
+              </div>
             </div>
 
-            {/* Right: Demo score card */}
+            {/* Demo score card */}
             <div className="flex-shrink-0 hidden lg:block anim-float">
               <div className="card-dark p-8 w-[300px]" style={{ boxShadow: '0 0 60px -10px rgba(99,102,241,0.15)' }}>
                 <div className="flex items-center justify-between mb-6">
@@ -201,13 +91,13 @@ export default function HomePage() {
                 </div>
                 <div className="space-y-3">
                   {[
-                    { label: 'Crawlability', score: 92, color: '#10B981' },
-                    { label: 'Readability', score: 68, color: '#F59E0B' },
-                    { label: 'Commercial', score: 45, color: '#EF4444' },
+                    { label: 'Findability', score: 92, color: '#10B981' },
+                    { label: 'Explainability', score: 68, color: '#F59E0B' },
+                    { label: 'Buyability', score: 45, color: '#EF4444' },
                     { label: 'Trust', score: 78, color: '#10B981' },
                   ].map((cat) => (
                     <div key={cat.label} className="flex items-center gap-3">
-                      <span className="text-xs w-20" style={{ color: '#64748B', fontFamily: 'var(--font-sans)' }}>{cat.label}</span>
+                      <span className="text-xs w-24" style={{ color: '#64748B', fontFamily: 'var(--font-sans)' }}>{cat.label}</span>
                       <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: '#1E293B' }}>
                         <div className="h-full rounded-full transition-all duration-1000" style={{ width: `${cat.score}%`, backgroundColor: cat.color, boxShadow: `0 0 6px ${cat.color}40` }} />
                       </div>
@@ -221,34 +111,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ===== PROBLEM SECTION ===== */}
-      <section className="py-20 sm:py-28" style={{ background: 'var(--bg)' }}>
-        <div className="max-w-5xl mx-auto px-4 sm:px-6">
-          <div className="text-center mb-14">
-            <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: '#6366F1' }}>The Problem</span>
-            <h2 className="mt-3 text-3xl sm:text-4xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>
-              AI is the new front door for your customers
-            </h2>
-            <p className="mt-4 text-lg max-w-2xl mx-auto leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-              If your site isn&apos;t structured for AI crawlers and AI-powered search, potential customers won&apos;t find you.
-            </p>
-          </div>
-          <div className="grid sm:grid-cols-3 gap-5">
-            {[
-              { icon: <Eye className="w-5 h-5" />, iconBg: '#FEE2E2', iconColor: '#EF4444', title: "AI can't find your pages", desc: 'Missing sitemaps, blocked crawlers, or poor structure means AI never indexes your most important pages.' },
-              { icon: <FileText className="w-5 h-5" />, iconBg: '#FEF3C7', iconColor: '#F59E0B', title: "Your content isn't machine-readable", desc: 'Without structured data and clear page structure, AI struggles to understand what your business offers.' },
-              { icon: <Target className="w-5 h-5" />, iconBg: '#E0E7FF', iconColor: '#6366F1', title: 'Your competitors get recommended', desc: "When AI can't confidently reference your business, it recommends whoever has better-structured content." },
-            ].map((item, i) => (
-              <div key={i} className="card-glow p-6 anim-in" style={{ animationDelay: `${i * 0.1}s` }}>
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-4" style={{ background: item.iconBg, color: item.iconColor }}>{item.icon}</div>
-                <h3 className="font-semibold text-[15px]" style={{ color: 'var(--text-primary)' }}>{item.title}</h3>
-                <p className="mt-2 text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>{item.desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
       {/* ===== HOW IT WORKS ===== */}
       <section className="py-20 sm:py-28 border-y" style={{ background: 'var(--bg-secondary)', borderColor: 'var(--border)' }}>
         <div className="max-w-5xl mx-auto px-4 sm:px-6">
@@ -258,9 +120,9 @@ export default function HomePage() {
           </div>
           <div className="grid sm:grid-cols-3 gap-10">
             {[
-              { num: '01', icon: <Search className="w-5 h-5" style={{ color: '#6366F1' }} />, title: 'Enter your URL', desc: 'Paste your website URL. We discover key pages automatically from your homepage and sitemap.' },
-              { num: '02', icon: <BarChart3 className="w-5 h-5" style={{ color: '#6366F1' }} />, title: 'We scan up to 50 pages', desc: 'We check robots.txt, sitemaps, metadata, structured data, page structure, and commercial clarity.' },
-              { num: '03', icon: <Sparkles className="w-5 h-5" style={{ color: '#6366F1' }} />, title: 'Get your full report', desc: 'See your AI Visibility Score with category breakdowns and actionable, prioritized recommendations.' },
+              { num: '01', icon: <Search className="w-5 h-5" style={{ color: '#6366F1' }} />, title: 'Enter your site', desc: 'Type your domain. We automatically discover your key pages from your homepage and sitemap.' },
+              { num: '02', icon: <BarChart3 className="w-5 h-5" style={{ color: '#6366F1' }} />, title: 'We scan how AI sees you', desc: 'We check if AI crawlers can access your site, understand your content, and recommend your business.' },
+              { num: '03', icon: <Sparkles className="w-5 h-5" style={{ color: '#6366F1' }} />, title: 'Get your visibility report', desc: 'See your AI Visibility Score with plain-English explanations and a prioritized fix plan.' },
             ].map((item, i) => (
               <div key={i} className="text-center sm:text-left">
                 <div className="flex items-center justify-center sm:justify-start gap-3 mb-4">
@@ -275,42 +137,114 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ===== WHAT WE CHECK ===== */}
+      {/* ===== WHAT YOU GET ===== */}
       <section className="py-20 sm:py-28" style={{ background: 'var(--bg)' }}>
         <div className="max-w-5xl mx-auto px-4 sm:px-6">
           <div className="text-center mb-14">
-            <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: '#6366F1' }}>What We Check</span>
-            <h2 className="mt-3 text-3xl sm:text-4xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>Four pillars of AI visibility</h2>
-            <p className="mt-4 max-w-2xl mx-auto" style={{ color: 'var(--text-secondary)' }}>Each pillar is scored independently so you know exactly where to focus.</p>
+            <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: '#6366F1' }}>What You Get</span>
+            <h2 className="mt-3 text-3xl sm:text-4xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>Everything you need to get found by AI</h2>
           </div>
           <div className="grid sm:grid-cols-2 gap-5">
             {[
-              { icon: <Shield className="w-5 h-5" />, color: '#10B981', bg: '#ECFDF5', title: 'Crawlability', items: ['robots.txt configuration', 'XML sitemap coverage', 'AI crawler access (GPTBot, ClaudeBot)', 'Response codes & redirects'] },
-              { icon: <FileText className="w-5 h-5" />, color: '#6366F1', bg: '#E0E7FF', title: 'Machine Readability', items: ['Title & meta description quality', 'JSON-LD structured data', 'Canonical tag consistency', 'Heading hierarchy & content depth'] },
-              { icon: <Zap className="w-5 h-5" />, color: '#F59E0B', bg: '#FEF3C7', title: 'Commercial Clarity', items: ['Pricing page discoverability', 'Product page structure', 'Contact & demo conversion paths', 'Internal linking & navigation'] },
-              { icon: <Globe className="w-5 h-5" />, color: '#EC4899', bg: '#FCE7F3', title: 'Trust & Authority', items: ['Organization schema markup', 'Content depth & authority', 'Resource/blog/docs presence', 'Page load performance'] },
-            ].map((cat, i) => (
+              { icon: <Eye className="w-5 h-5" />, color: '#6366F1', bg: '#E0E7FF', title: 'AI Perception Check', desc: 'Can AI accurately answer questions about your business? We test exactly what ChatGPT, Claude, and Perplexity would say about you.' },
+              { icon: <Shield className="w-5 h-5" />, color: '#10B981', bg: '#ECFDF5', title: 'Competitive Benchmark', desc: 'See how your AI visibility compares to your competitors. Know where you stand and where to focus.' },
+              { icon: <FileText className="w-5 h-5" />, color: '#F59E0B', bg: '#FEF3C7', title: 'Fix Plans with Code', desc: 'Get copy-paste code snippets and content recommendations. No guesswork — just implement the fixes.' },
+              { icon: <RefreshCw className="w-5 h-5" />, color: '#EC4899', bg: '#FCE7F3', title: 'Monthly Monitoring', desc: 'Track your progress over time. Get monthly rescans with change detection and new action items.' },
+            ].map((item, i) => (
               <div key={i} className="card-glow p-6">
                 <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: cat.bg, color: cat.color }}>{cat.icon}</div>
-                  <h3 className="font-semibold" style={{ color: 'var(--text-primary)' }}>{cat.title}</h3>
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: item.bg, color: item.color }}>{item.icon}</div>
+                  <h3 className="font-semibold" style={{ color: 'var(--text-primary)' }}>{item.title}</h3>
                 </div>
-                <ul className="space-y-2.5">
-                  {cat.items.map((item, j) => (
-                    <li key={j} className="flex items-start gap-2.5 text-sm" style={{ color: 'var(--text-secondary)' }}>
-                      <CheckCircle className="w-4 h-4 mt-0.5 shrink-0" style={{ color: cat.color }} />
-                      <span>{item}</span>
-                    </li>
-                  ))}
-                </ul>
+                <p className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>{item.desc}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* ===== WHO ITS FOR ===== */}
+      {/* ===== PRICING ===== */}
       <section className="py-20 sm:py-28 border-y" style={{ background: 'var(--bg-secondary)', borderColor: 'var(--border)' }}>
+        <div className="max-w-5xl mx-auto px-4 sm:px-6">
+          <div className="text-center mb-14">
+            <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: '#6366F1' }}>Pricing</span>
+            <h2 className="mt-3 text-3xl sm:text-4xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>Simple, transparent pricing</h2>
+            <p className="mt-4 max-w-xl mx-auto" style={{ color: 'var(--text-secondary)' }}>Start free. Upgrade when you&apos;re ready to get the full picture.</p>
+          </div>
+          <div className="grid sm:grid-cols-3 gap-5">
+            {/* Free Scan */}
+            <div className="card-glow p-6 flex flex-col">
+              <div className="mb-4">
+                <p className="text-sm font-semibold" style={{ color: 'var(--text-tertiary)' }}>Free Scan</p>
+                <div className="mt-2 flex items-baseline gap-1">
+                  <span className="text-3xl font-extrabold" style={{ color: 'var(--text-primary)' }}>$0</span>
+                </div>
+              </div>
+              <ul className="space-y-3 mb-6 flex-1">
+                {['AI Visibility Score', 'Top 5 issues identified', '4 category grades', 'Key pages check', 'AI bot access status'].map((item) => (
+                  <li key={item} className="flex items-start gap-2.5 text-sm" style={{ color: 'var(--text-secondary)' }}>
+                    <CheckCircle className="w-4 h-4 mt-0.5 shrink-0" style={{ color: '#10B981' }} />
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+              <a href="/auth/signup" className="w-full py-2.5 rounded-lg border text-sm font-medium text-center transition-colors" style={{ color: '#6366F1', borderColor: 'rgba(99,102,241,0.3)' }}>
+                Start Free
+              </a>
+            </div>
+
+            {/* Full Audit */}
+            <div className="card-glow p-6 flex flex-col relative" style={{ borderColor: 'rgba(99,102,241,0.3)', boxShadow: '0 0 30px -10px rgba(99,102,241,0.2)' }}>
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                <span className="text-xs font-semibold px-3 py-1 rounded-full" style={{ color: 'white', background: '#6366F1' }}>Most Popular</span>
+              </div>
+              <div className="mb-4">
+                <p className="text-sm font-semibold" style={{ color: '#6366F1' }}>Full Audit</p>
+                <div className="mt-2 flex items-baseline gap-1">
+                  <span className="text-3xl font-extrabold" style={{ color: 'var(--text-primary)' }}>$50</span>
+                  <span className="text-sm" style={{ color: 'var(--text-tertiary)' }}>one-time</span>
+                </div>
+              </div>
+              <ul className="space-y-3 mb-6 flex-1">
+                {['Everything in Free, plus:', 'All findings with code fixes', 'AI Perception Check', 'Growth Strategy & benchmarks', 'Detailed page analysis', 'Exportable report'].map((item, i) => (
+                  <li key={item} className="flex items-start gap-2.5 text-sm" style={{ color: i === 0 ? 'var(--text-tertiary)' : 'var(--text-secondary)' }}>
+                    <CheckCircle className="w-4 h-4 mt-0.5 shrink-0" style={{ color: '#6366F1' }} />
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+              <a href="/auth/signup" className="w-full py-2.5 btn-primary rounded-lg text-sm font-medium text-center">
+                Get Your Audit
+              </a>
+            </div>
+
+            {/* Monthly Monitoring */}
+            <div className="card-glow p-6 flex flex-col">
+              <div className="mb-4">
+                <p className="text-sm font-semibold" style={{ color: '#10B981' }}>Monthly Monitoring</p>
+                <div className="mt-2 flex items-baseline gap-1">
+                  <span className="text-3xl font-extrabold" style={{ color: 'var(--text-primary)' }}>$25</span>
+                  <span className="text-sm" style={{ color: 'var(--text-tertiary)' }}>/month</span>
+                </div>
+              </div>
+              <ul className="space-y-3 mb-6 flex-1">
+                {['Everything in Full Audit, plus:', 'Automatic monthly rescans', 'Score trend tracking', 'Change detection & alerts', 'Monthly action plans', 'New vs resolved issues'].map((item, i) => (
+                  <li key={item} className="flex items-start gap-2.5 text-sm" style={{ color: i === 0 ? 'var(--text-tertiary)' : 'var(--text-secondary)' }}>
+                    <CheckCircle className="w-4 h-4 mt-0.5 shrink-0" style={{ color: '#10B981' }} />
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+              <a href="/auth/signup" className="w-full py-2.5 rounded-lg border text-sm font-medium text-center transition-colors" style={{ color: '#10B981', borderColor: 'rgba(16,185,129,0.3)' }}>
+                Start Monitoring
+              </a>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ===== WHO ITS FOR ===== */}
+      <section className="py-20 sm:py-28" style={{ background: 'var(--bg)' }}>
         <div className="max-w-5xl mx-auto px-4 sm:px-6 text-center">
           <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: '#6366F1' }}>Who It&apos;s For</span>
           <h2 className="mt-3 text-3xl sm:text-4xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>Built for businesses that want to be found</h2>
@@ -326,40 +260,19 @@ export default function HomePage() {
       </section>
 
       {/* ===== BOTTOM CTA ===== */}
-      <section className="py-20 sm:py-28" style={{ background: 'var(--bg)' }}>
+      <section className="py-20 sm:py-28 border-t" style={{ background: 'var(--bg-secondary)', borderColor: 'var(--border)' }}>
         <div className="max-w-lg mx-auto px-4 sm:px-6 text-center">
           <div className="card-glow p-8 sm:p-10" style={{ boxShadow: '0 0 40px -10px rgba(99,102,241,0.1)' }}>
-            <h2 className="text-2xl sm:text-3xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>See how AI systems find your business</h2>
-            <p className="mt-3" style={{ color: 'var(--text-secondary)' }}>Get your AI Visibility Score and a clear action plan. Takes about 30 seconds.</p>
-            {isLoggedIn ? (
-              <form onSubmit={handleAudit} className="mt-6">
-                <div className="flex gap-2">
-                  <input type="text" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="yoursite.com" className="flex-1 px-4 py-3.5 input-light" disabled={loading} />
-                  <button type="submit" disabled={loading || !url.trim()} className="px-6 py-3.5 btn-primary flex items-center gap-2 whitespace-nowrap">
-                    {loading ? 'Scanning…' : 'Audit'}
-                  </button>
-                </div>
-                <select
-                  value={vertical}
-                  onChange={(e) => setVertical(e.target.value)}
-                  className="w-full mt-3 px-4 py-3 input-light appearance-none text-sm"
-                  disabled={loading}
-                >
-                  {VERTICAL_OPTIONS.map((v) => (
-                    <option key={v.value} value={v.value}>{v.label}</option>
-                  ))}
-                </select>
-              </form>
-            ) : (
-              <div className="mt-6 flex flex-col sm:flex-row gap-3 justify-center">
-                <a href="/auth/signup" className="px-6 py-3.5 btn-primary flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium">
-                  Start Your Free Scan <ArrowRight className="w-4 h-4" />
-                </a>
-                <a href="/auth/login" className="px-6 py-3.5 rounded-xl border text-sm font-medium flex items-center justify-center gap-2 whitespace-nowrap transition-colors" style={{ color: 'var(--text-secondary)', borderColor: 'var(--border)' }}>
-                  Sign In
-                </a>
-              </div>
-            )}
+            <h2 className="text-2xl sm:text-3xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>Ready to see how AI finds your business?</h2>
+            <p className="mt-3" style={{ color: 'var(--text-secondary)' }}>Get your AI Visibility Score in about 30 seconds. Free to start.</p>
+            <div className="mt-6 flex flex-col sm:flex-row gap-3 justify-center">
+              <a href="/auth/signup" className="px-6 py-3.5 btn-primary flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium">
+                Start Your Free Scan <ArrowRight className="w-4 h-4" />
+              </a>
+              <a href="/auth/login" className="px-6 py-3.5 rounded-xl border text-sm font-medium flex items-center justify-center gap-2 whitespace-nowrap transition-colors" style={{ color: 'var(--text-secondary)', borderColor: 'var(--border)' }}>
+                Sign In
+              </a>
+            </div>
           </div>
         </div>
       </section>

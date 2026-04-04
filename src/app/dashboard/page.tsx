@@ -101,7 +101,7 @@ function DashboardContent() {
         <div className="mb-6 p-4 rounded-xl border flex items-center justify-between" style={{ background: 'rgba(16,185,129,0.05)', borderColor: 'rgba(16,185,129,0.2)' }}>
           <div className="flex items-center gap-2">
             <CheckCircle className="w-5 h-5" style={{ color: '#10B981' }} />
-            <p className="text-sm font-medium" style={{ color: '#10B981' }}>Payment successful! Your full report is now available.</p>
+            <p className="text-sm font-medium" style={{ color: '#10B981' }}>Payment successful! Your full report is now unlocked.</p>
           </div>
           <button onClick={() => setCheckoutSuccess(false)} style={{ color: 'var(--text-tertiary)' }}><X className="w-4 h-4" /></button>
         </div>
