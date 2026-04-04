@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabase } from '@/lib/supabase/server';
-import { stripe } from '@/lib/stripe';
+import { getStripe } from '@/lib/stripe';
 
 export async function POST(request: NextRequest) {
   try {
@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
     const successUrl = `${origin}/site/${siteId}?checkout=success&type=${priceType}`;
     const cancelUrl = `${origin}/site/${siteId}?checkout=cancel`;
 
-    const session = await stripe.checkout.sessions.create({
+    const session = await getStripe().checkout.sessions.create({
       mode: priceConfig.mode,
       line_items: [{ price: priceConfig.priceId, quantity: 1 }],
       success_url: successUrl,
