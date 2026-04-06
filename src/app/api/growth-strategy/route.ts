@@ -19,21 +19,25 @@ export async function POST(request: NextRequest) {
     const { domain, h1, metaDescription, pageTypes, scores, recommendations, siteId } = body;
     if (!domain) return NextResponse.json({ error: 'Domain required' }, { status: 400 });
 
-    // Entitlement check
+    // Entitlement check (admin bypass first)
     const supabase = await createServerSupabase();
     const { data: { user } } = await supabase.auth.getUser();
-    if (user && siteId) {
-      const { data: entitlement } = await supabase
-        .from('entitlements')
-        .select('can_view_growth_strategy')
-        .eq('user_id', user.id)
-        .eq('site_id', siteId)
-        .single();
-      if (!entitlement?.can_view_growth_strategy) {
+    const ADMIN_EMAILS = ['demo@aivisibility.test', 'mikedaman@gmail.com'];
+    const isAdmin = !!(user?.email && ADMIN_EMAILS.includes(user.email));
+    if (!isAdmin) {
+      if (user && siteId) {
+        const { data: entitlement } = await supabase
+          .from('entitlements')
+          .select('can_view_growth_strategy')
+          .eq('user_id', user.id)
+          .eq('site_id', siteId)
+          .single();
+        if (!entitlement?.can_view_growth_strategy) {
+          return NextResponse.json({ error: 'Premium feature — purchase required' }, { status: 403 });
+        }
+      } else {
         return NextResponse.json({ error: 'Premium feature — purchase required' }, { status: 403 });
       }
-    } else {
-      return NextResponse.json({ error: 'Premium feature — purchase required' }, { status: 403 });
     }
 
     const apiKey = process.env.ANTHROPIC_API_KEY;

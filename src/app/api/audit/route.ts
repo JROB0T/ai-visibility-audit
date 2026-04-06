@@ -23,6 +23,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid URL' }, { status: 400 });
     }
 
+    // Normalize www prefix — "www.example.com" and "example.com" are the same site
+    if (domain.startsWith('www.')) {
+      domain = domain.slice(4);
+      siteUrl = siteUrl.replace(/\/\/www\./i, '//');
+    }
+
     const supabase = await createServerSupabase();
     const { data: { user } } = await supabase.auth.getUser();
 
@@ -57,14 +63,19 @@ export async function POST(request: NextRequest) {
       site = newSite;
     }
 
-    // Check if user has paid entitlements for this site
-    const { data: entitlement } = await supabase
-      .from('entitlements')
-      .select('can_view_core')
-      .eq('user_id', user.id)
-      .eq('site_id', site.id)
-      .single();
-    const hasPaidEntitlement = !!entitlement?.can_view_core;
+    // Check if user has paid entitlements for this site (admin bypass first)
+    const ADMIN_EMAILS = ['demo@aivisibility.test', 'mikedaman@gmail.com'];
+    const isAdmin = !!(user.email && ADMIN_EMAILS.includes(user.email));
+    let hasPaidEntitlement = isAdmin;
+    if (!hasPaidEntitlement) {
+      const { data: entitlement } = await supabase
+        .from('entitlements')
+        .select('can_view_core')
+        .eq('user_id', user.id)
+        .eq('site_id', site.id)
+        .single();
+      hasPaidEntitlement = !!entitlement?.can_view_core;
+    }
 
     // Look up previous completed audit for delta tracking
     let previousAuditId: string | null = null;

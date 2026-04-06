@@ -79,8 +79,10 @@ export async function GET(
 
     // Check entitlements for this user + site
     const { data: { user } } = await supabase.auth.getUser();
-    let hasEntitlement = false;
-    if (user && audit.site_id) {
+    const ADMIN_EMAILS = ['demo@aivisibility.test', 'mikedaman@gmail.com'];
+    const isAdmin = !!(user?.email && ADMIN_EMAILS.includes(user.email));
+    let hasEntitlement = isAdmin;
+    if (!hasEntitlement && user && audit.site_id) {
       const { data: entitlement } = await supabase
         .from('entitlements')
         .select('can_view_core')
