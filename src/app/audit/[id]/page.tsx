@@ -882,6 +882,44 @@ export default function AuditResultPage() {
         const top5 = [...allFindings]
           .sort((a, b) => (severityOrder[a.severity] ?? 9) - (severityOrder[b.severity] ?? 9) || (effortOrder[a.effort] ?? 9) - (effortOrder[b.effort] ?? 9))
           .slice(0, 5);
+
+        // Calculate projected improvement per category
+        const impactMap: Record<string, number> = { high: 10, medium: 5, low: 2 };
+        const categoryBoosts: Record<string, number> = {};
+        const fixImpacts: { id: string; points: number; category: string }[] = [];
+        for (const fix of top5) {
+          const points = impactMap[fix.severity] || 3;
+          const cat = fix.category;
+          categoryBoosts[cat] = (categoryBoosts[cat] || 0) + points;
+          fixImpacts.push({ id: fix.id, points, category: cat });
+        }
+
+        const currentScores = {
+          crawlability: audit.crawlability_score ?? 0,
+          machine_readability: audit.machine_readability_score ?? 0,
+          commercial_clarity: audit.commercial_clarity_score ?? 0,
+          trust_clarity: audit.trust_clarity_score ?? 0,
+        };
+        const projectedScores: Record<string, number> = {};
+        const improvements: { category: string; label: string; current: number; projected: number }[] = [];
+        for (const [cat, boost] of Object.entries(categoryBoosts)) {
+          const current = currentScores[cat as keyof typeof currentScores] ?? 0;
+          const projected = Math.min(100, current + boost);
+          projectedScores[cat] = projected;
+          if (projected > current) {
+            improvements.push({ category: cat, label: CATEGORY_LABELS[cat] || cat, current, projected });
+          }
+        }
+        // Fill in unchanged categories for overall calc
+        for (const cat of Object.keys(currentScores)) {
+          if (!(cat in projectedScores)) projectedScores[cat] = currentScores[cat as keyof typeof currentScores];
+        }
+        const weights: Record<string, number> = { crawlability: 0.3, machine_readability: 0.25, commercial_clarity: 0.3, trust_clarity: 0.15 };
+        const currentOverall = audit.overall_score ?? 0;
+        const projectedOverall = Math.min(100, Math.round(
+          Object.entries(weights).reduce((sum, [cat, w]) => sum + (projectedScores[cat] ?? 0) * w, 0)
+        ));
+
         return (
           <div className="card p-6 mb-6">
             <div className="flex items-center gap-2 mb-1">
@@ -889,9 +927,35 @@ export default function AuditResultPage() {
               <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>Top 5 Fixes</h2>
             </div>
             <p className="text-sm mb-4" style={{ color: 'var(--text-tertiary)' }}>The highest-impact improvements for your AI visibility, sorted by priority.</p>
+
+            {/* Projected improvement summary */}
+            {projectedOverall > currentOverall && (
+              <div className="rounded-lg border p-4 mb-4" style={{ borderColor: 'rgba(16,185,129,0.2)', background: 'rgba(16,185,129,0.04)' }}>
+                <p className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: '#10B981' }}>Projected improvement if you fix these 5 issues</p>
+                <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Overall:</span>
+                    <span className="text-sm font-bold" style={{ color: getScoreColor(currentOverall), fontFamily: 'var(--font-mono)' }}>{scoreToGrade(currentOverall)}</span>
+                    <ArrowRight className="w-3 h-3" style={{ color: 'var(--text-tertiary)' }} />
+                    <span className="text-sm font-bold" style={{ color: '#10B981', fontFamily: 'var(--font-mono)' }}>{scoreToGrade(projectedOverall)}</span>
+                  </div>
+                  {improvements.map((imp) => (
+                    <div key={imp.category} className="flex items-center gap-1.5">
+                      <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>{imp.label}:</span>
+                      <span className="text-xs font-bold" style={{ color: getScoreColor(imp.current), fontFamily: 'var(--font-mono)' }}>{scoreToGrade(imp.current)}</span>
+                      <ArrowRight className="w-3 h-3" style={{ color: 'var(--text-tertiary)' }} />
+                      <span className="text-xs font-bold" style={{ color: '#10B981', fontFamily: 'var(--font-mono)' }}>{scoreToGrade(imp.projected)}</span>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-xs mt-2" style={{ color: 'var(--text-tertiary)' }}>Estimates based on issue severity. Actual improvement may vary.</p>
+              </div>
+            )}
+
             <div className="space-y-3">
               {top5.map((fix, i) => {
                 const owner = getFixOwner(fix.title, fix.category);
+                const impact = fixImpacts.find(f => f.id === fix.id);
                 return (
                   <div key={fix.id} className="flex gap-3 p-3 rounded-lg border" style={{ background: 'var(--bg-tertiary)', borderColor: 'var(--border)' }}>
                     <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 text-sm font-bold" style={{ background: 'rgba(99,102,241,0.1)', color: '#6366F1' }}>{i + 1}</div>
@@ -902,6 +966,7 @@ export default function AuditResultPage() {
                         <SeverityBadge severity={fix.severity} />
                         <EffortBadge effort={fix.effort} />
                         <span className="text-xs px-1.5 py-0.5 rounded font-medium" style={{ color: owner.color, background: `${owner.color}15` }}>{owner.label}</span>
+                        {impact && <span className="text-xs px-1.5 py-0.5 rounded font-medium" style={{ color: '#10B981', background: 'rgba(16,185,129,0.1)' }}>+{impact.points} {CATEGORY_LABELS[impact.category] || impact.category}</span>}
                       </div>
                     </div>
                     <button
