@@ -113,8 +113,85 @@ export async function scanSite(inputUrl: string): Promise<ScanResult> {
   const crawlerStatuses = buildCrawlerStatuses(robotsTxt, pageResults);
   const keyPagesStatus = buildKeyPagesStatus(pageResults);
   const siteWideChecks = buildSiteWideChecks(pageResults, homepageResult);
+  const detectedVertical = detectVertical(homepageResult, pageResults);
 
-  return { robotsTxt, sitemap, pages: pageResults, errors, crawlerStatuses, keyPagesStatus, siteWideChecks };
+  return { robotsTxt, sitemap, pages: pageResults, errors, crawlerStatuses, keyPagesStatus, siteWideChecks, detectedVertical };
+}
+
+// ============================================================
+// Auto-detect business vertical from scan data
+// ============================================================
+function detectVertical(homepage: PageScanResult, pages: PageScanResult[]): string {
+  const scores: Record<string, number> = {
+    saas: 0, professional_services: 0, local_service: 0,
+    ecommerce: 0, healthcare: 0, law_firm: 0, restaurant: 0,
+  };
+
+  // Combine text signals from homepage
+  const h1 = (homepage.h1Text || '').toLowerCase();
+  const title = (homepage.title || '').toLowerCase();
+  const meta = (homepage.metaDescription || '').toLowerCase();
+  const firstP = (homepage.firstParagraphText || '').toLowerCase();
+  const text = `${h1} ${title} ${meta} ${firstP}`;
+
+  // Collect all URL paths
+  const allUrls = pages.map(p => { try { return new URL(p.url).pathname.toLowerCase(); } catch { return ''; } });
+  const urlText = allUrls.join(' ');
+
+  // Schema types
+  const schemaTypes = new Set(pages.flatMap(p => p.schemaTypes.map(s => s.toLowerCase())));
+
+  // ---- SaaS / Software ----
+  if (text.match(/\b(software|saas|platform|api|dashboard|deploy|integrat|devops|developer|automat|workflow)\b/)) scores.saas += 3;
+  if (urlText.match(/\/(docs|api|changelog|integrations|features|pricing|demo|signup|trial)/)) scores.saas += 2;
+  if (schemaTypes.has('softwareapplication') || schemaTypes.has('webapplication')) scores.saas += 4;
+  if (text.match(/\b(free trial|start free|sign up|get started)\b/)) scores.saas += 1;
+
+  // ---- E-commerce ----
+  if (text.match(/\b(shop|store|buy|cart|order|product|shipping|free delivery|checkout)\b/)) scores.ecommerce += 3;
+  if (urlText.match(/\/(shop|cart|product|collection|catalog|checkout)/)) scores.ecommerce += 3;
+  if (schemaTypes.has('product') || schemaTypes.has('offer') || schemaTypes.has('store')) scores.ecommerce += 4;
+  if (pages.some(p => p.hasPricingContent && p.pageType !== 'pricing')) scores.ecommerce += 1;
+
+  // ---- Healthcare ----
+  if (text.match(/\b(doctor|patient|clinic|medical|health|treatment|appointment|physician|dentist|therapy|wellness|diagnosis)\b/)) scores.healthcare += 3;
+  if (urlText.match(/\/(patient|appointment|treatments|conditions|providers|specialties|insurance)/)) scores.healthcare += 2;
+  if (schemaTypes.has('medicalbusiness') || schemaTypes.has('physician') || schemaTypes.has('dentist') || schemaTypes.has('hospital')) scores.healthcare += 4;
+
+  // ---- Law Firm ----
+  if (text.match(/\b(attorney|lawyer|law firm|legal|practice area|litigation|counsel|defense|plaintiff|injury|criminal|divorce|estate planning)\b/)) scores.law_firm += 4;
+  if (urlText.match(/\/(practice-areas|attorneys|case-results|legal|lawyer)/)) scores.law_firm += 3;
+  if (schemaTypes.has('legalservice') || schemaTypes.has('attorney')) scores.law_firm += 4;
+
+  // ---- Restaurant / Food ----
+  if (text.match(/\b(restaurant|menu|dining|chef|reservat|cuisine|food|bistro|cafe|bar & grill|brunch|takeout|delivery|appetizer|entree)\b/)) scores.restaurant += 4;
+  if (urlText.match(/\/(menu|reservat|catering|private-dining|order-online|specials)/)) scores.restaurant += 3;
+  if (schemaTypes.has('restaurant') || schemaTypes.has('foodestablishment') || schemaTypes.has('cafe') || schemaTypes.has('barorgrill')) scores.restaurant += 4;
+
+  // ---- Professional Services ----
+  if (text.match(/\b(consulting|advisory|firm|strategy|solutions|engagement|partner|expertise|consultant|accounting|financial planning|tax)\b/)) scores.professional_services += 3;
+  if (urlText.match(/\/(services|case-studies|industries|solutions|team|expertise)/)) scores.professional_services += 2;
+  if (schemaTypes.has('professionalservice') || schemaTypes.has('accountingservice') || schemaTypes.has('financialservice')) scores.professional_services += 4;
+  if (text.match(/\b(years of experience|certified|accredited|licensed professional)\b/)) scores.professional_services += 1;
+
+  // ---- Local Service ----
+  if (text.match(/\b(plumb|electrician|hvac|roofing|landscap|cleaning|handyman|pest control|moving|locksmith|painting|contractor|repair|installation|service area)\b/)) scores.local_service += 4;
+  if (urlText.match(/\/(service-area|locations|free-estimate|emergency|residential|commercial-services)/)) scores.local_service += 2;
+  if (schemaTypes.has('localbusiness') || schemaTypes.has('homeandconstructionbusiness') || schemaTypes.has('plumber') || schemaTypes.has('electrician')) scores.local_service += 4;
+  if (text.match(/\b(free estimate|same.day|24.7|emergency|licensed and insured|serving)\b/)) scores.local_service += 1;
+
+  // Find the highest scoring vertical
+  let best = 'other';
+  let bestScore = 0;
+  for (const [vertical, score] of Object.entries(scores)) {
+    if (score > bestScore) {
+      bestScore = score;
+      best = vertical;
+    }
+  }
+
+  // Require a minimum confidence threshold
+  return bestScore >= 3 ? best : 'other';
 }
 
 // ============================================================

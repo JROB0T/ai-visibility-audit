@@ -19,7 +19,7 @@ ALTER TABLE sites
 -- Constrain vertical values
 ALTER TABLE sites
   ADD CONSTRAINT sites_vertical_check
-  CHECK (vertical IS NULL OR vertical IN ('saas', 'professional_services', 'local_service', 'ecommerce', 'healthcare', 'law_firm', 'other'));
+  CHECK (vertical IS NULL OR vertical IN ('saas', 'professional_services', 'local_service', 'ecommerce', 'healthcare', 'law_firm', 'restaurant', 'other'));
 
 -- Constrain plan_status values
 ALTER TABLE sites

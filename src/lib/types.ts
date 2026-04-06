@@ -82,6 +82,7 @@ export interface ScanResult {
   crawlerStatuses: CrawlerStatus[];
   keyPagesStatus: KeyPageStatus[];
   siteWideChecks: SiteWideChecks;
+  detectedVertical: string;
 }
 
 export interface SiteWideChecks {
@@ -245,7 +246,7 @@ export interface RecommendationInput {
 export type RunType = 'free_preview' | 'paid_initial' | 'manual_paid_rescan' | 'monthly_auto_rerun';
 export type RunScope = 'free' | 'core' | 'core_plus_premium';
 export type PlanStatus = 'free' | 'core' | 'core_premium';
-export type VerticalType = 'saas' | 'professional_services' | 'local_service' | 'ecommerce' | 'healthcare' | 'law_firm' | 'other';
+export type VerticalType = 'saas' | 'professional_services' | 'local_service' | 'ecommerce' | 'healthcare' | 'law_firm' | 'restaurant' | 'other';
 export type FindingState = 'new' | 'ongoing' | 'resolved' | 'regressed';
 export type BillingEventType = 'initial_scan' | 'premium_addon' | 'bundle' | 'manual_rescan' | 'monthly_subscription' | 'monthly_renewal';
 

@@ -116,6 +116,22 @@ const VERTICAL_CONFIG: Record<VerticalType, VerticalConfig> = {
       audienceTerms: ['clients', 'individuals', 'businesses', 'plaintiffs'],
     },
   },
+  restaurant: {
+    label: 'Restaurant / Food Service',
+    expectedPages: [
+      { type: 'product', label: 'Menu', why: 'AI needs your menu to answer "what does this restaurant serve?" and price questions' },
+      { type: 'contact', label: 'Location / Hours', why: 'AI needs address and hours to recommend you for "restaurants near me" queries' },
+      { type: 'about', label: 'About / Story', why: 'Your origin story and chef credentials help AI differentiate you from chains' },
+      { type: 'resource', label: 'Reviews / Press', why: 'Press mentions and reviews give AI confidence to recommend your restaurant' },
+      { type: 'blog', label: 'Events / Specials', why: 'Current events and specials help AI answer "what\'s happening at..." queries' },
+    ],
+    recommendationPriorities: ['local_schema', 'menu_structured_data', 'review_signals', 'hours_and_location', 'photo_alt_text'],
+    messagingHints: {
+      valueProposition: 'Highlight cuisine, atmosphere, and unique dining experience',
+      keyDifferentiators: ['cuisine type', 'chef background', 'ambiance', 'reviews'],
+      audienceTerms: ['diners', 'guests', 'food lovers', 'customers'],
+    },
+  },
   other: {
     label: 'Other',
     expectedPages: [
@@ -141,6 +157,7 @@ export const VERTICAL_OPTIONS: { value: VerticalType; label: string }[] = [
   { value: 'ecommerce', label: 'E-commerce' },
   { value: 'healthcare', label: 'Healthcare / Clinic' },
   { value: 'law_firm', label: 'Law Firm' },
+  { value: 'restaurant', label: 'Restaurant / Food Service' },
   { value: 'other', label: 'Other' },
 ];
 

@@ -111,6 +111,7 @@ function SiteDashboardContent() {
                 onChange={(e) => handleVerticalChange(e.target.value)}
                 className="pl-7 pr-2 py-0.5 rounded text-xs appearance-none"
                 style={{ background: 'var(--bg-tertiary)', color: 'var(--text-secondary)', border: 'none' }}
+                title="Business type — auto-detected, click to change"
               >
                 {VERTICAL_OPTIONS.map((v) => (
                   <option key={v.value} value={v.value}>{v.label}</option>

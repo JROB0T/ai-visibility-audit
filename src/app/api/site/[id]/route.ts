@@ -86,7 +86,7 @@ export async function PATCH(
       return NextResponse.json({ error: 'Site not found' }, { status: 404 });
     }
 
-    const validVerticals = ['saas', 'professional_services', 'local_service', 'ecommerce', 'healthcare', 'law_firm', 'other'];
+    const validVerticals = ['saas', 'professional_services', 'local_service', 'ecommerce', 'healthcare', 'law_firm', 'restaurant', 'other'];
     const updateData: Record<string, string> = {};
 
     if (body.vertical && validVerticals.includes(body.vertical)) {

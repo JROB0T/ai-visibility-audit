@@ -7,7 +7,7 @@ export const maxDuration = 60;
 
 export async function POST(request: NextRequest) {
   try {
-    const { url, vertical } = await request.json();
+    const { url } = await request.json();
 
     if (!url || typeof url !== 'string') {
       return NextResponse.json({ error: 'URL is required' }, { status: 400 });
@@ -39,21 +39,14 @@ export async function POST(request: NextRequest) {
       .eq('user_id', user.id)
       .single();
 
-    const validVerticals = ['saas', 'professional_services', 'local_service', 'ecommerce', 'healthcare', 'law_firm', 'other'];
-    const siteVertical = vertical && validVerticals.includes(vertical) ? vertical : null;
-
     if (existingSite) {
       site = existingSite;
-      if (siteVertical && existingSite.vertical !== siteVertical) {
-        await supabase.from('sites').update({ vertical: siteVertical }).eq('id', existingSite.id);
-        site = { ...existingSite, vertical: siteVertical };
-      }
     }
 
     if (!site) {
       const { data: newSite, error: siteError } = await supabase
         .from('sites')
-        .insert({ domain, url: siteUrl, user_id: user.id, ...(siteVertical ? { vertical: siteVertical } : {}) })
+        .insert({ domain, url: siteUrl, user_id: user.id })
         .select()
         .single();
 
@@ -107,6 +100,12 @@ export async function POST(request: NextRequest) {
       console.error('Scan error:', scanError);
       await supabase.from('audits').update({ status: 'failed', summary: 'Scan failed — site may be unreachable' }).eq('id', audit.id);
       return NextResponse.json({ error: 'Could not scan this site.', auditId: audit.id }, { status: 422 });
+    }
+
+    // Auto-detect vertical from scan results and save to site if not already set
+    const detectedVertical = scanResult.detectedVertical || 'other';
+    if (!site.vertical || site.vertical === 'other') {
+      await supabase.from('sites').update({ vertical: detectedVertical }).eq('id', site.id);
     }
 
     const scores = calculateScores(scanResult);
