@@ -78,7 +78,7 @@ export function ThemeWrapper({ children }: { children: React.ReactNode }) {
               </div>
               <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>AI Visibility Audit</span>
             </div>
-            <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>Helping SaaS companies get found by AI systems</p>
+            <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>Helping businesses get found by AI systems</p>
           </div>
         </div>
       </footer>

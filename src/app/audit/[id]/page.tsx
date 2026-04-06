@@ -70,14 +70,14 @@ type ReportTab = 'overview' | 'findings' | 'ai-perception' | 'growth' | 'pages';
 const FREE_RECOMMENDATION_LIMIT = 3;
 
 const CATEGORY_LABELS: Record<string, string> = {
-  crawlability: 'Crawlability', machine_readability: 'Machine Readability',
-  commercial_clarity: 'Commercial Page Clarity', trust_clarity: 'Trust & Source Clarity',
+  crawlability: 'Findability', machine_readability: 'Explainability',
+  commercial_clarity: 'Buyability', trust_clarity: 'Trustworthiness',
 };
 const CATEGORY_DESCRIPTIONS: Record<string, string> = {
-  crawlability: 'Can AI crawlers access and navigate your site?',
-  machine_readability: 'Can AI systems understand your page content?',
-  commercial_clarity: 'Are your key commercial pages structured for AI discovery?',
-  trust_clarity: 'Does your site establish trust and authority signals?',
+  crawlability: 'Can AI find your site and access your pages?',
+  machine_readability: 'Can AI explain what your business does?',
+  commercial_clarity: 'Can AI help someone buy from you?',
+  trust_clarity: 'Can AI trust and recommend your business?',
 };
 
 function getIssueDetail(issue: string): { why: string; fix: string; category: string } {
@@ -320,16 +320,16 @@ th{background:#f8fafc;font-weight:600;color:#64748b}
 <div class="score-box">
 <div class="score-num">${scoreToGrade(score)}</div>
 <p style="color:#64748b;margin:8px 0 16px">${score}/100 — Overall AI Visibility Grade</p>
-<div class="score-bar"><span class="score-bar-label">Crawlability</span><div class="score-bar-track"><div class="score-bar-fill" style="width:${audit.crawlability_score ?? 0}%;background:${getScoreColor(audit.crawlability_score ?? 0)}"></div></div><span style="font-weight:600;width:30px;text-align:right">${scoreToGrade(audit.crawlability_score ?? 0)}</span></div>
-<div class="score-bar"><span class="score-bar-label">Readability</span><div class="score-bar-track"><div class="score-bar-fill" style="width:${audit.machine_readability_score ?? 0}%;background:${getScoreColor(audit.machine_readability_score ?? 0)}"></div></div><span style="font-weight:600;width:30px;text-align:right">${scoreToGrade(audit.machine_readability_score ?? 0)}</span></div>
-<div class="score-bar"><span class="score-bar-label">Commercial</span><div class="score-bar-track"><div class="score-bar-fill" style="width:${audit.commercial_clarity_score ?? 0}%;background:${getScoreColor(audit.commercial_clarity_score ?? 0)}"></div></div><span style="font-weight:600;width:30px;text-align:right">${scoreToGrade(audit.commercial_clarity_score ?? 0)}</span></div>
-<div class="score-bar"><span class="score-bar-label">Trust</span><div class="score-bar-track"><div class="score-bar-fill" style="width:${audit.trust_clarity_score ?? 0}%;background:${getScoreColor(audit.trust_clarity_score ?? 0)}"></div></div><span style="font-weight:600;width:30px;text-align:right">${scoreToGrade(audit.trust_clarity_score ?? 0)}</span></div>
+<div class="score-bar"><span class="score-bar-label">Findability</span><div class="score-bar-track"><div class="score-bar-fill" style="width:${audit.crawlability_score ?? 0}%;background:${getScoreColor(audit.crawlability_score ?? 0)}"></div></div><span style="font-weight:600;width:30px;text-align:right">${scoreToGrade(audit.crawlability_score ?? 0)}</span></div>
+<div class="score-bar"><span class="score-bar-label">Explainability</span><div class="score-bar-track"><div class="score-bar-fill" style="width:${audit.machine_readability_score ?? 0}%;background:${getScoreColor(audit.machine_readability_score ?? 0)}"></div></div><span style="font-weight:600;width:30px;text-align:right">${scoreToGrade(audit.machine_readability_score ?? 0)}</span></div>
+<div class="score-bar"><span class="score-bar-label">Buyability</span><div class="score-bar-track"><div class="score-bar-fill" style="width:${audit.commercial_clarity_score ?? 0}%;background:${getScoreColor(audit.commercial_clarity_score ?? 0)}"></div></div><span style="font-weight:600;width:30px;text-align:right">${scoreToGrade(audit.commercial_clarity_score ?? 0)}</span></div>
+<div class="score-bar"><span class="score-bar-label">Trustworthiness</span><div class="score-bar-track"><div class="score-bar-fill" style="width:${audit.trust_clarity_score ?? 0}%;background:${getScoreColor(audit.trust_clarity_score ?? 0)}"></div></div><span style="font-weight:600;width:30px;text-align:right">${scoreToGrade(audit.trust_clarity_score ?? 0)}</span></div>
 </div>
 
 <p>${score >= 80 ? 'Your site has strong AI visibility.' : score >= 60 ? 'Your site has moderate AI visibility with clear areas for improvement.' : score >= 40 ? 'Your site has limited AI visibility. AI systems may struggle to accurately describe or recommend your product.' : 'Your site has poor AI visibility. Immediate action is needed to ensure AI systems can find and reference your content.'} We identified ${highRecs.length} high-priority, ${medRecs.length} medium-priority, and ${lowRecs.length} low-priority findings across ${pages.length} scanned pages.</p>
 
 <h2>Methodology</h2>
-<p>This audit scanned ${pages.length} pages on ${domain} using 100+ automated checks across four categories: Crawlability (can AI systems access your site?), Machine Readability (can they understand it?), Commercial Page Clarity (can they help someone buy?), and Trust & Source Clarity (can they trust and recommend you?). Each page was analyzed for technical SEO signals, structured data, content quality, and commercial clarity.</p>
+<p>This audit scanned ${pages.length} pages on ${domain} using 100+ automated checks across four categories: Findability (can AI find your site?), Explainability (can AI explain what you do?), Buyability (can AI help someone buy?), and Trustworthiness (can AI trust and recommend you?). Each page was analyzed for technical signals, structured data, content quality, and commercial clarity.</p>
 
 <h2>Key Pages Status</h2>
 <table>
@@ -884,54 +884,48 @@ export default function AuditResultPage() {
         );
       })()}
 
-      {/* 2b. CHANGES SINCE LAST SCAN */}
-      {isAuthenticated && (
+      {/* 2b. CHANGES SINCE LAST SCAN — only shown when there IS a previous audit */}
+      {isAuthenticated && auditDelta && (
         <div className="card p-6 mb-6">
           <div className="flex items-center gap-2 mb-1">
             <RefreshCw className="w-5 h-5" style={{ color: '#6366F1' }} />
             <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>Changes Since Last Scan</h2>
           </div>
-          {auditDelta ? (
-            <>
-              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mt-4">
-                <div className="text-center p-3 rounded-lg" style={{ background: 'var(--bg-tertiary)' }}>
-                  <p className="text-xs font-medium mb-1" style={{ color: 'var(--text-tertiary)' }}>Overall</p>
-                  <span className="text-xl font-bold" style={{ color: auditDelta.overallDelta > 0 ? '#10B981' : auditDelta.overallDelta < 0 ? '#EF4444' : 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>
-                    {auditDelta.overallDelta > 0 ? '+' : ''}{auditDelta.overallDelta}
-                  </span>
-                </div>
-                {([
-                  { label: 'Find', delta: auditDelta.categoryDeltas.crawlability },
-                  { label: 'Explain', delta: auditDelta.categoryDeltas.machine_readability },
-                  { label: 'Buy', delta: auditDelta.categoryDeltas.commercial_clarity },
-                  { label: 'Trust', delta: auditDelta.categoryDeltas.trust_clarity },
-                ]).map((c) => (
-                  <div key={c.label} className="text-center p-3 rounded-lg" style={{ background: 'var(--bg-tertiary)' }}>
-                    <p className="text-xs font-medium mb-1" style={{ color: 'var(--text-tertiary)' }}>{c.label}</p>
-                    <span className="text-lg font-bold" style={{ color: c.delta > 0 ? '#10B981' : c.delta < 0 ? '#EF4444' : 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>
-                      {c.delta > 0 ? '+' : ''}{c.delta}
-                    </span>
-                  </div>
-                ))}
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mt-4">
+            <div className="text-center p-3 rounded-lg" style={{ background: 'var(--bg-tertiary)' }}>
+              <p className="text-xs font-medium mb-1" style={{ color: 'var(--text-tertiary)' }}>Overall</p>
+              <span className="text-xl font-bold" style={{ color: auditDelta.overallDelta > 0 ? '#10B981' : auditDelta.overallDelta < 0 ? '#EF4444' : 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>
+                {auditDelta.overallDelta > 0 ? '+' : ''}{auditDelta.overallDelta}
+              </span>
+            </div>
+            {([
+              { label: 'Find', delta: auditDelta.categoryDeltas.crawlability },
+              { label: 'Explain', delta: auditDelta.categoryDeltas.machine_readability },
+              { label: 'Buy', delta: auditDelta.categoryDeltas.commercial_clarity },
+              { label: 'Trust', delta: auditDelta.categoryDeltas.trust_clarity },
+            ]).map((c) => (
+              <div key={c.label} className="text-center p-3 rounded-lg" style={{ background: 'var(--bg-tertiary)' }}>
+                <p className="text-xs font-medium mb-1" style={{ color: 'var(--text-tertiary)' }}>{c.label}</p>
+                <span className="text-lg font-bold" style={{ color: c.delta > 0 ? '#10B981' : c.delta < 0 ? '#EF4444' : 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>
+                  {c.delta > 0 ? '+' : ''}{c.delta}
+                </span>
               </div>
-              <div className="flex flex-wrap gap-3 mt-3">
-                {auditDelta.newFindings.length > 0 && (
-                  <span className="text-xs px-2 py-1 rounded font-medium" style={{ color: '#3B82F6', background: 'rgba(59,130,246,0.1)' }}>{auditDelta.newFindings.length} new issue{auditDelta.newFindings.length !== 1 ? 's' : ''}</span>
-                )}
-                {auditDelta.resolvedFindings.length > 0 && (
-                  <span className="text-xs px-2 py-1 rounded font-medium" style={{ color: '#10B981', background: 'rgba(16,185,129,0.1)' }}>{auditDelta.resolvedFindings.length} resolved</span>
-                )}
-                {auditDelta.regressedFindings.length > 0 && (
-                  <span className="text-xs px-2 py-1 rounded font-medium" style={{ color: '#EF4444', background: 'rgba(239,68,68,0.1)' }}>{auditDelta.regressedFindings.length} regressed</span>
-                )}
-                {auditDelta.ongoingFindings.length > 0 && (
-                  <span className="text-xs px-2 py-1 rounded font-medium" style={{ color: 'var(--text-tertiary)', background: 'var(--bg-tertiary)' }}>{auditDelta.ongoingFindings.length} ongoing</span>
-                )}
-              </div>
-            </>
-          ) : (
-            <p className="text-sm mt-2" style={{ color: 'var(--text-tertiary)' }}>This is your first scan for this site. Future scans will show changes here.</p>
-          )}
+            ))}
+          </div>
+          <div className="flex flex-wrap gap-3 mt-3">
+            {auditDelta.newFindings.length > 0 && (
+              <span className="text-xs px-2 py-1 rounded font-medium" style={{ color: '#3B82F6', background: 'rgba(59,130,246,0.1)' }}>{auditDelta.newFindings.length} new issue{auditDelta.newFindings.length !== 1 ? 's' : ''}</span>
+            )}
+            {auditDelta.resolvedFindings.length > 0 && (
+              <span className="text-xs px-2 py-1 rounded font-medium" style={{ color: '#10B981', background: 'rgba(16,185,129,0.1)' }}>{auditDelta.resolvedFindings.length} resolved</span>
+            )}
+            {auditDelta.regressedFindings.length > 0 && (
+              <span className="text-xs px-2 py-1 rounded font-medium" style={{ color: '#EF4444', background: 'rgba(239,68,68,0.1)' }}>{auditDelta.regressedFindings.length} regressed</span>
+            )}
+            {auditDelta.ongoingFindings.length > 0 && (
+              <span className="text-xs px-2 py-1 rounded font-medium" style={{ color: 'var(--text-tertiary)', background: 'var(--bg-tertiary)' }}>{auditDelta.ongoingFindings.length} ongoing</span>
+            )}
+          </div>
         </div>
       )}
 
@@ -1004,10 +998,10 @@ export default function AuditResultPage() {
         <div className="flex flex-col sm:flex-row items-center gap-8">
           <ScoreRing score={audit.overall_score ?? 0} label="Overall Score" size={160} />
           <div className="flex-1 w-full space-y-3">
-            <ScoreBar score={audit.crawlability_score ?? 0} label="Crawlability" />
-            <ScoreBar score={audit.machine_readability_score ?? 0} label="Readability" />
-            <ScoreBar score={audit.commercial_clarity_score ?? 0} label="Commercial" />
-            <ScoreBar score={audit.trust_clarity_score ?? 0} label="Trust" />
+            <ScoreBar score={audit.crawlability_score ?? 0} label="Findability" />
+            <ScoreBar score={audit.machine_readability_score ?? 0} label="Explainability" />
+            <ScoreBar score={audit.commercial_clarity_score ?? 0} label="Buyability" />
+            <ScoreBar score={audit.trust_clarity_score ?? 0} label="Trustworthiness" />
           </div>
         </div>
       </div>
@@ -1636,9 +1630,28 @@ export default function AuditResultPage() {
           </div>
         )}
 
-        {growthData && (
+        {growthData && (() => {
+          const FALLBACK_STRINGS = ['What is the best software tool', 'What is the best project management', 'What is the best analytics', 'solve problems with AI tools', 'small businesses in 2025', 'team collaboration in 2025'];
+          const isGenericFallback = growthData.marketingStrategy?.queries?.some((q: string) => FALLBACK_STRINGS.some(f => q.includes(f))) ?? false;
+          return (
           <div className="space-y-6">
-            {/* Peer Benchmark */}
+            {/* Generic fallback warning */}
+            {isGenericFallback && (
+              <div className="card p-6 text-center">
+                <AlertTriangle className="w-8 h-8 mx-auto mb-2" style={{ color: '#F59E0B' }} />
+                <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Strategy is using generic recommendations</p>
+                <p className="text-xs mt-1 mb-4" style={{ color: 'var(--text-tertiary)' }}>AI-generated strategy was not fully tailored to your business. Regenerate to get personalized recommendations.</p>
+                <button onClick={async () => {
+                  setGrowthData(null);
+                  await fetch(`/api/audit/${params.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ growthData: null }) }).catch(() => {});
+                  loadGrowthStrategy();
+                }} className="btn-primary px-5 py-2 text-sm inline-flex items-center gap-2">
+                  <RefreshCw className="w-4 h-4" />Regenerate Strategy
+                </button>
+              </div>
+            )}
+
+            {/* Peer Benchmark — only if competitors exist */}
             {growthData.competitors.length > 0 && (
               <div className="card p-6">
                 <div className="flex items-center gap-2 mb-2">
@@ -1652,9 +1665,9 @@ export default function AuditResultPage() {
                       <tr style={{ background: 'var(--bg-tertiary)' }}>
                         <th className="text-left py-3 px-4 font-medium" style={{ color: 'var(--text-tertiary)' }}>Site</th>
                         <th className="text-center py-3 px-4 font-medium" style={{ color: 'var(--text-tertiary)' }}>Overall</th>
-                        <th className="text-center py-3 px-4 font-medium" style={{ color: 'var(--text-tertiary)' }}>Crawl</th>
-                        <th className="text-center py-3 px-4 font-medium" style={{ color: 'var(--text-tertiary)' }}>Read</th>
-                        <th className="text-center py-3 px-4 font-medium" style={{ color: 'var(--text-tertiary)' }}>Commercial</th>
+                        <th className="text-center py-3 px-4 font-medium" style={{ color: 'var(--text-tertiary)' }}>Find</th>
+                        <th className="text-center py-3 px-4 font-medium" style={{ color: 'var(--text-tertiary)' }}>Explain</th>
+                        <th className="text-center py-3 px-4 font-medium" style={{ color: 'var(--text-tertiary)' }}>Buy</th>
                         <th className="text-center py-3 px-4 font-medium" style={{ color: 'var(--text-tertiary)' }}>Trust</th>
                       </tr>
                     </thead>
@@ -1781,7 +1794,8 @@ export default function AuditResultPage() {
               </div>
             )}
           </div>
-        )}
+          );
+        })()}
       </div>
       </>
       )}

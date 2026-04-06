@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useState } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
-import ScoreRing from '@/components/ScoreRing';
+import ScoreRing, { scoreToGrade } from '@/components/ScoreRing';
 import { ArrowLeft, Clock, TrendingUp, ChevronRight, AlertTriangle, BarChart3, Building2, RefreshCw, CalendarCheck, X } from 'lucide-react';
 import { VERTICAL_OPTIONS } from '@/lib/verticals';
 import { getRunTypeLabel } from '@/lib/entitlements';
@@ -192,19 +192,19 @@ function SiteDashboardContent() {
             <ScoreRing score={latest.overall_score ?? 0} label="Overall" size={140} />
             <div className="flex-1 w-full space-y-3">
               {[
-                { label: 'Crawlability', score: latest.crawlability_score, prev: previous?.crawlability_score },
-                { label: 'Readability', score: latest.machine_readability_score, prev: previous?.machine_readability_score },
-                { label: 'Commercial', score: latest.commercial_clarity_score, prev: previous?.commercial_clarity_score },
-                { label: 'Trust', score: latest.trust_clarity_score, prev: previous?.trust_clarity_score },
+                { label: 'Findability', score: latest.crawlability_score, prev: previous?.crawlability_score },
+                { label: 'Explainability', score: latest.machine_readability_score, prev: previous?.machine_readability_score },
+                { label: 'Buyability', score: latest.commercial_clarity_score, prev: previous?.commercial_clarity_score },
+                { label: 'Trustworthiness', score: latest.trust_clarity_score, prev: previous?.trust_clarity_score },
               ].map(({ label, score, prev }) => {
                 const d = scoreDelta(score ?? null, prev ?? null);
                 return (
                   <div key={label} className="flex items-center gap-3">
-                    <span className="text-sm w-24" style={{ color: 'var(--text-secondary)' }}>{label}</span>
+                    <span className="text-sm w-28" style={{ color: 'var(--text-secondary)' }}>{label}</span>
                     <div className="flex-1 h-2 rounded-full" style={{ background: 'var(--bg-tertiary)' }}>
                       <div className="h-full rounded-full" style={{ width: `${score ?? 0}%`, background: scoreColor(score ?? 0) }} />
                     </div>
-                    <span className="text-sm font-bold w-8 text-right" style={{ color: scoreColor(score ?? 0), fontFamily: 'var(--font-mono)' }}>{score ?? 0}</span>
+                    <span className="text-sm font-bold w-8 text-right" style={{ color: scoreColor(score ?? 0), fontFamily: 'var(--font-mono)' }}>{scoreToGrade(score ?? 0)}</span>
                     {d && <span className="text-xs font-medium w-8" style={{ color: d.startsWith('+') ? '#10B981' : '#EF4444' }}>{d}</span>}
                   </div>
                 );

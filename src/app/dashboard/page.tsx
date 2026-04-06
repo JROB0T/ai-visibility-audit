@@ -182,7 +182,7 @@ function DashboardContent() {
                       })()}
                     </div>
                     <div className="space-y-1.5">
-                      {[{ label: 'Crawl', s: la.crawlability_score }, { label: 'Read', s: la.machine_readability_score }, { label: 'Commercial', s: la.commercial_clarity_score }, { label: 'Trust', s: la.trust_clarity_score }].map(({ label, s }) => (
+                      {[{ label: 'Find', s: la.crawlability_score }, { label: 'Explain', s: la.machine_readability_score }, { label: 'Buy', s: la.commercial_clarity_score }, { label: 'Trust', s: la.trust_clarity_score }].map(({ label, s }) => (
                         <div key={label} className="flex items-center gap-2">
                           <span className="text-xs w-20" style={{ color: 'var(--text-tertiary)' }}>{label}</span>
                           <div className="flex-1 h-1.5 rounded-full" style={{ background: 'var(--bg-tertiary)' }}>
