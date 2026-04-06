@@ -58,6 +58,7 @@ export async function scanSite(inputUrl: string): Promise<ScanResult> {
       crawlerStatuses: buildCrawlerStatuses(robotsTxt, []),
       keyPagesStatus: [],
       siteWideChecks: defaultSiteWideChecks(),
+      detectedVertical: 'other',
     };
   }
 
