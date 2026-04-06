@@ -29,7 +29,7 @@ function DashboardContent() {
   const [sites, setSites] = useState<SiteWithLatest[]>([]);
   const [loading, setLoading] = useState(true);
   const [url, setUrl] = useState('');
-  const [vertical, setVertical] = useState('other');
+  const [vertical, setVertical] = useState('');
   const [scanning, setScanning] = useState(false);
   const [error, setError] = useState('');
   const [checkoutSuccess, setCheckoutSuccess] = useState(false);
@@ -79,6 +79,11 @@ function DashboardContent() {
   async function handleNewAudit(e: React.FormEvent) {
     e.preventDefault();
     if (!url.trim()) return;
+    if (!vertical) {
+      setError('select-vertical');
+      setTimeout(() => setError(''), 2000);
+      return;
+    }
     setScanning(true); setError('');
     try {
       const res = await fetch('/api/audit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: url.trim(), vertical }) });
@@ -126,18 +131,20 @@ function DashboardContent() {
               value={vertical}
               onChange={(e) => setVertical(e.target.value)}
               className="pl-9 pr-3 py-2.5 rounded-lg text-sm appearance-none"
-              style={{ background: 'var(--surface)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}
+              style={{ background: 'var(--surface)', color: vertical ? 'var(--text-primary)' : 'var(--text-tertiary)', border: `1px solid ${!vertical && error === 'select-vertical' ? '#EF4444' : 'var(--border)'}`, transition: 'border-color 0.2s' }}
             >
+              <option value="" disabled>Business type…</option>
               {VERTICAL_OPTIONS.map((v) => (
                 <option key={v.value} value={v.value}>{v.label}</option>
               ))}
             </select>
           </div>
-          <button type="submit" disabled={scanning} className="btn-primary px-5 py-2.5 text-sm font-medium inline-flex items-center gap-2" style={{ opacity: scanning ? 0.7 : 1 }}>
+          <button type="submit" disabled={scanning || !url.trim()} className="btn-primary px-5 py-2.5 text-sm font-medium inline-flex items-center gap-2" style={{ opacity: scanning ? 0.7 : 1 }}>
             {scanning ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Scanning…</> : <><Plus className="w-4 h-4" />Scan Site</>}
           </button>
         </div>
-        {error && <p className="mt-2 text-sm text-red-500">{error}</p>}
+        {error && error !== 'select-vertical' && <p className="mt-2 text-sm text-red-500">{error}</p>}
+        {error === 'select-vertical' && <p className="mt-2 text-sm text-red-500">Please select your business type before scanning.</p>}
       </form>
 
       {sites.length === 0 ? (

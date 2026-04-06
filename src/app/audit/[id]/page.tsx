@@ -1210,7 +1210,28 @@ export default function AuditResultPage() {
       )}
 
       {/* 5. AI SOURCE VISIBILITY */}
-      {isAuthenticated && crawlerStatuses && crawlerStatuses.length > 0 && (
+      {isAuthenticated && crawlerStatuses && crawlerStatuses.length > 0 && (() => {
+        // Group 10 bots into 5 platforms
+        const platformDefs = [
+          { id: 'chatgpt', name: 'ChatGPT / OpenAI', question: 'Can people find you through ChatGPT?', bots: ['GPTBot', 'ChatGPT-User'] },
+          { id: 'google', name: 'Google AI / Gemini', question: 'Does Google AI reference your content?', bots: ['Google-Extended'] },
+          { id: 'claude', name: 'Claude / Anthropic', question: 'Can people find you through Claude?', bots: ['ClaudeBot', 'Anthropic'] },
+          { id: 'perplexity', name: 'Perplexity', question: 'Do you show up in Perplexity search?', bots: ['PerplexityBot'] },
+          { id: 'others', name: 'Other AI Systems', question: 'Are other AI crawlers allowed?', bots: ['CCBot', 'Amazonbot', 'Meta-ExternalAgent', 'Bytespider'] },
+        ];
+
+        const platforms = platformDefs.map((pd) => {
+          const bots = pd.bots.map(name => crawlerStatuses.find(c => c.name === name)).filter(Boolean) as CrawlerStatus[];
+          const allowedCount = bots.filter(b => b.status === 'allowed').length;
+          const blockedCount = bots.filter(b => b.status === 'blocked').length;
+          const bestStatus: 'allowed' | 'blocked' | 'no_rule' | 'mixed' = blockedCount > 0 && allowedCount > 0 ? 'mixed' : blockedCount > 0 ? 'blocked' : allowedCount > 0 ? 'allowed' : 'no_rule';
+          const avgReadiness = bots.length > 0 ? Math.round(bots.reduce((sum, b) => sum + b.readinessScore, 0) / bots.length) : 0;
+          const allBarriers = Array.from(new Set(bots.flatMap(b => b.barriers)));
+          const allRecs = Array.from(new Set(bots.flatMap(b => b.recommendations)));
+          return { ...pd, bots, status: bestStatus, readiness: avgReadiness, barriers: allBarriers, recommendations: allRecs, allowedCount, totalCount: bots.length };
+        });
+
+        return (
         <div className="card p-6 mb-6">
           <div className="flex items-center gap-2 mb-2">
             <Shield className="w-5 h-5" style={{ color: '#6366F1' }} />
@@ -1218,101 +1239,86 @@ export default function AuditResultPage() {
           </div>
           <p className="text-sm mb-4" style={{ color: 'var(--text-tertiary)' }}>Which AI systems can access your site and recommend your business?{hasPaid ? ' Click any to learn more.' : ''}</p>
           <div className="space-y-2">
-            {crawlerStatuses.map((c) => {
-              const isExp = hasPaid && expandedCrawlers.has(c.name);
-              const readColor = getScoreColor(c.readinessScore);
+            {platforms.map((p) => {
+              const isExp = hasPaid && expandedCrawlers.has(p.id);
+              const readColor = getScoreColor(p.readiness);
               return (
-                <div key={c.name} className="rounded-xl border overflow-hidden" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
-                  {/* Collapsed card */}
-                  <button onClick={() => hasPaid && toggleCrawler(c.name)} className="w-full flex items-center justify-between p-4 text-left transition-colors" style={{ background: isExp ? 'var(--bg-tertiary)' : 'transparent', cursor: hasPaid ? 'pointer' : 'default' }}>
+                <div key={p.id} className="rounded-xl border overflow-hidden" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
+                  <button onClick={() => hasPaid && toggleCrawler(p.id)} className="w-full flex items-center justify-between p-4 text-left transition-colors" style={{ background: isExp ? 'var(--bg-tertiary)' : 'transparent', cursor: hasPaid ? 'pointer' : 'default' }}>
                     <div className="flex items-center gap-3 min-w-0">
                       {hasPaid && (isExp ? <ChevronDown className="w-4 h-4 shrink-0" style={{ color: 'var(--text-tertiary)' }} /> : <ChevronRight className="w-4 h-4 shrink-0" style={{ color: 'var(--text-tertiary)' }} />)}
                       <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>{c.displayName}</span>
-                          <span className="text-xs px-1.5 py-0.5 rounded" style={{ color: 'var(--text-tertiary)', background: 'var(--bg-tertiary)' }}>{c.operator}</span>
-                        </div>
+                        <span className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>{p.name}</span>
+                        <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>{p.question}</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-3 shrink-0">
-                      {c.status === 'allowed' && <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-500"><CheckCircle className="w-3.5 h-3.5" />Allowed</span>}
-                      {c.status === 'blocked' && <span className="inline-flex items-center gap-1 text-xs font-semibold text-red-500"><XCircle className="w-3.5 h-3.5" />Blocked</span>}
-                      {c.status === 'no_rule' && <span className="inline-flex items-center gap-1 text-xs font-semibold" style={{ color: 'var(--text-tertiary)' }}><Minus className="w-3.5 h-3.5" />No Rule</span>}
+                      {p.id === 'others' ? (
+                        <span className="text-xs font-semibold" style={{ color: p.allowedCount === p.totalCount ? '#10B981' : p.allowedCount > 0 ? '#F59E0B' : '#EF4444' }}>{p.allowedCount}/{p.totalCount} allowed</span>
+                      ) : (
+                        <>
+                          {p.status === 'allowed' && <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-500"><CheckCircle className="w-3.5 h-3.5" />Allowed</span>}
+                          {p.status === 'blocked' && <span className="inline-flex items-center gap-1 text-xs font-semibold text-red-500"><XCircle className="w-3.5 h-3.5" />Blocked</span>}
+                          {p.status === 'mixed' && <span className="inline-flex items-center gap-1 text-xs font-semibold" style={{ color: '#F59E0B' }}>Mixed</span>}
+                          {p.status === 'no_rule' && <span className="inline-flex items-center gap-1 text-xs font-semibold" style={{ color: 'var(--text-tertiary)' }}><Minus className="w-3.5 h-3.5" />No Rule</span>}
+                        </>
+                      )}
                       {hasPaid && (
                         <div className="flex items-center gap-1.5 ml-2">
                           <div className="w-12 h-1.5 rounded-full" style={{ background: 'var(--bg-tertiary)' }}>
-                            <div className="h-full rounded-full" style={{ width: `${c.readinessScore}%`, background: readColor }} />
+                            <div className="h-full rounded-full" style={{ width: `${p.readiness}%`, background: readColor }} />
                           </div>
-                          <span className="text-xs font-bold w-7 text-right" style={{ color: readColor, fontFamily: 'var(--font-mono)' }}>{scoreToGrade(c.readinessScore)}</span>
+                          <span className="text-xs font-bold w-7 text-right" style={{ color: readColor, fontFamily: 'var(--font-mono)' }}>{scoreToGrade(p.readiness)}</span>
                         </div>
                       )}
                     </div>
                   </button>
 
-                  {/* Expanded detail */}
+                  {/* Expanded detail — individual bots */}
                   {isExp && (
                     <div className="border-t p-4 space-y-4" style={{ borderColor: 'var(--border)' }}>
-                      {/* About this source */}
-                      <div>
-                        <p className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>{c.description}</p>
-                        <span className="inline-flex items-center gap-1 text-xs mt-1.5 px-1.5 py-0.5 rounded" style={{ color: '#818CF8', background: 'rgba(99,102,241,0.08)' }}>Inferred context</span>
+                      {/* Individual bot statuses */}
+                      <div className="space-y-2">
+                        {p.bots.map((bot) => {
+                          const botReadColor = getScoreColor(bot.readinessScore);
+                          return (
+                            <div key={bot.name} className="flex items-center justify-between p-2.5 rounded-lg" style={{ background: 'var(--bg-tertiary)' }}>
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>{bot.displayName}</span>
+                                <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>— {bot.description}</span>
+                              </div>
+                              <div className="flex items-center gap-2 shrink-0">
+                                {bot.status === 'allowed' && <span className="text-xs font-semibold text-emerald-500">Allowed</span>}
+                                {bot.status === 'blocked' && <span className="text-xs font-semibold text-red-500">Blocked</span>}
+                                {bot.status === 'no_rule' && <span className="text-xs font-semibold" style={{ color: 'var(--text-tertiary)' }}>No Rule</span>}
+                                <span className="text-xs font-bold" style={{ color: botReadColor, fontFamily: 'var(--font-mono)' }}>{scoreToGrade(bot.readinessScore)}</span>
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
 
-                      {/* Access Status */}
-                      <div className="rounded-lg p-3 border" style={{ borderColor: 'var(--border)', background: 'var(--bg-tertiary)' }}>
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>Access Status</span>
-                          <span className="text-xs px-1.5 py-0.5 rounded" style={{ color: '#10B981', background: 'rgba(16,185,129,0.08)' }}>Observed</span>
-                        </div>
-                        <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>{c.statusDetail}</p>
-                      </div>
-
-                      {/* Detection Status — placeholder */}
-                      <div className="rounded-lg p-3 border" style={{ borderColor: 'var(--border)', background: 'var(--bg-tertiary)' }}>
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>Detection Status</span>
-                          <span className="text-xs px-1.5 py-0.5 rounded" style={{ color: 'var(--text-tertiary)', background: 'var(--bg-tertiary)', border: '1px solid var(--border)' }}>Not yet measured</span>
-                        </div>
-                        <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>Actual visit detection requires server log monitoring. This will be available in a future update.</p>
-                      </div>
-
-                      {/* Readiness for this source */}
-                      <div>
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>Site Readiness for {c.displayName}</span>
-                            <span className="text-xs px-1.5 py-0.5 rounded" style={{ color: '#F59E0B', background: 'rgba(245,158,11,0.08)' }}>Measured + Inferred</span>
-                          </div>
-                          <span className="text-sm font-bold" style={{ color: readColor, fontFamily: 'var(--font-mono)' }}>{scoreToGrade(c.readinessScore)}</span>
-                        </div>
-                        <div className="w-full h-2 rounded-full mb-3" style={{ background: 'var(--bg-tertiary)' }}>
-                          <div className="h-full rounded-full transition-all" style={{ width: `${c.readinessScore}%`, background: readColor }} />
-                        </div>
-                        {c.barriers.length > 0 && (
+                      {/* Platform barriers */}
+                      {p.barriers.length > 0 && (
+                        <div>
+                          <p className="text-xs font-medium mb-1.5" style={{ color: 'var(--text-tertiary)' }}>Barriers:</p>
                           <div className="space-y-1">
-                            <p className="text-xs font-medium" style={{ color: 'var(--text-tertiary)' }}>Barriers:</p>
-                            {c.barriers.map((b, i) => (
+                            {p.barriers.map((b, i) => (
                               <div key={i} className="flex items-start gap-1.5">
                                 <XCircle className="w-3 h-3 mt-0.5 shrink-0 text-red-400" />
                                 <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{b}</span>
                               </div>
                             ))}
                           </div>
-                        )}
-                        {c.barriers.length === 0 && (
-                          <p className="text-xs" style={{ color: '#10B981' }}>No significant barriers detected for this source.</p>
-                        )}
-                      </div>
+                        </div>
+                      )}
 
-                      {/* Source-specific recommendations */}
-                      {c.recommendations.length > 0 && (
+                      {/* Platform recommendations */}
+                      {p.recommendations.length > 0 && (
                         <div>
-                          <div className="flex items-center gap-2 mb-2">
-                            <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>Recommendations for {c.displayName}</span>
-                            <span className="text-xs px-1.5 py-0.5 rounded" style={{ color: '#F59E0B', background: 'rgba(245,158,11,0.08)' }}>Inferred</span>
-                          </div>
-                          <div className="space-y-1.5">
-                            {c.recommendations.map((r, i) => (
+                          <p className="text-xs font-medium mb-1.5" style={{ color: 'var(--text-tertiary)' }}>Recommendations:</p>
+                          <div className="space-y-1">
+                            {p.recommendations.map((r, i) => (
                               <div key={i} className="flex items-start gap-1.5">
                                 <Zap className="w-3 h-3 mt-0.5 shrink-0" style={{ color: '#6366F1' }} />
                                 <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{r}</span>
@@ -1328,7 +1334,8 @@ export default function AuditResultPage() {
             })}
           </div>
         </div>
-      )}
+        );
+      })()}
 
       </>)}
 
