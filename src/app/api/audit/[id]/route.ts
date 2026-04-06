@@ -106,19 +106,20 @@ export async function GET(
       });
     }
 
-    // Free tier: limited response
+    // Free tier: limited response — enough to hook, not enough to act
     const limitedRecs = (recommendations || []).slice(0, 3);
     return NextResponse.json({
       audit,
       pages: [],
       findings: findings || [],
       recommendations: limitedRecs,
+      totalRecommendationCount: (recommendations || []).length,
       crawlerStatuses,
       keyPagesStatus,
       pagePreviews: [],
       perceptionData: null,
       growthData: null,
-      previousAudit,
+      previousAudit: null,
       hasEntitlement: false,
     });
   } catch (error) {

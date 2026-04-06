@@ -61,6 +61,7 @@ interface AuditData {
     pages: Array<{ url: string }>;
   } | null;
   hasEntitlement?: boolean;
+  totalRecommendationCount?: number;
 }
 
 type ViewMode = 'priority' | 'page' | 'category';
@@ -383,6 +384,22 @@ function CopyButton({ text }: { text: string }) {
       style={{ color: copied ? '#10B981' : 'var(--text-tertiary)', background: 'var(--bg-tertiary)' }}>
       {copied ? <><Check className="w-3 h-3" />Copied</> : <><Copy className="w-3 h-3" />Copy</>}
     </button>
+  );
+}
+
+// ============================================================
+// Reusable locked/upgrade CTA component
+// ============================================================
+function LockedSection({ title, description, onCheckout, loading }: { title: string; description: string; onCheckout: () => void; loading: boolean }) {
+  return (
+    <div className="card p-10 text-center mb-6" style={{ borderColor: 'rgba(99,102,241,0.15)', background: 'var(--surface)' }}>
+      <Lock className="w-8 h-8 mx-auto" style={{ color: '#6366F1' }} />
+      <h2 className="mt-3 text-lg font-bold" style={{ color: 'var(--text-primary)' }}>{title}</h2>
+      <p className="mt-2 text-sm max-w-md mx-auto" style={{ color: 'var(--text-secondary)' }}>{description}</p>
+      <button onClick={onCheckout} disabled={loading} className="mt-5 btn-primary inline-flex items-center gap-2 px-6 py-2.5 text-sm font-medium">
+        {loading ? 'Redirecting…' : '$50 — Unlock Full Report'} <ArrowRight className="w-4 h-4" />
+      </button>
+    </div>
   );
 }
 
@@ -793,20 +810,21 @@ export default function AuditResultPage() {
         </div>
       </div>
 
-      {/* TAB NAVIGATION */}
+      {/* TAB NAVIGATION — always visible for authenticated users */}
       {isAuthenticated && (
         <div className="flex items-center gap-1 overflow-x-auto mb-6 pb-1 rounded-lg p-1" style={{ background: 'var(--bg-tertiary)' }}>
           {([
-            { id: 'overview' as ReportTab, label: 'Overview', icon: LayoutGrid },
-            { id: 'findings' as ReportTab, label: 'Findings & Fixes', icon: Wrench },
-            { id: 'ai-perception' as ReportTab, label: 'AI Perception', icon: Eye },
-            { id: 'growth' as ReportTab, label: 'Growth Strategy', icon: TrendingUp },
-            { id: 'pages' as ReportTab, label: 'Pages', icon: MonitorSmartphone },
+            { id: 'overview' as ReportTab, label: 'Overview', icon: LayoutGrid, locked: false },
+            { id: 'findings' as ReportTab, label: 'Findings & Fixes', icon: Wrench, locked: !hasPaid },
+            { id: 'ai-perception' as ReportTab, label: 'AI Perception', icon: Eye, locked: !hasPaid },
+            { id: 'growth' as ReportTab, label: 'Growth Strategy', icon: TrendingUp, locked: !hasPaid },
+            { id: 'pages' as ReportTab, label: 'Pages', icon: MonitorSmartphone, locked: !hasPaid },
           ]).map(tab => (
             <button key={tab.id} onClick={() => switchTab(tab.id)}
               className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-md whitespace-nowrap transition-colors"
               style={{ background: activeTab === tab.id ? 'var(--surface)' : 'transparent', color: activeTab === tab.id ? 'var(--text-primary)' : 'var(--text-tertiary)', boxShadow: activeTab === tab.id ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}>
               <tab.icon className="w-3.5 h-3.5" />{tab.label}
+              {tab.locked && <Lock className="w-3 h-3 ml-0.5" style={{ color: 'var(--text-tertiary)' }} />}
             </button>
           ))}
         </div>
@@ -839,8 +857,26 @@ export default function AuditResultPage() {
         </div>
       )}
 
-      {/* 2. TOP 5 FIXES */}
-      {isAuthenticated && allFindings.length > 0 && (() => {
+      {/* UPGRADE CTA for free users — between summary and details */}
+      {isAuthenticated && !hasPaid && (
+        <div className="card p-6 sm:p-8 mb-6 text-center" style={{ borderColor: 'rgba(99,102,241,0.2)', background: 'var(--surface)' }}>
+          <div className="w-12 h-12 rounded-xl mx-auto flex items-center justify-center mb-4" style={{ background: 'rgba(99,102,241,0.1)' }}>
+            <Lock className="w-6 h-6" style={{ color: '#6366F1' }} />
+          </div>
+          <h2 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>
+            Your AI Report Card found {allFindings.length} issue{allFindings.length !== 1 ? 's' : ''}
+          </h2>
+          <p className="mt-2 text-sm max-w-lg mx-auto" style={{ color: 'var(--text-secondary)' }}>
+            Unlock the full report to see your Top 5 Fixes, AI Perception Check, competitive benchmark, and complete action plan with code snippets.
+          </p>
+          <button onClick={() => handleCheckout('initial_scan')} disabled={checkoutLoading} className="mt-5 btn-primary inline-flex items-center gap-2 px-6 py-3 text-sm font-medium">
+            {checkoutLoading ? 'Redirecting…' : '$50 — Unlock Full Report'} <ArrowRight className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      {/* 2. TOP 5 FIXES — paid only */}
+      {isAuthenticated && hasPaid && allFindings.length > 0 && (() => {
         const severityOrder: Record<string, number> = { high: 0, medium: 1, low: 2 };
         const effortOrder: Record<string, number> = { easy: 0, medium: 1, harder: 2 };
         const top5 = [...allFindings]
@@ -884,8 +920,8 @@ export default function AuditResultPage() {
         );
       })()}
 
-      {/* 2b. CHANGES SINCE LAST SCAN — only shown when there IS a previous audit */}
-      {isAuthenticated && auditDelta && (
+      {/* 2b. CHANGES SINCE LAST SCAN — paid only, and only when there IS a previous audit */}
+      {isAuthenticated && hasPaid && auditDelta && (
         <div className="card p-6 mb-6">
           <div className="flex items-center gap-2 mb-1">
             <RefreshCw className="w-5 h-5" style={{ color: '#6366F1' }} />
@@ -930,7 +966,8 @@ export default function AuditResultPage() {
       )}
 
       {/* 2c. WHAT TO DO THIS MONTH */}
-      {isAuthenticated && monthlyActions && (monthlyActions.quickWins.length > 0 || monthlyActions.mediumEffort.length > 0 || monthlyActions.strategic.length > 0) && (
+      {/* 2c. WHAT TO DO THIS MONTH — paid only */}
+      {isAuthenticated && hasPaid && monthlyActions && (monthlyActions.quickWins.length > 0 || monthlyActions.mediumEffort.length > 0 || monthlyActions.strategic.length > 0) && (
         <div className="card p-6 mb-6">
           <div className="flex items-center gap-2 mb-1">
             <CalendarCheck className="w-5 h-5" style={{ color: '#6366F1' }} />
@@ -1006,8 +1043,8 @@ export default function AuditResultPage() {
         </div>
       </div>
 
-      {/* 3. AI VISIBILITY SUMMARY */}
-      {isAuthenticated && (
+      {/* 3. AI VISIBILITY SUMMARY — paid only */}
+      {isAuthenticated && hasPaid && (
         <div className="card p-6 mb-6">
           <div className="flex items-center gap-2 mb-3">
             <Bot className="w-5 h-5" style={{ color: '#6366F1' }} />
@@ -1042,24 +1079,27 @@ export default function AuditResultPage() {
               <Globe className="w-5 h-5" style={{ color: '#6366F1' }} />
               <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>Key Pages for Your {verticalConfig.label} Site</h2>
             </div>
-            <p className="text-sm mb-4" style={{ color: 'var(--text-tertiary)' }}>These are the pages AI needs to accurately describe and recommend your business. Click any page for details.</p>
+            <p className="text-sm mb-4" style={{ color: 'var(--text-tertiary)' }}>These are the pages AI needs to accurately describe and recommend your business.{hasPaid ? ' Click any page for details.' : ''}</p>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               {verticalKeyPages.map((kp) => (
-                <button key={kp.type} onClick={() => setSelectedKeyPage(kp)}
+                <button key={kp.type} onClick={() => hasPaid ? setSelectedKeyPage(kp) : handleCheckout('initial_scan')}
                   className="rounded-lg p-3 border text-left transition-all hover:shadow-md" style={{ borderColor: kp.found ? 'rgba(16,185,129,0.2)' : 'rgba(239,68,68,0.2)', background: kp.found ? 'rgba(16,185,129,0.05)' : 'rgba(239,68,68,0.05)', cursor: 'pointer' }}>
                   <p className="text-xs font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>{kp.label}</p>
-                  {kp.found ? (
-                    <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-500"><CheckCircle className="w-3.5 h-3.5" />Found</span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1 text-xs font-semibold text-red-500"><XCircle className="w-3.5 h-3.5" />Missing</span>
-                  )}
+                  <div className="flex items-center justify-between">
+                    {kp.found ? (
+                      <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-500"><CheckCircle className="w-3.5 h-3.5" />Found</span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 text-xs font-semibold text-red-500"><XCircle className="w-3.5 h-3.5" />Missing</span>
+                    )}
+                    {!hasPaid && <Lock className="w-3 h-3" style={{ color: 'var(--text-tertiary)' }} />}
+                  </div>
                 </button>
               ))}
             </div>
           </div>
 
-          {/* 4b. MISSING PAGES BLUEPRINT */}
-          {missingPages.length > 0 && (
+          {/* 4b. MISSING PAGES BLUEPRINT — paid only */}
+          {hasPaid && missingPages.length > 0 && (
             <div className="card p-6 mb-6">
               <div className="flex items-center gap-2 mb-1">
                 <FileText className="w-5 h-5" style={{ color: '#F59E0B' }} />
@@ -1176,36 +1216,36 @@ export default function AuditResultPage() {
             <Shield className="w-5 h-5" style={{ color: '#6366F1' }} />
             <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>AI Source Visibility</h2>
           </div>
-          <p className="text-sm mb-4" style={{ color: 'var(--text-tertiary)' }}>Which AI systems can access your site and recommend your business? Click any to learn more.</p>
+          <p className="text-sm mb-4" style={{ color: 'var(--text-tertiary)' }}>Which AI systems can access your site and recommend your business?{hasPaid ? ' Click any to learn more.' : ''}</p>
           <div className="space-y-2">
             {crawlerStatuses.map((c) => {
-              const isExp = expandedCrawlers.has(c.name);
+              const isExp = hasPaid && expandedCrawlers.has(c.name);
               const readColor = getScoreColor(c.readinessScore);
               return (
                 <div key={c.name} className="rounded-xl border overflow-hidden" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
                   {/* Collapsed card */}
-                  <button onClick={() => toggleCrawler(c.name)} className="w-full flex items-center justify-between p-4 text-left transition-colors" style={{ background: isExp ? 'var(--bg-tertiary)' : 'transparent' }}>
+                  <button onClick={() => hasPaid && toggleCrawler(c.name)} className="w-full flex items-center justify-between p-4 text-left transition-colors" style={{ background: isExp ? 'var(--bg-tertiary)' : 'transparent', cursor: hasPaid ? 'pointer' : 'default' }}>
                     <div className="flex items-center gap-3 min-w-0">
-                      {isExp ? <ChevronDown className="w-4 h-4 shrink-0" style={{ color: 'var(--text-tertiary)' }} /> : <ChevronRight className="w-4 h-4 shrink-0" style={{ color: 'var(--text-tertiary)' }} />}
+                      {hasPaid && (isExp ? <ChevronDown className="w-4 h-4 shrink-0" style={{ color: 'var(--text-tertiary)' }} /> : <ChevronRight className="w-4 h-4 shrink-0" style={{ color: 'var(--text-tertiary)' }} />)}
                       <div className="min-w-0">
                         <div className="flex items-center gap-2">
                           <span className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>{c.displayName}</span>
                           <span className="text-xs px-1.5 py-0.5 rounded" style={{ color: 'var(--text-tertiary)', background: 'var(--bg-tertiary)' }}>{c.operator}</span>
-                          <span className="text-xs px-1.5 py-0.5 rounded" style={{ color: c.visibilityValue === 'search_citation' ? '#6366F1' : c.visibilityValue === 'assistant_browsing' ? '#F59E0B' : '#64748B', background: c.visibilityValue === 'search_citation' ? 'rgba(99,102,241,0.1)' : c.visibilityValue === 'assistant_browsing' ? 'rgba(245,158,11,0.1)' : 'var(--bg-tertiary)' }}>{c.visibilityLabel}</span>
                         </div>
-                        {!isExp && <p className="text-xs mt-0.5 truncate" style={{ color: 'var(--text-tertiary)' }}>{c.description}</p>}
                       </div>
                     </div>
                     <div className="flex items-center gap-3 shrink-0">
                       {c.status === 'allowed' && <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-500"><CheckCircle className="w-3.5 h-3.5" />Allowed</span>}
                       {c.status === 'blocked' && <span className="inline-flex items-center gap-1 text-xs font-semibold text-red-500"><XCircle className="w-3.5 h-3.5" />Blocked</span>}
                       {c.status === 'no_rule' && <span className="inline-flex items-center gap-1 text-xs font-semibold" style={{ color: 'var(--text-tertiary)' }}><Minus className="w-3.5 h-3.5" />No Rule</span>}
-                      <div className="flex items-center gap-1.5 ml-2">
-                        <div className="w-12 h-1.5 rounded-full" style={{ background: 'var(--bg-tertiary)' }}>
-                          <div className="h-full rounded-full" style={{ width: `${c.readinessScore}%`, background: readColor }} />
+                      {hasPaid && (
+                        <div className="flex items-center gap-1.5 ml-2">
+                          <div className="w-12 h-1.5 rounded-full" style={{ background: 'var(--bg-tertiary)' }}>
+                            <div className="h-full rounded-full" style={{ width: `${c.readinessScore}%`, background: readColor }} />
+                          </div>
+                          <span className="text-xs font-bold w-7 text-right" style={{ color: readColor, fontFamily: 'var(--font-mono)' }}>{scoreToGrade(c.readinessScore)}</span>
                         </div>
-                        <span className="text-xs font-bold w-7 text-right" style={{ color: readColor, fontFamily: 'var(--font-mono)' }}>{scoreToGrade(c.readinessScore)}</span>
-                      </div>
+                      )}
                     </div>
                   </button>
 
@@ -1294,14 +1334,12 @@ export default function AuditResultPage() {
 
       {/* ===== AI PERCEPTION TAB ===== */}
       {isAuthenticated && activeTab === 'ai-perception' && !hasPaid && (
-        <div className="card p-12 text-center mb-6">
-          <Lock className="w-10 h-10 mx-auto" style={{ color: '#6366F1' }} />
-          <h2 className="mt-4 text-xl font-bold" style={{ color: 'var(--text-primary)' }}>AI Perception Check</h2>
-          <p className="mt-2 text-sm max-w-md mx-auto" style={{ color: 'var(--text-secondary)' }}>See how AI assistants actually describe your business when customers ask. Find out if AI can answer key buyer questions about your product.</p>
-          <button onClick={() => handleCheckout('initial_scan')} disabled={checkoutLoading} className="mt-6 btn-primary inline-flex items-center gap-2 px-6 py-3 text-sm">
-            {checkoutLoading ? 'Redirecting…' : 'Unlock Full Report — $50'} <ArrowRight className="w-4 h-4" />
-          </button>
-        </div>
+        <LockedSection
+          title="AI Perception Check"
+          description="See how AI assistants would answer questions about your business. Find out if ChatGPT, Claude, and Perplexity can accurately describe what you offer."
+          onCheckout={() => handleCheckout('initial_scan')}
+          loading={checkoutLoading}
+        />
       )}
 
       {isAuthenticated && activeTab === 'ai-perception' && hasPaid && (
@@ -1579,10 +1617,10 @@ export default function AuditResultPage() {
               <div className="rounded-xl border-2 p-6 text-center shadow-lg max-w-sm" style={{ background: 'var(--surface)', borderColor: 'rgba(99,102,241,0.3)' }}>
                 <Lock className="w-8 h-8 mx-auto" style={{ color: '#6366F1' }} />
                 <h3 className="mt-3 font-semibold" style={{ color: 'var(--text-primary)' }}>{gatedCount} more finding{gatedCount > 1 ? 's' : ''} available</h3>
-                <p className="mt-2 text-sm" style={{ color: 'var(--text-secondary)' }}>Unlock your full report with all findings, code snippets, AI perception, and growth strategy.</p>
+                <p className="mt-2 text-sm" style={{ color: 'var(--text-secondary)' }}>See all {allFindings.length} findings with fix instructions and code snippets.</p>
                 {isAuthenticated ? (
                   <button onClick={() => handleCheckout('initial_scan')} disabled={checkoutLoading} className="mt-4 btn-primary inline-flex items-center gap-2 px-5 py-2.5 text-sm">
-                    {checkoutLoading ? 'Redirecting…' : 'Unlock Full Report — $50'} <ArrowRight className="w-4 h-4" />
+                    {checkoutLoading ? 'Redirecting…' : '$50 — Unlock Full Report'} <ArrowRight className="w-4 h-4" />
                   </button>
                 ) : (
                   <a href={`/auth/signup?redirect=/audit/${audit.id}`} className="mt-4 btn-primary inline-flex items-center gap-2 px-5 py-2.5 text-sm">Sign Up to Unlock <ArrowRight className="w-4 h-4" /></a>
@@ -1598,14 +1636,12 @@ export default function AuditResultPage() {
 
       {/* ===== GROWTH STRATEGY TAB ===== */}
       {isAuthenticated && activeTab === 'growth' && !hasPaid && (
-        <div className="card p-12 text-center mb-6">
-          <Lock className="w-10 h-10 mx-auto" style={{ color: '#6366F1' }} />
-          <h2 className="mt-4 text-xl font-bold" style={{ color: 'var(--text-primary)' }}>Growth Strategy</h2>
-          <p className="mt-2 text-sm max-w-md mx-auto" style={{ color: 'var(--text-secondary)' }}>Get a competitive analysis comparing your AI visibility against competitors, plus a custom action plan to improve your rankings.</p>
-          <button onClick={() => handleCheckout('initial_scan')} disabled={checkoutLoading} className="mt-6 btn-primary inline-flex items-center gap-2 px-6 py-3 text-sm">
-            {checkoutLoading ? 'Redirecting…' : 'Unlock Full Report — $50'} <ArrowRight className="w-4 h-4" />
-          </button>
-        </div>
+        <LockedSection
+          title="Growth Strategy"
+          description="Get an AI-powered marketing strategy with competitor benchmarks, content recommendations, and a prioritized action plan."
+          onCheckout={() => handleCheckout('initial_scan')}
+          loading={checkoutLoading}
+        />
       )}
 
       {isAuthenticated && activeTab === 'growth' && hasPaid && (
@@ -1805,14 +1841,12 @@ export default function AuditResultPage() {
       <>
       {/* 8. PAGES ANALYZED */}
       {isAuthenticated && !hasPaid && activeTab === 'pages' && (
-        <div className="card p-12 text-center mb-6">
-          <Lock className="w-10 h-10 mx-auto" style={{ color: '#6366F1' }} />
-          <h2 className="mt-4 text-xl font-bold" style={{ color: 'var(--text-primary)' }}>Detailed Page Analysis</h2>
-          <p className="mt-2 text-sm max-w-md mx-auto" style={{ color: 'var(--text-secondary)' }}>See how each of your pages performs for AI visibility — with title quality, schema data, and page-level issues.</p>
-          <button onClick={() => handleCheckout('initial_scan')} disabled={checkoutLoading} className="mt-6 btn-primary inline-flex items-center gap-2 px-6 py-3 text-sm">
-            {checkoutLoading ? 'Redirecting…' : 'Unlock Full Report — $50'} <ArrowRight className="w-4 h-4" />
-          </button>
-        </div>
+        <LockedSection
+          title="Detailed Page Analysis"
+          description="See how each of your pages performs for AI visibility — titles, schema data, content quality, and page-level issues."
+          onCheckout={() => handleCheckout('initial_scan')}
+          loading={checkoutLoading}
+        />
       )}
       {isAuthenticated && hasPaid && pages.length > 0 && (
         <div className="mb-6">
