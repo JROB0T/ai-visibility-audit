@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import ScoreRing, { ScoreBar, scoreToGrade, getScoreColor } from '@/components/ScoreRing';
 import SeverityBadge, { EffortBadge } from '@/components/SeverityBadge';
-import { Lock, ArrowRight, ArrowLeft, CheckCircle, XCircle, ExternalLink, FileText, AlertTriangle, RefreshCw, ChevronDown, ChevronRight, Filter, Shield, Code, Eye, Bot, Copy, Check, Globe, Minus, LayoutGrid, Wrench, Zap, MonitorSmartphone, X, Download, TrendingUp, Target, Users, CalendarCheck } from 'lucide-react';
+import { Lock, ArrowRight, ArrowLeft, CheckCircle, XCircle, ExternalLink, FileText, AlertTriangle, RefreshCw, ChevronDown, ChevronRight, Filter, Shield, Code, Eye, Bot, Copy, Check, Globe, Minus, LayoutGrid, Wrench, Zap, MonitorSmartphone, X, Download, Target, Users, CalendarCheck } from 'lucide-react';
 import { compareAudits, classifyFinding, generateMonthlyActions } from '@/lib/deltas';
 import { getExpectedPages, getVerticalConfig } from '@/lib/verticals';
 
@@ -66,9 +66,9 @@ interface AuditData {
 
 type ViewMode = 'priority' | 'page' | 'category';
 type SeverityFilter = 'all' | 'high' | 'medium' | 'low';
-type ReportTab = 'overview' | 'findings' | 'ai-perception' | 'growth' | 'pages';
+type ReportTab = 'overview' | 'fix-plan' | 'ai-perception' | 'pages';
 
-const FREE_RECOMMENDATION_LIMIT = 3;
+// FREE_RECOMMENDATION_LIMIT removed — gating now handled at tab level
 
 const CATEGORY_LABELS: Record<string, string> = {
   crawlability: 'Findability', machine_readability: 'Explainability',
@@ -148,6 +148,7 @@ function generateCodeSnippet(title: string, domain: string): string | null {
 }
 
 // Generate AI visibility summary from scan data (no API needed)
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function generateAiSummary(audit: AuditData['audit'], crawlerStatuses: CrawlerStatus[], keyPagesStatus: KeyPageStatus[], findingsCount: number, highCount: number): string {
   const domain = audit.site?.domain || 'this site';
   const score = audit.overall_score ?? 0;
@@ -469,9 +470,12 @@ export default function AuditResultPage() {
 
   function switchTab(tab: ReportTab) {
     setActiveTab(tab);
-    if (tab === 'findings') setViewMode('category');
+    if (tab === 'fix-plan') {
+      setViewMode('category');
+      // Auto-load growth data for fix plan if not loaded
+      if (!growthData && !growthLoading && hasPaid) loadGrowthStrategy();
+    }
     else if (tab === 'ai-perception' && !perceptionQuestions && !perceptionLoading) loadPerceptionQuestions();
-    else if (tab === 'growth' && !growthData && !growthLoading) loadGrowthStrategy();
   }
 
   async function loadPerceptionQuestions() {
@@ -729,8 +733,7 @@ export default function AuditResultPage() {
   const { audit, pages, recommendations, crawlerStatuses, keyPagesStatus } = data;
   if (audit.status === 'failed') return (<div className="max-w-4xl mx-auto px-4 py-20 text-center"><AlertTriangle className="w-10 h-10 text-red-500 mx-auto" /><h2 className="mt-4 text-xl font-semibold" style={{ color: 'var(--text-primary)' }}>Scan failed</h2><p className="mt-2" style={{ color: 'var(--text-secondary)' }}>{audit.summary || 'The site could not be scanned.'}</p><a href="/" className="mt-6 inline-block" style={{ color: '#6366F1' }}>← Try another URL</a></div>);
 
-  const visibleRecs = (isAuthenticated && hasPaid) ? recommendations : recommendations.slice(0, FREE_RECOMMENDATION_LIMIT);
-  const gatedCount = recommendations.length - FREE_RECOMMENDATION_LIMIT;
+  // visibleRecs and gatedCount removed — old findings tab replaced by Fix Plan
   const highCount = allFindings.filter(f => f.severity === 'high').length;
   const medCount = allFindings.filter(f => f.severity === 'medium').length;
   const lowCount = allFindings.filter(f => f.severity === 'low').length;
@@ -816,9 +819,8 @@ export default function AuditResultPage() {
         <div className="flex items-center gap-1 overflow-x-auto mb-6 pb-1 rounded-lg p-1" style={{ background: 'var(--bg-tertiary)' }}>
           {([
             { id: 'overview' as ReportTab, label: 'Overview', icon: LayoutGrid, locked: false },
-            { id: 'findings' as ReportTab, label: 'Findings & Fixes', icon: Wrench, locked: !hasPaid },
+            { id: 'fix-plan' as ReportTab, label: 'Fix Plan', icon: Wrench, locked: !hasPaid },
             { id: 'ai-perception' as ReportTab, label: 'AI Perception', icon: Eye, locked: !hasPaid },
-            { id: 'growth' as ReportTab, label: 'Growth Strategy', icon: TrendingUp, locked: !hasPaid },
             { id: 'pages' as ReportTab, label: 'Pages', icon: MonitorSmartphone, locked: !hasPaid },
           ]).map(tab => (
             <button key={tab.id} onClick={() => switchTab(tab.id)}
@@ -834,269 +836,29 @@ export default function AuditResultPage() {
       {/* ===== OVERVIEW TAB ===== */}
       {(!isAuthenticated || activeTab === 'overview') && (<>
 
-      {/* 1. BUSINESS-FRIENDLY SUMMARY */}
-      {isAuthenticated && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-          {([
-            { question: 'Can AI find you?', score: audit.crawlability_score ?? 0, category: 'findability' as const },
-            { question: 'Can AI explain what you do?', score: audit.machine_readability_score ?? 0, category: 'explainability' as const },
-            { question: 'Can AI help someone buy from you?', score: audit.commercial_clarity_score ?? 0, category: 'buyability' as const },
-            { question: 'Can AI trust you?', score: audit.trust_clarity_score ?? 0, category: 'trustworthiness' as const },
-          ]).map((item) => {
-            const grade = scoreToGrade(item.score);
-            const color = getScoreColor(item.score);
-            return (
-              <div key={item.category} className="card p-5">
-                <div className="flex items-start justify-between mb-2">
-                  <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{item.question}</p>
-                  <span className="text-lg font-bold shrink-0 ml-3" style={{ color, fontFamily: 'var(--font-mono)' }}>{grade}</span>
-                </div>
-                <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>{getCategoryInterpretation(item.score, item.category)}</p>
+      {/* 1. BUSINESS-FRIENDLY SUMMARY — always visible */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+        {([
+          { question: 'Can AI find you?', score: audit.crawlability_score ?? 0, category: 'findability' as const },
+          { question: 'Can AI explain what you do?', score: audit.machine_readability_score ?? 0, category: 'explainability' as const },
+          { question: 'Can AI help someone buy from you?', score: audit.commercial_clarity_score ?? 0, category: 'buyability' as const },
+          { question: 'Can AI trust you?', score: audit.trust_clarity_score ?? 0, category: 'trustworthiness' as const },
+        ]).map((item) => {
+          const grade = scoreToGrade(item.score);
+          const color = getScoreColor(item.score);
+          return (
+            <div key={item.category} className="card p-5">
+              <div className="flex items-start justify-between mb-2">
+                <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{item.question}</p>
+                <span className="text-lg font-bold shrink-0 ml-3" style={{ color, fontFamily: 'var(--font-mono)' }}>{grade}</span>
               </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* UPGRADE CTA for free users — between summary and details */}
-      {isAuthenticated && !hasPaid && (
-        <div className="card p-6 sm:p-8 mb-6 text-center" style={{ borderColor: 'rgba(99,102,241,0.2)', background: 'var(--surface)' }}>
-          <div className="w-12 h-12 rounded-xl mx-auto flex items-center justify-center mb-4" style={{ background: 'rgba(99,102,241,0.1)' }}>
-            <Lock className="w-6 h-6" style={{ color: '#6366F1' }} />
-          </div>
-          <h2 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>
-            Your AI Report Card found {allFindings.length} issue{allFindings.length !== 1 ? 's' : ''}
-          </h2>
-          <p className="mt-2 text-sm max-w-lg mx-auto" style={{ color: 'var(--text-secondary)' }}>
-            Unlock the full report to see your Top 5 Fixes, AI Perception Check, competitive benchmark, and complete action plan with code snippets.
-          </p>
-          <button onClick={() => handleCheckout('initial_scan')} disabled={checkoutLoading} className="mt-5 btn-primary inline-flex items-center gap-2 px-6 py-3 text-sm font-medium">
-            {checkoutLoading ? 'Redirecting…' : '$50 — Unlock Full Report'} <ArrowRight className="w-4 h-4" />
-          </button>
-        </div>
-      )}
-
-      {/* 2. TOP 5 FIXES — paid only */}
-      {isAuthenticated && hasPaid && allFindings.length > 0 && (() => {
-        const severityOrder: Record<string, number> = { high: 0, medium: 1, low: 2 };
-        const effortOrder: Record<string, number> = { easy: 0, medium: 1, harder: 2 };
-        const top5 = [...allFindings]
-          .sort((a, b) => (severityOrder[a.severity] ?? 9) - (severityOrder[b.severity] ?? 9) || (effortOrder[a.effort] ?? 9) - (effortOrder[b.effort] ?? 9))
-          .slice(0, 5);
-
-        // Calculate projected improvement per category
-        const impactMap: Record<string, number> = { high: 10, medium: 5, low: 2 };
-        const categoryBoosts: Record<string, number> = {};
-        const fixImpacts: { id: string; points: number; category: string }[] = [];
-        for (const fix of top5) {
-          const points = impactMap[fix.severity] || 3;
-          const cat = fix.category;
-          categoryBoosts[cat] = (categoryBoosts[cat] || 0) + points;
-          fixImpacts.push({ id: fix.id, points, category: cat });
-        }
-
-        const currentScores = {
-          crawlability: audit.crawlability_score ?? 0,
-          machine_readability: audit.machine_readability_score ?? 0,
-          commercial_clarity: audit.commercial_clarity_score ?? 0,
-          trust_clarity: audit.trust_clarity_score ?? 0,
-        };
-        const projectedScores: Record<string, number> = {};
-        const improvements: { category: string; label: string; current: number; projected: number }[] = [];
-        for (const [cat, boost] of Object.entries(categoryBoosts)) {
-          const current = currentScores[cat as keyof typeof currentScores] ?? 0;
-          const projected = Math.min(100, current + boost);
-          projectedScores[cat] = projected;
-          if (projected > current) {
-            improvements.push({ category: cat, label: CATEGORY_LABELS[cat] || cat, current, projected });
-          }
-        }
-        // Fill in unchanged categories for overall calc
-        for (const cat of Object.keys(currentScores)) {
-          if (!(cat in projectedScores)) projectedScores[cat] = currentScores[cat as keyof typeof currentScores];
-        }
-        const weights: Record<string, number> = { crawlability: 0.3, machine_readability: 0.25, commercial_clarity: 0.3, trust_clarity: 0.15 };
-        const currentOverall = audit.overall_score ?? 0;
-        const projectedOverall = Math.min(100, Math.round(
-          Object.entries(weights).reduce((sum, [cat, w]) => sum + (projectedScores[cat] ?? 0) * w, 0)
-        ));
-
-        return (
-          <div className="card p-6 mb-6">
-            <div className="flex items-center gap-2 mb-1">
-              <Wrench className="w-5 h-5" style={{ color: '#6366F1' }} />
-              <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>Top 5 Fixes</h2>
+              <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>{getCategoryInterpretation(item.score, item.category)}</p>
             </div>
-            <p className="text-sm mb-4" style={{ color: 'var(--text-tertiary)' }}>The highest-impact improvements for your AI visibility, sorted by priority.</p>
+          );
+        })}
+      </div>
 
-            {/* Projected improvement summary */}
-            {projectedOverall > currentOverall && (
-              <div className="rounded-lg border p-4 mb-4" style={{ borderColor: 'rgba(16,185,129,0.2)', background: 'rgba(16,185,129,0.04)' }}>
-                <p className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: '#10B981' }}>Projected improvement if you fix these 5 issues</p>
-                <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Overall:</span>
-                    <span className="text-sm font-bold" style={{ color: getScoreColor(currentOverall), fontFamily: 'var(--font-mono)' }}>{scoreToGrade(currentOverall)}</span>
-                    <ArrowRight className="w-3 h-3" style={{ color: 'var(--text-tertiary)' }} />
-                    <span className="text-sm font-bold" style={{ color: '#10B981', fontFamily: 'var(--font-mono)' }}>{scoreToGrade(projectedOverall)}</span>
-                  </div>
-                  {improvements.map((imp) => (
-                    <div key={imp.category} className="flex items-center gap-1.5">
-                      <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>{imp.label}:</span>
-                      <span className="text-xs font-bold" style={{ color: getScoreColor(imp.current), fontFamily: 'var(--font-mono)' }}>{scoreToGrade(imp.current)}</span>
-                      <ArrowRight className="w-3 h-3" style={{ color: 'var(--text-tertiary)' }} />
-                      <span className="text-xs font-bold" style={{ color: '#10B981', fontFamily: 'var(--font-mono)' }}>{scoreToGrade(imp.projected)}</span>
-                    </div>
-                  ))}
-                </div>
-                <p className="text-xs mt-2" style={{ color: 'var(--text-tertiary)' }}>Estimates based on issue severity. Actual improvement may vary.</p>
-              </div>
-            )}
-
-            <div className="space-y-3">
-              {top5.map((fix, i) => {
-                const owner = getFixOwner(fix.title, fix.category);
-                const impact = fixImpacts.find(f => f.id === fix.id);
-                return (
-                  <div key={fix.id} className="flex gap-3 p-3 rounded-lg border" style={{ background: 'var(--bg-tertiary)', borderColor: 'var(--border)' }}>
-                    <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 text-sm font-bold" style={{ background: 'rgba(99,102,241,0.1)', color: '#6366F1' }}>{i + 1}</div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{fix.title}</p>
-                      <p className="text-xs mt-0.5 line-clamp-1" style={{ color: 'var(--text-secondary)' }}>{fix.why}</p>
-                      <div className="flex items-center gap-2 mt-2 flex-wrap">
-                        <SeverityBadge severity={fix.severity} />
-                        <EffortBadge effort={fix.effort} />
-                        <span className="text-xs px-1.5 py-0.5 rounded font-medium" style={{ color: owner.color, background: `${owner.color}15` }}>{owner.label}</span>
-                        {impact && <span className="text-xs px-1.5 py-0.5 rounded font-medium" style={{ color: '#10B981', background: 'rgba(16,185,129,0.1)' }}>+{impact.points} {CATEGORY_LABELS[impact.category] || impact.category}</span>}
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => { setActiveTab('findings'); setViewMode('priority'); }}
-                      className="shrink-0 self-center p-1.5 rounded-lg transition-colors"
-                      style={{ color: '#6366F1' }}
-                      title="View in Findings & Fixes"
-                    >
-                      <ArrowRight className="w-4 h-4" />
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        );
-      })()}
-
-      {/* 2b. CHANGES SINCE LAST SCAN — paid only, and only when there IS a previous audit */}
-      {isAuthenticated && hasPaid && auditDelta && (
-        <div className="card p-6 mb-6">
-          <div className="flex items-center gap-2 mb-1">
-            <RefreshCw className="w-5 h-5" style={{ color: '#6366F1' }} />
-            <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>Changes Since Last Scan</h2>
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mt-4">
-            <div className="text-center p-3 rounded-lg" style={{ background: 'var(--bg-tertiary)' }}>
-              <p className="text-xs font-medium mb-1" style={{ color: 'var(--text-tertiary)' }}>Overall</p>
-              <span className="text-xl font-bold" style={{ color: auditDelta.overallDelta > 0 ? '#10B981' : auditDelta.overallDelta < 0 ? '#EF4444' : 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>
-                {auditDelta.overallDelta > 0 ? '+' : ''}{auditDelta.overallDelta}
-              </span>
-            </div>
-            {([
-              { label: 'Find', delta: auditDelta.categoryDeltas.crawlability },
-              { label: 'Explain', delta: auditDelta.categoryDeltas.machine_readability },
-              { label: 'Buy', delta: auditDelta.categoryDeltas.commercial_clarity },
-              { label: 'Trust', delta: auditDelta.categoryDeltas.trust_clarity },
-            ]).map((c) => (
-              <div key={c.label} className="text-center p-3 rounded-lg" style={{ background: 'var(--bg-tertiary)' }}>
-                <p className="text-xs font-medium mb-1" style={{ color: 'var(--text-tertiary)' }}>{c.label}</p>
-                <span className="text-lg font-bold" style={{ color: c.delta > 0 ? '#10B981' : c.delta < 0 ? '#EF4444' : 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>
-                  {c.delta > 0 ? '+' : ''}{c.delta}
-                </span>
-              </div>
-            ))}
-          </div>
-          <div className="flex flex-wrap gap-3 mt-3">
-            {auditDelta.newFindings.length > 0 && (
-              <span className="text-xs px-2 py-1 rounded font-medium" style={{ color: '#3B82F6', background: 'rgba(59,130,246,0.1)' }}>{auditDelta.newFindings.length} new issue{auditDelta.newFindings.length !== 1 ? 's' : ''}</span>
-            )}
-            {auditDelta.resolvedFindings.length > 0 && (
-              <span className="text-xs px-2 py-1 rounded font-medium" style={{ color: '#10B981', background: 'rgba(16,185,129,0.1)' }}>{auditDelta.resolvedFindings.length} resolved</span>
-            )}
-            {auditDelta.regressedFindings.length > 0 && (
-              <span className="text-xs px-2 py-1 rounded font-medium" style={{ color: '#EF4444', background: 'rgba(239,68,68,0.1)' }}>{auditDelta.regressedFindings.length} regressed</span>
-            )}
-            {auditDelta.ongoingFindings.length > 0 && (
-              <span className="text-xs px-2 py-1 rounded font-medium" style={{ color: 'var(--text-tertiary)', background: 'var(--bg-tertiary)' }}>{auditDelta.ongoingFindings.length} ongoing</span>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* 2c. WHAT TO DO THIS MONTH */}
-      {/* 2c. WHAT TO DO THIS MONTH — paid only */}
-      {isAuthenticated && hasPaid && monthlyActions && (monthlyActions.quickWins.length > 0 || monthlyActions.mediumEffort.length > 0 || monthlyActions.strategic.length > 0) && (
-        <div className="card p-6 mb-6">
-          <div className="flex items-center gap-2 mb-1">
-            <CalendarCheck className="w-5 h-5" style={{ color: '#6366F1' }} />
-            <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>What to Do This Month</h2>
-          </div>
-          <p className="text-sm mb-4" style={{ color: 'var(--text-tertiary)' }}>Prioritized actions based on what changed and what has the most impact.</p>
-          <div className="space-y-4">
-            {monthlyActions.quickWins.length > 0 && (
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: '#10B981' }}>Quick Wins</p>
-                <div className="space-y-2">
-                  {monthlyActions.quickWins.map((f) => (
-                    <div key={f.id} className="flex items-center gap-3 p-2.5 rounded-lg" style={{ background: 'var(--bg-tertiary)' }}>
-                      <Zap className="w-4 h-4 shrink-0" style={{ color: '#10B981' }} />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>{f.title}</p>
-                        <p className="text-xs truncate" style={{ color: 'var(--text-secondary)' }}>{f.description}</p>
-                      </div>
-                      <SeverityBadge severity={f.severity} />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-            {monthlyActions.mediumEffort.length > 0 && (
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: '#F59E0B' }}>Medium Effort</p>
-                <div className="space-y-2">
-                  {monthlyActions.mediumEffort.map((f) => (
-                    <div key={f.id} className="flex items-center gap-3 p-2.5 rounded-lg" style={{ background: 'var(--bg-tertiary)' }}>
-                      <Wrench className="w-4 h-4 shrink-0" style={{ color: '#F59E0B' }} />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>{f.title}</p>
-                        <p className="text-xs truncate" style={{ color: 'var(--text-secondary)' }}>{f.description}</p>
-                      </div>
-                      <SeverityBadge severity={f.severity} />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-            {monthlyActions.strategic.length > 0 && (
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: '#6366F1' }}>Strategic</p>
-                <div className="space-y-2">
-                  {monthlyActions.strategic.map((f) => (
-                    <div key={f.id} className="flex items-center gap-3 p-2.5 rounded-lg" style={{ background: 'var(--bg-tertiary)' }}>
-                      <Target className="w-4 h-4 shrink-0" style={{ color: '#6366F1' }} />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>{f.title}</p>
-                        <p className="text-xs truncate" style={{ color: 'var(--text-secondary)' }}>{f.description}</p>
-                      </div>
-                      <SeverityBadge severity={f.severity} />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* 3. SCORE OVERVIEW (graph) */}
+      {/* SCORE RING */}
       <div className="card p-6 sm:p-8 mb-6">
         <div className="flex flex-col sm:flex-row items-center gap-8">
           <ScoreRing score={audit.overall_score ?? 0} label="Overall Score" size={160} />
@@ -1109,27 +871,128 @@ export default function AuditResultPage() {
         </div>
       </div>
 
-      {/* 3. AI VISIBILITY SUMMARY — paid only */}
-      {isAuthenticated && hasPaid && (
-        <div className="card p-6 mb-6">
-          <div className="flex items-center gap-2 mb-3">
-            <Bot className="w-5 h-5" style={{ color: '#6366F1' }} />
-            <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>AI Visibility Summary</h2>
-          </div>
-          <div className="p-4 rounded-lg border" style={{ background: 'var(--bg-tertiary)', borderColor: 'var(--border)' }}>
-            <p className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: 'var(--text-primary)' }}>
-              {generateAiSummary(audit, crawlerStatuses || [], keyPagesStatus || [], allFindings.length, highCount)}
+      {/* ISSUE COUNT + FIX PLAN CTA */}
+      <div className="card p-6 mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+              We found <span className="font-bold">{allFindings.length}</span> issue{allFindings.length !== 1 ? 's' : ''} affecting your AI visibility
+              {highCount > 0 && <> · <span className="font-bold" style={{ color: '#EF4444' }}>{highCount} high priority</span></>}
             </p>
           </div>
+          {isAuthenticated && (
+            <button onClick={() => switchTab('fix-plan')} className="btn-primary px-5 py-2.5 text-sm font-medium inline-flex items-center gap-2 whitespace-nowrap">
+              {hasPaid ? 'See Your Fix Plan' : 'Unlock Fix Plan — $50'} <ArrowRight className="w-4 h-4" />
+            </button>
+          )}
         </div>
-      )}
-      {!isAuthenticated && audit.summary && (
-        <div className="card p-4 mb-6">
-          <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>{audit.summary}</p>
+      </div>
+
+      {/* PROJECTED IMPROVEMENT — paid only */}
+      {isAuthenticated && hasPaid && allFindings.length > 0 && (() => {
+        const severityOrder: Record<string, number> = { high: 0, medium: 1, low: 2 };
+        const effortOrder: Record<string, number> = { easy: 0, medium: 1, harder: 2 };
+        const top5 = [...allFindings]
+          .sort((a, b) => (severityOrder[a.severity] ?? 9) - (severityOrder[b.severity] ?? 9) || (effortOrder[a.effort] ?? 9) - (effortOrder[b.effort] ?? 9))
+          .slice(0, 5);
+        const impactMap: Record<string, number> = { high: 10, medium: 5, low: 2 };
+        const categoryBoosts: Record<string, number> = {};
+        for (const fix of top5) {
+          const pts = impactMap[fix.severity] || 3;
+          categoryBoosts[fix.category] = (categoryBoosts[fix.category] || 0) + pts;
+        }
+        const currentScores: Record<string, number> = {
+          crawlability: audit.crawlability_score ?? 0, machine_readability: audit.machine_readability_score ?? 0,
+          commercial_clarity: audit.commercial_clarity_score ?? 0, trust_clarity: audit.trust_clarity_score ?? 0,
+        };
+        const projectedScores: Record<string, number> = { ...currentScores };
+        const improvements: { label: string; current: number; projected: number }[] = [];
+        for (const [cat, boost] of Object.entries(categoryBoosts)) {
+          const proj = Math.min(100, (currentScores[cat] ?? 0) + boost);
+          projectedScores[cat] = proj;
+          if (proj > (currentScores[cat] ?? 0)) improvements.push({ label: CATEGORY_LABELS[cat] || cat, current: currentScores[cat] ?? 0, projected: proj });
+        }
+        const weights: Record<string, number> = { crawlability: 0.3, machine_readability: 0.25, commercial_clarity: 0.3, trust_clarity: 0.15 };
+        const currentOverall = audit.overall_score ?? 0;
+        const projectedOverall = Math.min(100, Math.round(Object.entries(weights).reduce((sum, [cat, w]) => sum + (projectedScores[cat] ?? 0) * w, 0)));
+        if (projectedOverall <= currentOverall) return null;
+        return (
+          <div className="rounded-lg border p-4 mb-6" style={{ borderColor: 'rgba(16,185,129,0.2)', background: 'rgba(16,185,129,0.04)' }}>
+            <p className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: '#10B981' }}>Projected improvement from your top 5 fixes</p>
+            <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Overall:</span>
+                <span className="text-sm font-bold" style={{ color: getScoreColor(currentOverall), fontFamily: 'var(--font-mono)' }}>{scoreToGrade(currentOverall)}</span>
+                <ArrowRight className="w-3 h-3" style={{ color: 'var(--text-tertiary)' }} />
+                <span className="text-sm font-bold" style={{ color: '#10B981', fontFamily: 'var(--font-mono)' }}>{scoreToGrade(projectedOverall)}</span>
+              </div>
+              {improvements.map((imp) => (
+                <div key={imp.label} className="flex items-center gap-1.5">
+                  <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>{imp.label}:</span>
+                  <span className="text-xs font-bold" style={{ color: getScoreColor(imp.current), fontFamily: 'var(--font-mono)' }}>{scoreToGrade(imp.current)}</span>
+                  <ArrowRight className="w-3 h-3" style={{ color: 'var(--text-tertiary)' }} />
+                  <span className="text-xs font-bold" style={{ color: '#10B981', fontFamily: 'var(--font-mono)' }}>{scoreToGrade(imp.projected)}</span>
+                </div>
+              ))}
+            </div>
+            <p className="text-xs mt-2" style={{ color: 'var(--text-tertiary)' }}>Estimates based on issue severity. Actual improvement may vary.</p>
+          </div>
+        );
+      })()}
+
+      {/* COMPETITOR BENCHMARK — paid only, on Overview */}
+      {isAuthenticated && hasPaid && growthData && growthData.competitors.length > 0 && (
+        <div className="card p-6 mb-6">
+          <div className="flex items-center gap-2 mb-2">
+            <Users className="w-5 h-5" style={{ color: '#6366F1' }} />
+            <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>Peer Benchmark</h2>
+          </div>
+          <p className="text-sm mb-4" style={{ color: 'var(--text-tertiary)' }}>How your AI visibility compares to likely competitors. Scores are AI-estimated.</p>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr style={{ background: 'var(--bg-tertiary)' }}>
+                  <th className="text-left py-3 px-4 font-medium" style={{ color: 'var(--text-tertiary)' }}>Site</th>
+                  <th className="text-center py-3 px-4 font-medium" style={{ color: 'var(--text-tertiary)' }}>Overall</th>
+                  <th className="text-center py-3 px-4 font-medium" style={{ color: 'var(--text-tertiary)' }}>Find</th>
+                  <th className="text-center py-3 px-4 font-medium" style={{ color: 'var(--text-tertiary)' }}>Explain</th>
+                  <th className="text-center py-3 px-4 font-medium" style={{ color: 'var(--text-tertiary)' }}>Buy</th>
+                  <th className="text-center py-3 px-4 font-medium" style={{ color: 'var(--text-tertiary)' }}>Trust</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr className="border-t" style={{ borderColor: 'var(--border)', background: 'rgba(99,102,241,0.04)' }}>
+                  <td className="py-3 px-4 font-semibold" style={{ color: '#6366F1' }}>{audit.site?.domain} (you)</td>
+                  {[growthData.yourScores.overall, growthData.yourScores.crawl, growthData.yourScores.read, growthData.yourScores.commercial, growthData.yourScores.trust].map((s, i) => (
+                    <td key={i} className="py-3 px-4 text-center font-bold" style={{ color: getScoreColor(s), fontFamily: 'var(--font-mono)' }}>{scoreToGrade(s)}</td>
+                  ))}
+                </tr>
+                {growthData.competitors.map((comp) => (
+                  <tr key={comp.domain} className="border-t" style={{ borderColor: 'var(--border)' }}>
+                    <td className="py-3 px-4" style={{ color: 'var(--text-primary)' }}>
+                      <span>{comp.domain}</span>
+                      {comp.rationale && <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>{comp.rationale}</p>}
+                    </td>
+                    {[comp.overall, comp.crawl, comp.read, comp.commercial, comp.trust].map((s, i) => {
+                      const yours = [growthData.yourScores.overall, growthData.yourScores.crawl, growthData.yourScores.read, growthData.yourScores.commercial, growthData.yourScores.trust][i];
+                      const ahead = s > yours;
+                      return (
+                        <td key={i} className="py-3 px-4 text-center" style={{ fontFamily: 'var(--font-mono)' }}>
+                          <span className="font-bold" style={{ color: getScoreColor(s) }}>{scoreToGrade(s)}</span>
+                          {ahead && <span className="text-xs ml-1" style={{ color: '#EF4444' }}>▲</span>}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="text-xs mt-3" style={{ color: 'var(--text-tertiary)' }}>Competitor scores are AI-estimated based on public knowledge. ▲ = competitor scores higher.</p>
         </div>
       )}
 
-      {/* 4. KEY PAGES STATUS (vertical-aware) */}
+      {/* KEY PAGES STATUS (vertical-aware) */}
       {isAuthenticated && (() => {
         const siteVertical = audit.site?.vertical || 'other';
         const expectedPages = getExpectedPages(siteVertical);
@@ -1163,15 +1026,13 @@ export default function AuditResultPage() {
               ))}
             </div>
           </div>
-
-          {/* 4b. MISSING PAGES BLUEPRINT — paid only */}
           {hasPaid && missingPages.length > 0 && (
             <div className="card p-6 mb-6">
               <div className="flex items-center gap-2 mb-1">
                 <FileText className="w-5 h-5" style={{ color: '#F59E0B' }} />
                 <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>Pages Your {verticalConfig.label} Site Needs</h2>
               </div>
-              <p className="text-sm mb-4" style={{ color: 'var(--text-tertiary)' }}>{missingPages.length} key page{missingPages.length !== 1 ? 's are' : ' is'} missing. Here&apos;s why each matters and what to include.</p>
+              <p className="text-sm mb-4" style={{ color: 'var(--text-tertiary)' }}>{missingPages.length} key page{missingPages.length !== 1 ? 's are' : ' is'} missing.</p>
               <div className="space-y-3">
                 {missingPages.slice(0, showAllMissing ? undefined : 3).map((mp) => {
                   const detail = getKeyPageDetail(mp.type, audit.site?.domain || 'example.com');
@@ -1185,8 +1046,8 @@ export default function AuditResultPage() {
                           </div>
                           <p className="text-xs mb-2" style={{ color: 'var(--text-secondary)' }}>{mp.why}</p>
                           <div className="flex flex-wrap gap-1.5">
-                            {detail.whatToInclude.slice(0, 3).map((item, i) => (
-                              <span key={i} className="text-xs px-2 py-0.5 rounded" style={{ color: 'var(--text-tertiary)', background: 'var(--bg-tertiary)' }}>{item}</span>
+                            {detail.whatToInclude.slice(0, 3).map((item, idx) => (
+                              <span key={idx} className="text-xs px-2 py-0.5 rounded" style={{ color: 'var(--text-tertiary)', background: 'var(--bg-tertiary)' }}>{item}</span>
                             ))}
                           </div>
                         </div>
@@ -1199,13 +1060,11 @@ export default function AuditResultPage() {
                 })}
                 {missingPages.length > 3 && !showAllMissing && (
                   <button onClick={() => setShowAllMissing(true)} className="text-xs font-medium flex items-center gap-1" style={{ color: '#6366F1' }}>
-                    <ChevronDown className="w-3.5 h-3.5" />Show {missingPages.length - 3} more missing page{missingPages.length - 3 !== 1 ? 's' : ''}
+                    <ChevronDown className="w-3.5 h-3.5" />Show {missingPages.length - 3} more
                   </button>
                 )}
                 {missingPages.length > 3 && showAllMissing && (
-                  <button onClick={() => setShowAllMissing(false)} className="text-xs font-medium flex items-center gap-1" style={{ color: '#6366F1' }}>
-                    Show fewer
-                  </button>
+                  <button onClick={() => setShowAllMissing(false)} className="text-xs font-medium flex items-center gap-1" style={{ color: '#6366F1' }}>Show fewer</button>
                 )}
               </div>
             </div>
@@ -1233,24 +1092,21 @@ export default function AuditResultPage() {
                       <span className="inline-flex items-center gap-1 text-sm font-semibold text-red-500 px-2 py-1 rounded" style={{ background: 'rgba(239,68,68,0.1)' }}><XCircle className="w-4 h-4" />Not Found</span>
                     )}
                   </div>
-
                   <div className="rounded-lg p-4 mb-4 border" style={{ borderColor: 'rgba(245,158,11,0.2)', background: 'rgba(245,158,11,0.05)' }}>
                     <p className="text-xs font-semibold mb-1" style={{ color: '#F59E0B' }}>Why This Page Matters for AI</p>
                     <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>{detail.whyItMatters}</p>
                   </div>
-
                   <div className="mb-4">
                     <p className="text-xs font-semibold mb-2" style={{ color: 'var(--text-primary)' }}>What This Page Should Include</p>
                     <div className="space-y-1.5">
-                      {detail.whatToInclude.map((item, i) => (
-                        <div key={i} className="flex items-start gap-2">
+                      {detail.whatToInclude.map((detailItem, idx) => (
+                        <div key={idx} className="flex items-start gap-2">
                           <CheckCircle className="w-3.5 h-3.5 mt-0.5 shrink-0" style={{ color: '#6366F1' }} />
-                          <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{item}</span>
+                          <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{detailItem}</span>
                         </div>
                       ))}
                     </div>
                   </div>
-
                   <div>
                     <div className="flex items-center justify-between mb-2">
                       <p className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>Recommended Code</p>
@@ -1260,7 +1116,6 @@ export default function AuditResultPage() {
                       <pre className="text-xs leading-relaxed whitespace-pre-wrap" style={{ color: '#E2E8F0', fontFamily: 'var(--font-mono)' }}>{detail.exampleCode}</pre>
                     </div>
                   </div>
-
                   {selectedKeyPage.found && selectedKeyPage.url && (
                     <div className="mt-4">
                       <a href={selectedKeyPage.url} target="_blank" rel="noopener" className="text-sm inline-flex items-center gap-1" style={{ color: '#6366F1' }}>
@@ -1275,9 +1130,226 @@ export default function AuditResultPage() {
         </>
       )}
 
-      {/* 5. AI SOURCE VISIBILITY */}
-      {isAuthenticated && crawlerStatuses && crawlerStatuses.length > 0 && (() => {
-        // Group 10 bots into 5 platforms
+      </>)}
+
+      {/* ===== FIX PLAN TAB ===== */}
+      {isAuthenticated && activeTab === 'fix-plan' && !hasPaid && (
+        <LockedSection
+          title="Your Fix Plan"
+          description={`We found ${allFindings.length} improvements for your AI visibility. Unlock to see your prioritized fix plan with code snippets and action items.`}
+          onCheckout={() => handleCheckout('initial_scan')}
+          loading={checkoutLoading}
+        />
+      )}
+      {isAuthenticated && activeTab === 'fix-plan' && hasPaid && (<>
+
+      {/* FIX PLAN HEADER — changes since last scan */}
+      {auditDelta && (
+        <div className="flex flex-wrap items-center gap-3 mb-4 p-3 rounded-lg" style={{ background: 'var(--bg-tertiary)' }}>
+          <span className="text-xs font-medium" style={{ color: 'var(--text-tertiary)' }}>Since last scan:</span>
+          <span className="text-xs font-bold" style={{ color: auditDelta.overallDelta > 0 ? '#10B981' : auditDelta.overallDelta < 0 ? '#EF4444' : 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>
+            {auditDelta.overallDelta > 0 ? '+' : ''}{auditDelta.overallDelta} overall
+          </span>
+          {auditDelta.newFindings.length > 0 && <span className="text-xs px-1.5 py-0.5 rounded font-medium" style={{ color: '#3B82F6', background: 'rgba(59,130,246,0.1)' }}>{auditDelta.newFindings.length} new</span>}
+          {auditDelta.resolvedFindings.length > 0 && <span className="text-xs px-1.5 py-0.5 rounded font-medium" style={{ color: '#10B981', background: 'rgba(16,185,129,0.1)' }}>{auditDelta.resolvedFindings.length} resolved</span>}
+          {auditDelta.regressedFindings.length > 0 && <span className="text-xs px-1.5 py-0.5 rounded font-medium" style={{ color: '#EF4444', background: 'rgba(239,68,68,0.1)' }}>{auditDelta.regressedFindings.length} regressed</span>}
+        </div>
+      )}
+
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>Fix Plan</h2>
+        <div className="flex items-center gap-3 text-xs">
+          <span style={{ color: 'var(--text-tertiary)' }}>{allFindings.length} improvements</span>
+          {highCount > 0 && <span className="px-2 py-0.5 rounded font-medium" style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444' }}>{highCount} high</span>}
+        </div>
+      </div>
+
+      {/* TOP 5 FIXES */}
+      {allFindings.length > 0 && (() => {
+        const severityOrder: Record<string, number> = { high: 0, medium: 1, low: 2 };
+        const effortOrder: Record<string, number> = { easy: 0, medium: 1, harder: 2 };
+        const top5 = [...allFindings]
+          .sort((a, b) => (severityOrder[a.severity] ?? 9) - (severityOrder[b.severity] ?? 9) || (effortOrder[a.effort] ?? 9) - (effortOrder[b.effort] ?? 9))
+          .slice(0, 5);
+        const impactMap: Record<string, number> = { high: 10, medium: 5, low: 2 };
+        const fixImpacts = top5.map(fix => ({ id: fix.id, points: impactMap[fix.severity] || 3, category: fix.category }));
+        return (
+          <div className="card p-6 mb-6">
+            <div className="flex items-center gap-2 mb-1">
+              <Wrench className="w-5 h-5" style={{ color: '#6366F1' }} />
+              <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>Top 5 Fixes</h2>
+            </div>
+            <p className="text-sm mb-4" style={{ color: 'var(--text-tertiary)' }}>Highest-impact improvements, sorted by priority.</p>
+            <div className="space-y-3">
+              {top5.map((fix, i) => {
+                const owner = getFixOwner(fix.title, fix.category);
+                const impact = fixImpacts.find(f => f.id === fix.id);
+                return (
+                  <div key={fix.id} className="flex gap-3 p-3 rounded-lg border" style={{ background: 'var(--bg-tertiary)', borderColor: 'var(--border)' }}>
+                    <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 text-sm font-bold" style={{ background: 'rgba(99,102,241,0.1)', color: '#6366F1' }}>{i + 1}</div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{fix.title}</p>
+                      <p className="text-xs mt-0.5 line-clamp-1" style={{ color: 'var(--text-secondary)' }}>{fix.why}</p>
+                      <div className="flex items-center gap-2 mt-2 flex-wrap">
+                        <SeverityBadge severity={fix.severity} />
+                        <EffortBadge effort={fix.effort} />
+                        <span className="text-xs px-1.5 py-0.5 rounded font-medium" style={{ color: owner.color, background: `${owner.color}15` }}>{owner.label}</span>
+                        {impact && <span className="text-xs px-1.5 py-0.5 rounded font-medium" style={{ color: '#10B981', background: 'rgba(16,185,129,0.1)' }}>+{impact.points} {CATEGORY_LABELS[impact.category] || impact.category}</span>}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* WHAT TO DO THIS MONTH */}
+      {monthlyActions && (monthlyActions.quickWins.length > 0 || monthlyActions.mediumEffort.length > 0 || monthlyActions.strategic.length > 0) && (
+        <div className="card p-6 mb-6">
+          <div className="flex items-center gap-2 mb-1">
+            <CalendarCheck className="w-5 h-5" style={{ color: '#6366F1' }} />
+            <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>What to Do This Month</h2>
+          </div>
+          <div className="space-y-4 mt-3">
+            {monthlyActions.quickWins.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: '#10B981' }}>Quick Wins</p>
+                <div className="space-y-2">
+                  {monthlyActions.quickWins.map((f) => (
+                    <div key={f.id} className="flex items-center gap-3 p-2.5 rounded-lg" style={{ background: 'var(--bg-tertiary)' }}>
+                      <Zap className="w-4 h-4 shrink-0" style={{ color: '#10B981' }} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>{f.title}</p>
+                      </div>
+                      <SeverityBadge severity={f.severity} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {monthlyActions.mediumEffort.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: '#F59E0B' }}>Medium Effort</p>
+                <div className="space-y-2">
+                  {monthlyActions.mediumEffort.map((f) => (
+                    <div key={f.id} className="flex items-center gap-3 p-2.5 rounded-lg" style={{ background: 'var(--bg-tertiary)' }}>
+                      <Wrench className="w-4 h-4 shrink-0" style={{ color: '#F59E0B' }} />
+                      <div className="flex-1 min-w-0"><p className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>{f.title}</p></div>
+                      <SeverityBadge severity={f.severity} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {monthlyActions.strategic.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: '#6366F1' }}>Strategic</p>
+                <div className="space-y-2">
+                  {monthlyActions.strategic.map((f) => (
+                    <div key={f.id} className="flex items-center gap-3 p-2.5 rounded-lg" style={{ background: 'var(--bg-tertiary)' }}>
+                      <Target className="w-4 h-4 shrink-0" style={{ color: '#6366F1' }} />
+                      <div className="flex-1 min-w-0"><p className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>{f.title}</p></div>
+                      <SeverityBadge severity={f.severity} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ALL FINDINGS — view toggle */}
+      <div className="mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+          <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>All Findings</h2>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1 rounded-lg p-0.5" style={{ background: 'var(--bg-tertiary)' }}>
+              {(['category', 'priority', 'page'] as ViewMode[]).map((mode) => (
+                <button key={mode} onClick={() => setViewMode(mode)} className="px-3 py-1.5 text-sm font-medium rounded-md transition-colors" style={{ background: viewMode === mode ? 'var(--surface)' : 'transparent', color: viewMode === mode ? 'var(--text-primary)' : 'var(--text-tertiary)', boxShadow: viewMode === mode ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}>
+                  {mode === 'category' ? 'By Category' : mode === 'priority' ? 'By Priority' : 'By Page'}
+                </button>
+              ))}
+            </div>
+            <div className="flex items-center gap-2">
+              <Filter className="w-4 h-4" style={{ color: 'var(--text-tertiary)' }} />
+              <select value={severityFilter} onChange={(e) => setSeverityFilter(e.target.value as SeverityFilter)} className="text-sm rounded-lg px-3 py-1.5" style={{ background: 'var(--surface)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}>
+                <option value="all">All severities</option><option value="high">High only</option><option value="medium">Medium only</option><option value="low">Low only</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        {viewMode === 'category' && (
+          <div className="space-y-3">
+            {Array.from(findingsByCategory.entries()).map(([cat, catFindings]) => {
+              const isExp = expandedCategories.has(cat);
+              const cs = cat === 'crawlability' ? audit.crawlability_score : cat === 'machine_readability' ? audit.machine_readability_score : cat === 'commercial_clarity' ? audit.commercial_clarity_score : audit.trust_clarity_score;
+              const catHigh = catFindings.filter(f => f.severity === 'high').length;
+              return (
+                <div key={cat} className="rounded-xl border overflow-hidden" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
+                  <button onClick={() => toggleCategory(cat)} className="w-full flex items-center justify-between p-4 transition-colors text-left">
+                    <div className="flex items-center gap-3">
+                      {isExp ? <ChevronDown className="w-4 h-4 shrink-0" style={{ color: 'var(--text-tertiary)' }} /> : <ChevronRight className="w-4 h-4 shrink-0" style={{ color: 'var(--text-tertiary)' }} />}
+                      <div>
+                        <p className="font-semibold" style={{ color: 'var(--text-primary)' }}>{CATEGORY_LABELS[cat] || cat}</p>
+                        <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>{CATEGORY_DESCRIPTIONS[cat]}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3 shrink-0">
+                      {catHigh > 0 && <span className="text-xs px-1.5 py-0.5 rounded font-medium" style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444' }}>{catHigh} high</span>}
+                      <span className="text-sm font-bold" style={{ color: getScoreColor(cs ?? 0), fontFamily: 'var(--font-mono)' }}>{scoreToGrade(cs ?? 0)}</span>
+                      <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>{catFindings.length} issue{catFindings.length !== 1 ? 's' : ''}</span>
+                    </div>
+                  </button>
+                  {isExp && <div className="border-t p-4 space-y-3" style={{ borderColor: 'var(--border)' }}>{catFindings.map((f, i) => renderFindingCard(f, i))}</div>}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {viewMode === 'priority' && (
+          <div className="space-y-4">
+            {[...filteredFindings].sort((a, b) => { const s: Record<string, number> = { high: 0, medium: 1, low: 2 }; return (s[a.severity] - s[b.severity]) || (a.priorityOrder - b.priorityOrder); }).map((finding, i) => renderFindingCard(finding, i))}
+          </div>
+        )}
+
+        {viewMode === 'page' && (
+          <div className="space-y-3">
+            {Array.from(findingsByPage.entries()).map(([url, pageFindings]) => {
+              const isExp = expandedPages.has(url);
+              const page = pages.find(p => p.url === url);
+              const isSW = url === '__site_wide__';
+              let pageName = isSW ? 'Site-wide issues' : url;
+              try { if (!isSW) pageName = page?.title || new URL(url).pathname || url; } catch { /* skip */ }
+              return (
+                <div key={url} className="rounded-xl border overflow-hidden" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
+                  <button onClick={() => togglePage(url)} className="w-full flex items-center justify-between p-4 transition-colors text-left">
+                    <div className="flex items-center gap-3 min-w-0">
+                      {isExp ? <ChevronDown className="w-4 h-4 shrink-0" style={{ color: 'var(--text-tertiary)' }} /> : <ChevronRight className="w-4 h-4 shrink-0" style={{ color: 'var(--text-tertiary)' }} />}
+                      <div className="min-w-0">
+                        <p className="font-medium truncate" style={{ color: 'var(--text-primary)' }}>{pageName}</p>
+                        {!isSW && page && <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}><span className="capitalize">{page.page_type}</span>{page.word_count ? ` · ${page.word_count} words` : ''}</p>}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {pageFindings.filter(f => f.severity === 'high').length > 0 && <span className="text-xs px-1.5 py-0.5 rounded font-medium" style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444' }}>{pageFindings.filter(f => f.severity === 'high').length} high</span>}
+                      <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>{pageFindings.length} issue{pageFindings.length !== 1 ? 's' : ''}</span>
+                    </div>
+                  </button>
+                  {isExp && <div className="border-t p-4 space-y-3" style={{ borderColor: 'var(--border)' }}>{pageFindings.map(f => renderFindingCard(f))}</div>}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* AI BOT ACCESS STATUS */}
+      {crawlerStatuses && crawlerStatuses.length > 0 && (() => {
         const platformDefs = [
           { id: 'chatgpt', name: 'ChatGPT / OpenAI', question: 'Can people find you through ChatGPT?', bots: ['GPTBot', 'ChatGPT-User'] },
           { id: 'google', name: 'Google AI / Gemini', question: 'Does Google AI reference your content?', bots: ['Google-Extended'] },
@@ -1285,7 +1357,6 @@ export default function AuditResultPage() {
           { id: 'perplexity', name: 'Perplexity', question: 'Do you show up in Perplexity search?', bots: ['PerplexityBot'] },
           { id: 'others', name: 'Other AI Systems', question: 'Are other AI crawlers allowed?', bots: ['CCBot', 'Amazonbot', 'Meta-ExternalAgent', 'Bytespider'] },
         ];
-
         const platforms = platformDefs.map((pd) => {
           const bots = pd.bots.map(name => crawlerStatuses.find(c => c.name === name)).filter(Boolean) as CrawlerStatus[];
           const allowedCount = bots.filter(b => b.status === 'allowed').length;
@@ -1296,58 +1367,50 @@ export default function AuditResultPage() {
           const allRecs = Array.from(new Set(bots.flatMap(b => b.recommendations)));
           return { ...pd, bots, status: bestStatus, readiness: avgReadiness, barriers: allBarriers, recommendations: allRecs, allowedCount, totalCount: bots.length };
         });
-
         return (
-        <div className="card p-6 mb-6">
-          <div className="flex items-center gap-2 mb-2">
-            <Shield className="w-5 h-5" style={{ color: '#6366F1' }} />
-            <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>AI Source Visibility</h2>
-          </div>
-          <p className="text-sm mb-4" style={{ color: 'var(--text-tertiary)' }}>Which AI systems can access your site and recommend your business?{hasPaid ? ' Click any to learn more.' : ''}</p>
-          <div className="space-y-2">
-            {platforms.map((p) => {
-              const isExp = hasPaid && expandedCrawlers.has(p.id);
-              const readColor = getScoreColor(p.readiness);
-              return (
-                <div key={p.id} className="rounded-xl border overflow-hidden" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
-                  <button onClick={() => hasPaid && toggleCrawler(p.id)} className="w-full flex items-center justify-between p-4 text-left transition-colors" style={{ background: isExp ? 'var(--bg-tertiary)' : 'transparent', cursor: hasPaid ? 'pointer' : 'default' }}>
-                    <div className="flex items-center gap-3 min-w-0">
-                      {hasPaid && (isExp ? <ChevronDown className="w-4 h-4 shrink-0" style={{ color: 'var(--text-tertiary)' }} /> : <ChevronRight className="w-4 h-4 shrink-0" style={{ color: 'var(--text-tertiary)' }} />)}
-                      <div className="min-w-0">
-                        <span className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>{p.name}</span>
-                        <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>{p.question}</p>
+          <div className="card p-6 mb-6">
+            <div className="flex items-center gap-2 mb-2">
+              <Shield className="w-5 h-5" style={{ color: '#6366F1' }} />
+              <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>AI Bot Access Status</h2>
+            </div>
+            <p className="text-sm mb-4" style={{ color: 'var(--text-tertiary)' }}>Which AI systems can access your site? Click any to learn more.</p>
+            <div className="space-y-2">
+              {platforms.map((p) => {
+                const isExp = expandedCrawlers.has(p.id);
+                const readColor = getScoreColor(p.readiness);
+                return (
+                  <div key={p.id} className="rounded-xl border overflow-hidden" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
+                    <button onClick={() => toggleCrawler(p.id)} className="w-full flex items-center justify-between p-4 text-left transition-colors" style={{ background: isExp ? 'var(--bg-tertiary)' : 'transparent' }}>
+                      <div className="flex items-center gap-3 min-w-0">
+                        {isExp ? <ChevronDown className="w-4 h-4 shrink-0" style={{ color: 'var(--text-tertiary)' }} /> : <ChevronRight className="w-4 h-4 shrink-0" style={{ color: 'var(--text-tertiary)' }} />}
+                        <div className="min-w-0">
+                          <span className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>{p.name}</span>
+                          <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>{p.question}</p>
+                        </div>
                       </div>
-                    </div>
-                    <div className="flex items-center gap-3 shrink-0">
-                      {p.id === 'others' ? (
-                        <span className="text-xs font-semibold" style={{ color: p.allowedCount === p.totalCount ? '#10B981' : p.allowedCount > 0 ? '#F59E0B' : '#EF4444' }}>{p.allowedCount}/{p.totalCount} allowed</span>
-                      ) : (
-                        <>
-                          {p.status === 'allowed' && <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-500"><CheckCircle className="w-3.5 h-3.5" />Allowed</span>}
-                          {p.status === 'blocked' && <span className="inline-flex items-center gap-1 text-xs font-semibold text-red-500"><XCircle className="w-3.5 h-3.5" />Blocked</span>}
-                          {p.status === 'mixed' && <span className="inline-flex items-center gap-1 text-xs font-semibold" style={{ color: '#F59E0B' }}>Mixed</span>}
-                          {p.status === 'no_rule' && <span className="inline-flex items-center gap-1 text-xs font-semibold" style={{ color: 'var(--text-tertiary)' }}><Minus className="w-3.5 h-3.5" />No Rule</span>}
-                        </>
-                      )}
-                      {hasPaid && (
+                      <div className="flex items-center gap-3 shrink-0">
+                        {p.id === 'others' ? (
+                          <span className="text-xs font-semibold" style={{ color: p.allowedCount === p.totalCount ? '#10B981' : p.allowedCount > 0 ? '#F59E0B' : '#EF4444' }}>{p.allowedCount}/{p.totalCount} allowed</span>
+                        ) : (
+                          <>
+                            {p.status === 'allowed' && <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-500"><CheckCircle className="w-3.5 h-3.5" />Allowed</span>}
+                            {p.status === 'blocked' && <span className="inline-flex items-center gap-1 text-xs font-semibold text-red-500"><XCircle className="w-3.5 h-3.5" />Blocked</span>}
+                            {p.status === 'mixed' && <span className="text-xs font-semibold" style={{ color: '#F59E0B' }}>Mixed</span>}
+                            {p.status === 'no_rule' && <span className="inline-flex items-center gap-1 text-xs font-semibold" style={{ color: 'var(--text-tertiary)' }}><Minus className="w-3.5 h-3.5" />No Rule</span>}
+                          </>
+                        )}
                         <div className="flex items-center gap-1.5 ml-2">
                           <div className="w-12 h-1.5 rounded-full" style={{ background: 'var(--bg-tertiary)' }}>
                             <div className="h-full rounded-full" style={{ width: `${p.readiness}%`, background: readColor }} />
                           </div>
                           <span className="text-xs font-bold w-7 text-right" style={{ color: readColor, fontFamily: 'var(--font-mono)' }}>{scoreToGrade(p.readiness)}</span>
                         </div>
-                      )}
-                    </div>
-                  </button>
-
-                  {/* Expanded detail — individual bots */}
-                  {isExp && (
-                    <div className="border-t p-4 space-y-4" style={{ borderColor: 'var(--border)' }}>
-                      {/* Individual bot statuses */}
-                      <div className="space-y-2">
-                        {p.bots.map((bot) => {
-                          const botReadColor = getScoreColor(bot.readinessScore);
-                          return (
+                      </div>
+                    </button>
+                    {isExp && (
+                      <div className="border-t p-4 space-y-4" style={{ borderColor: 'var(--border)' }}>
+                        <div className="space-y-2">
+                          {p.bots.map((bot) => (
                             <div key={bot.name} className="flex items-center justify-between p-2.5 rounded-lg" style={{ background: 'var(--bg-tertiary)' }}>
                               <div className="flex items-center gap-2 min-w-0">
                                 <span className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>{bot.displayName}</span>
@@ -1357,53 +1420,39 @@ export default function AuditResultPage() {
                                 {bot.status === 'allowed' && <span className="text-xs font-semibold text-emerald-500">Allowed</span>}
                                 {bot.status === 'blocked' && <span className="text-xs font-semibold text-red-500">Blocked</span>}
                                 {bot.status === 'no_rule' && <span className="text-xs font-semibold" style={{ color: 'var(--text-tertiary)' }}>No Rule</span>}
-                                <span className="text-xs font-bold" style={{ color: botReadColor, fontFamily: 'var(--font-mono)' }}>{scoreToGrade(bot.readinessScore)}</span>
+                                <span className="text-xs font-bold" style={{ color: getScoreColor(bot.readinessScore), fontFamily: 'var(--font-mono)' }}>{scoreToGrade(bot.readinessScore)}</span>
                               </div>
                             </div>
-                          );
-                        })}
-                      </div>
-
-                      {/* Platform barriers */}
-                      {p.barriers.length > 0 && (
-                        <div>
-                          <p className="text-xs font-medium mb-1.5" style={{ color: 'var(--text-tertiary)' }}>Barriers:</p>
-                          <div className="space-y-1">
+                          ))}
+                        </div>
+                        {p.barriers.length > 0 && (
+                          <div>
+                            <p className="text-xs font-medium mb-1.5" style={{ color: 'var(--text-tertiary)' }}>Barriers:</p>
                             {p.barriers.map((b, i) => (
-                              <div key={i} className="flex items-start gap-1.5">
-                                <XCircle className="w-3 h-3 mt-0.5 shrink-0 text-red-400" />
-                                <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{b}</span>
-                              </div>
+                              <div key={i} className="flex items-start gap-1.5"><XCircle className="w-3 h-3 mt-0.5 shrink-0 text-red-400" /><span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{b}</span></div>
                             ))}
                           </div>
-                        </div>
-                      )}
-
-                      {/* Platform recommendations */}
-                      {p.recommendations.length > 0 && (
-                        <div>
-                          <p className="text-xs font-medium mb-1.5" style={{ color: 'var(--text-tertiary)' }}>Recommendations:</p>
-                          <div className="space-y-1">
+                        )}
+                        {p.recommendations.length > 0 && (
+                          <div>
+                            <p className="text-xs font-medium mb-1.5" style={{ color: 'var(--text-tertiary)' }}>Recommendations:</p>
                             {p.recommendations.map((r, i) => (
-                              <div key={i} className="flex items-start gap-1.5">
-                                <Zap className="w-3 h-3 mt-0.5 shrink-0" style={{ color: '#6366F1' }} />
-                                <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{r}</span>
-                              </div>
+                              <div key={i} className="flex items-start gap-1.5"><Zap className="w-3 h-3 mt-0.5 shrink-0" style={{ color: '#6366F1' }} /><span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{r}</span></div>
                             ))}
                           </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
-        </div>
         );
       })()}
 
       </>)}
+
 
       {/* ===== AI PERCEPTION TAB ===== */}
       {isAuthenticated && activeTab === 'ai-perception' && !hasPaid && (
@@ -1578,336 +1627,7 @@ export default function AuditResultPage() {
         </>
       )}
 
-      {/* ===== FINDINGS & FIXES TAB ===== */}
-      {(!isAuthenticated || activeTab === 'findings') && (
-      <>
-      {/* 7. DETAILED FINDINGS */}
-      <div className="mb-6">
-        <div className="flex items-center justify-between mb-2">
-          <h2 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>{isAuthenticated ? 'Findings & Fixes' : 'Top Recommendations'}</h2>
-          <div className="flex items-center gap-3 text-xs">
-            {highCount > 0 && <span className="px-2 py-0.5 rounded font-medium" style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444', border: '1px solid rgba(239,68,68,0.2)' }}>{highCount} high</span>}
-            {medCount > 0 && <span className="px-2 py-0.5 rounded font-medium" style={{ background: 'rgba(245,158,11,0.1)', color: '#F59E0B', border: '1px solid rgba(245,158,11,0.2)' }}>{medCount} medium</span>}
-            {lowCount > 0 && <span className="px-2 py-0.5 rounded font-medium" style={{ background: 'rgba(99,102,241,0.1)', color: '#6366F1', border: '1px solid rgba(99,102,241,0.2)' }}>{lowCount} low</span>}
-          </div>
-        </div>
 
-        {/* View toggle and filters */}
-        {isAuthenticated && (
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
-            <div className="flex items-center gap-1 rounded-lg p-0.5" style={{ background: 'var(--bg-tertiary)' }}>
-              {(['category', 'priority', 'page'] as ViewMode[]).map((mode) => (
-                <button key={mode} onClick={() => setViewMode(mode)} className="px-3 py-1.5 text-sm font-medium rounded-md transition-colors" style={{ background: viewMode === mode ? 'var(--surface)' : 'transparent', color: viewMode === mode ? 'var(--text-primary)' : 'var(--text-tertiary)', boxShadow: viewMode === mode ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}>
-                  {mode === 'category' ? 'By Category' : mode === 'priority' ? 'By Priority' : 'By Page'}
-                </button>
-              ))}
-            </div>
-            <div className="flex items-center gap-2">
-              <Filter className="w-4 h-4" style={{ color: 'var(--text-tertiary)' }} />
-              <select value={severityFilter} onChange={(e) => setSeverityFilter(e.target.value as SeverityFilter)} className="text-sm rounded-lg px-3 py-1.5" style={{ background: 'var(--surface)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}>
-                <option value="all">All severities</option>
-                <option value="high">High only</option>
-                <option value="medium">Medium only</option>
-                <option value="low">Low only</option>
-              </select>
-            </div>
-          </div>
-        )}
-
-        {/* Category view (default for authenticated) */}
-        {isAuthenticated && viewMode === 'category' && (
-          <div className="space-y-3">
-            {Array.from(findingsByCategory.entries()).map(([cat, catFindings]) => {
-              const isExp = expandedCategories.has(cat);
-              const cs = cat === 'crawlability' ? audit.crawlability_score : cat === 'machine_readability' ? audit.machine_readability_score : cat === 'commercial_clarity' ? audit.commercial_clarity_score : audit.trust_clarity_score;
-              const catHigh = catFindings.filter(f => f.severity === 'high').length;
-              return (
-                <div key={cat} className="rounded-xl border overflow-hidden" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
-                  <button onClick={() => toggleCategory(cat)} className="w-full flex items-center justify-between p-4 transition-colors text-left">
-                    <div className="flex items-center gap-3">
-                      {isExp ? <ChevronDown className="w-4 h-4 shrink-0" style={{ color: 'var(--text-tertiary)' }} /> : <ChevronRight className="w-4 h-4 shrink-0" style={{ color: 'var(--text-tertiary)' }} />}
-                      <div>
-                        <p className="font-semibold" style={{ color: 'var(--text-primary)' }}>{CATEGORY_LABELS[cat] || cat}</p>
-                        <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>{CATEGORY_DESCRIPTIONS[cat]}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3 shrink-0">
-                      {catHigh > 0 && <span className="text-xs px-1.5 py-0.5 rounded font-medium" style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444' }}>{catHigh} high</span>}
-                      <span className="text-sm font-bold" style={{ color: getScoreColor(cs ?? 0), fontFamily: 'var(--font-mono)' }}>{scoreToGrade(cs ?? 0)}</span>
-                      <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>{catFindings.length} issue{catFindings.length !== 1 ? 's' : ''}</span>
-                    </div>
-                  </button>
-                  {isExp && <div className="border-t p-4 space-y-3" style={{ borderColor: 'var(--border)' }}>{catFindings.map((f, i) => renderFindingCard(f, i))}</div>}
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        {/* Priority view */}
-        {(!isAuthenticated || viewMode === 'priority') && (
-          <div className="space-y-4">
-            {(isAuthenticated ? [...filteredFindings].sort((a, b) => { const s: Record<string, number> = { high: 0, medium: 1, low: 2 }; return (s[a.severity] - s[b.severity]) || (a.priorityOrder - b.priorityOrder); }) : visibleRecs.map((rec, i) => ({ id: rec.id, title: rec.title, why: rec.why_it_matters, fix: rec.recommended_fix, codeSnippet: generateCodeSnippet(rec.title, audit.site?.domain || 'example.com'), severity: rec.severity as 'high' | 'medium' | 'low', effort: rec.effort as 'easy' | 'medium' | 'harder', category: rec.category, affectedUrls: [] as string[], priorityOrder: i }))).map((finding, i) => renderFindingCard(finding, i))}
-          </div>
-        )}
-
-        {/* Page view */}
-        {isAuthenticated && viewMode === 'page' && (
-          <div className="space-y-3">
-            {Array.from(findingsByPage.entries()).map(([url, pageFindings]) => {
-              const isExp = expandedPages.has(url);
-              const page = pages.find(p => p.url === url);
-              const isSW = url === '__site_wide__';
-              let name = isSW ? 'Site-wide issues' : url;
-              try { if (!isSW) name = page?.title || new URL(url).pathname || url; } catch {}
-              return (
-                <div key={url} className="rounded-xl border overflow-hidden" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
-                  <button onClick={() => togglePage(url)} className="w-full flex items-center justify-between p-4 transition-colors text-left">
-                    <div className="flex items-center gap-3 min-w-0">
-                      {isExp ? <ChevronDown className="w-4 h-4 shrink-0" style={{ color: 'var(--text-tertiary)' }} /> : <ChevronRight className="w-4 h-4 shrink-0" style={{ color: 'var(--text-tertiary)' }} />}
-                      <div className="min-w-0">
-                        <p className="font-medium truncate" style={{ color: 'var(--text-primary)' }}>{name}</p>
-                        {!isSW && page && <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}><span className="capitalize">{page.page_type}</span>{page.word_count ? ` · ${page.word_count} words` : ''}</p>}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      {pageFindings.filter(f => f.severity === 'high').length > 0 && <span className="text-xs px-1.5 py-0.5 rounded font-medium" style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444' }}>{pageFindings.filter(f => f.severity === 'high').length} high</span>}
-                      <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>{pageFindings.length} issue{pageFindings.length !== 1 ? 's' : ''}</span>
-                    </div>
-                  </button>
-                  {isExp && <div className="border-t p-4 space-y-3" style={{ borderColor: 'var(--border)' }}>{pageFindings.map(f => renderFindingCard(f))}</div>}
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        {/* Gate for unpaid users */}
-        {(!isAuthenticated || !hasPaid) && gatedCount > 0 && (
-          <div className="mt-6 relative">
-            <div className="rounded-xl border p-5 opacity-40 blur-[2px] pointer-events-none" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}><div className="flex items-start gap-3"><span className="flex items-center justify-center w-6 h-6 rounded-full text-xs font-semibold" style={{ background: 'var(--bg-tertiary)', color: 'var(--text-tertiary)' }}>{FREE_RECOMMENDATION_LIMIT + 1}</span><div><div className="h-4 w-64 rounded" style={{ background: 'var(--bg-tertiary)' }} /><div className="h-3 w-96 rounded mt-2" style={{ background: 'var(--bg-tertiary)' }} /></div></div></div>
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="rounded-xl border-2 p-6 text-center shadow-lg max-w-sm" style={{ background: 'var(--surface)', borderColor: 'rgba(99,102,241,0.3)' }}>
-                <Lock className="w-8 h-8 mx-auto" style={{ color: '#6366F1' }} />
-                <h3 className="mt-3 font-semibold" style={{ color: 'var(--text-primary)' }}>{gatedCount} more finding{gatedCount > 1 ? 's' : ''} available</h3>
-                <p className="mt-2 text-sm" style={{ color: 'var(--text-secondary)' }}>See all {allFindings.length} findings with fix instructions and code snippets.</p>
-                {isAuthenticated ? (
-                  <button onClick={() => handleCheckout('initial_scan')} disabled={checkoutLoading} className="mt-4 btn-primary inline-flex items-center gap-2 px-5 py-2.5 text-sm">
-                    {checkoutLoading ? 'Redirecting…' : '$50 — Unlock Full Report'} <ArrowRight className="w-4 h-4" />
-                  </button>
-                ) : (
-                  <a href={`/auth/signup?redirect=/audit/${audit.id}`} className="mt-4 btn-primary inline-flex items-center gap-2 px-5 py-2.5 text-sm">Sign Up to Unlock <ArrowRight className="w-4 h-4" /></a>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      </>
-      )}
-
-      {/* ===== GROWTH STRATEGY TAB ===== */}
-      {isAuthenticated && activeTab === 'growth' && !hasPaid && (
-        <LockedSection
-          title="Growth Strategy"
-          description="Get an AI-powered marketing strategy with competitor benchmarks, content recommendations, and a prioritized action plan."
-          onCheckout={() => handleCheckout('initial_scan')}
-          loading={checkoutLoading}
-        />
-      )}
-
-      {isAuthenticated && activeTab === 'growth' && hasPaid && (
-      <>
-      <div className="mb-6">
-        {growthLoading && (
-          <div className="card p-8 text-center">
-            <div className="animate-spin w-6 h-6 border-2 rounded-full mx-auto mb-3" style={{ borderColor: '#6366F1', borderTopColor: 'transparent' }} />
-            <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Identifying competitors and generating your growth strategy…</p>
-            <p className="text-xs mt-1" style={{ color: 'var(--text-tertiary)' }}>This may take 10-15 seconds</p>
-          </div>
-        )}
-
-        {!growthData && !growthLoading && (
-          <div className="card p-8 text-center">
-            <TrendingUp className="w-10 h-10 mx-auto mb-3" style={{ color: '#6366F1' }} />
-            <h3 className="font-semibold mb-2" style={{ color: 'var(--text-primary)' }}>AI Growth Strategy</h3>
-            <p className="text-sm mb-4 max-w-md mx-auto" style={{ color: 'var(--text-secondary)' }}>Get a competitive benchmark against 2 peer sites and an AI-powered marketing strategy tailored to your product.</p>
-            <button onClick={loadGrowthStrategy} className="btn-primary px-5 py-2.5 text-sm inline-flex items-center gap-2">
-              <TrendingUp className="w-4 h-4" />Generate Growth Strategy
-            </button>
-          </div>
-        )}
-
-        {growthData && (() => {
-          const FALLBACK_STRINGS = ['What is the best software tool', 'What is the best project management', 'What is the best analytics', 'solve problems with AI tools', 'small businesses in 2025', 'team collaboration in 2025'];
-          const isGenericFallback = growthData.marketingStrategy?.queries?.some((q: string) => FALLBACK_STRINGS.some(f => q.includes(f))) ?? false;
-          return (
-          <div className="space-y-6">
-            {/* Generic fallback warning */}
-            {isGenericFallback && (
-              <div className="card p-6 text-center">
-                <AlertTriangle className="w-8 h-8 mx-auto mb-2" style={{ color: '#F59E0B' }} />
-                <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Strategy is using generic recommendations</p>
-                <p className="text-xs mt-1 mb-4" style={{ color: 'var(--text-tertiary)' }}>AI-generated strategy was not fully tailored to your business. Regenerate to get personalized recommendations.</p>
-                <button onClick={async () => {
-                  setGrowthData(null);
-                  await fetch(`/api/audit/${params.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ growthData: null }) }).catch(() => {});
-                  loadGrowthStrategy();
-                }} className="btn-primary px-5 py-2 text-sm inline-flex items-center gap-2">
-                  <RefreshCw className="w-4 h-4" />Regenerate Strategy
-                </button>
-              </div>
-            )}
-
-            {/* Peer Benchmark — only if competitors exist */}
-            {growthData.competitors.length > 0 && (
-              <div className="card p-6">
-                <div className="flex items-center gap-2 mb-2">
-                  <Users className="w-5 h-5" style={{ color: '#6366F1' }} />
-                  <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>Peer Benchmark</h2>
-                </div>
-                <p className="text-sm mb-4" style={{ color: 'var(--text-tertiary)' }}>How your AI visibility compares to likely competitors. Competitor scores are AI-estimated based on public knowledge.</p>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr style={{ background: 'var(--bg-tertiary)' }}>
-                        <th className="text-left py-3 px-4 font-medium" style={{ color: 'var(--text-tertiary)' }}>Site</th>
-                        <th className="text-center py-3 px-4 font-medium" style={{ color: 'var(--text-tertiary)' }}>Overall</th>
-                        <th className="text-center py-3 px-4 font-medium" style={{ color: 'var(--text-tertiary)' }}>Find</th>
-                        <th className="text-center py-3 px-4 font-medium" style={{ color: 'var(--text-tertiary)' }}>Explain</th>
-                        <th className="text-center py-3 px-4 font-medium" style={{ color: 'var(--text-tertiary)' }}>Buy</th>
-                        <th className="text-center py-3 px-4 font-medium" style={{ color: 'var(--text-tertiary)' }}>Trust</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr className="border-t" style={{ borderColor: 'var(--border)', background: 'rgba(99,102,241,0.04)' }}>
-                        <td className="py-3 px-4 font-semibold" style={{ color: '#6366F1' }}>{audit.site?.domain} (you)</td>
-                        {[growthData.yourScores.overall, growthData.yourScores.crawl, growthData.yourScores.read, growthData.yourScores.commercial, growthData.yourScores.trust].map((s, i) => (
-                          <td key={i} className="py-3 px-4 text-center font-bold" style={{ color: getScoreColor(s), fontFamily: 'var(--font-mono)' }}>{scoreToGrade(s)}</td>
-                        ))}
-                      </tr>
-                      {growthData.competitors.map((comp) => (
-                        <tr key={comp.domain} className="border-t" style={{ borderColor: 'var(--border)' }}>
-                          <td className="py-3 px-4" style={{ color: 'var(--text-primary)' }}>
-                            <span>{comp.domain}</span>
-                            {comp.rationale && <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>{comp.rationale}</p>}
-                          </td>
-                          {[comp.overall, comp.crawl, comp.read, comp.commercial, comp.trust].map((s, i) => {
-                            const yours = [growthData.yourScores.overall, growthData.yourScores.crawl, growthData.yourScores.read, growthData.yourScores.commercial, growthData.yourScores.trust][i];
-                            const ahead = s > yours;
-                            return (
-                              <td key={i} className="py-3 px-4 text-center" style={{ fontFamily: 'var(--font-mono)' }}>
-                                <span className="font-bold" style={{ color: getScoreColor(s) }}>{scoreToGrade(s)}</span>
-                                {ahead && <span className="text-xs ml-1" style={{ color: '#EF4444' }}>▲</span>}
-                              </td>
-                            );
-                          })}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                <p className="text-xs mt-3" style={{ color: 'var(--text-tertiary)' }}>Competitor scores are AI-estimated based on public knowledge, not from a direct scan. ▲ indicates the competitor is estimated to score higher than you.</p>
-              </div>
-            )}
-
-            {/* AI Marketing Strategy */}
-            {growthData.marketingStrategy && (
-              <div className="card p-6">
-                <div className="flex items-center gap-2 mb-2">
-                  <Target className="w-5 h-5" style={{ color: '#6366F1' }} />
-                  <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>AI Marketing Strategy</h2>
-                </div>
-                <p className="text-sm mb-6" style={{ color: 'var(--text-tertiary)' }}>Targeted actions to improve how AI systems discover, understand, and recommend your product.</p>
-
-                {/* Queries to Target */}
-                {growthData.marketingStrategy.queries?.length > 0 && (
-                  <div className="mb-6">
-                    <h3 className="text-sm font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>AI-Searchable Queries to Target</h3>
-                    <p className="text-xs mb-3" style={{ color: 'var(--text-tertiary)' }}>These are questions real buyers are asking AI assistants. Creating content that answers them increases your chances of being recommended.</p>
-                    <div className="space-y-2">
-                      {growthData.marketingStrategy.queries.map((q: string, i: number) => (
-                        <div key={i} className="flex items-start gap-3 p-3 rounded-lg border" style={{ borderColor: 'var(--border)', background: 'var(--bg-tertiary)' }}>
-                          <span className="flex items-center justify-center w-5 h-5 rounded-full text-xs font-bold shrink-0 mt-0.5" style={{ background: 'rgba(99,102,241,0.1)', color: '#6366F1' }}>{i + 1}</span>
-                          <p className="text-sm" style={{ color: 'var(--text-primary)' }}>&ldquo;{q}&rdquo;</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Pages to Create */}
-                {growthData.marketingStrategy.pages_to_create?.length > 0 && (
-                  <div className="mb-6">
-                    <h3 className="text-sm font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>Strategic Pages to Create</h3>
-                    <p className="text-xs mb-3" style={{ color: 'var(--text-tertiary)' }}>New pages that would significantly improve your AI discoverability for common buyer queries.</p>
-                    <div className="space-y-2">
-                      {growthData.marketingStrategy.pages_to_create.map((p: { title: string; why: string }, i: number) => (
-                        <div key={i} className="p-3 rounded-lg border" style={{ borderColor: 'var(--border)', background: 'var(--bg-tertiary)' }}>
-                          <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{p.title}</p>
-                          <p className="text-xs mt-1" style={{ color: 'var(--text-tertiary)' }}>{p.why}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Content to Optimize */}
-                {growthData.marketingStrategy.content_to_optimize?.length > 0 && (
-                  <div className="mb-6">
-                    <h3 className="text-sm font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>Content Optimization</h3>
-                    <p className="text-xs mb-3" style={{ color: 'var(--text-tertiary)' }}>Improvements to existing pages that would make them more useful to AI systems.</p>
-                    <div className="space-y-2">
-                      {growthData.marketingStrategy.content_to_optimize.map((c: { page: string; action: string }, i: number) => (
-                        <div key={i} className="flex items-start gap-3 p-3 rounded-lg border" style={{ borderColor: 'var(--border)', background: 'var(--bg-tertiary)' }}>
-                          <span className="text-xs font-bold px-2 py-0.5 rounded shrink-0" style={{ background: 'rgba(99,102,241,0.1)', color: '#6366F1' }}>{c.page}</span>
-                          <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>{c.action}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Schema Actions */}
-                {growthData.marketingStrategy.schema_actions?.length > 0 && (
-                  <div className="mb-6">
-                    <h3 className="text-sm font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>Structured Data Strategy</h3>
-                    <p className="text-xs mb-3" style={{ color: 'var(--text-tertiary)' }}>Schema markup that helps AI systems understand your content in machine-readable format.</p>
-                    <div className="space-y-2">
-                      {growthData.marketingStrategy.schema_actions.map((s: { action: string; impact: string }, i: number) => (
-                        <div key={i} className="p-3 rounded-lg border" style={{ borderColor: 'var(--border)', background: 'var(--bg-tertiary)' }}>
-                          <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{s.action}</p>
-                          <p className="text-xs mt-1" style={{ color: '#6366F1' }}>{s.impact}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Trust Actions */}
-                {growthData.marketingStrategy.trust_actions?.length > 0 && (
-                  <div>
-                    <h3 className="text-sm font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>Trust & Authority Building</h3>
-                    <p className="text-xs mb-3" style={{ color: 'var(--text-tertiary)' }}>Actions that help AI systems trust and confidently recommend your product.</p>
-                    <div className="space-y-2">
-                      {growthData.marketingStrategy.trust_actions.map((t: { action: string; impact: string }, i: number) => (
-                        <div key={i} className="p-3 rounded-lg border" style={{ borderColor: 'var(--border)', background: 'var(--bg-tertiary)' }}>
-                          <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{t.action}</p>
-                          <p className="text-xs mt-1" style={{ color: '#6366F1' }}>{t.impact}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-          );
-        })()}
-      </div>
-      </>
-      )}
 
       {/* ===== PAGES TAB ===== */}
       {(!isAuthenticated || activeTab === 'pages') && (
