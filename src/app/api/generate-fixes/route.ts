@@ -3,8 +3,14 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabase } from '@/lib/supabase/server';
+import { createClient } from '@supabase/supabase-js';
 
 export const maxDuration = 60;
+
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+)
 
 const ADMIN_EMAILS = ['demo@aivisibility.test', 'mikedaman@gmail.com'];
 
@@ -124,7 +130,7 @@ Generate a fix for EVERY issue listed. Return ONLY a JSON array. No markdown, no
       // Try to save to DB — may fail due to RLS or missing column
       let saved = false;
       if (fixes.length > 0) {
-        const { error: updateError } = await supabase.from('audits').update({ generated_fixes: fixes }).eq('id', auditId);
+        const { error: updateError } = await supabaseAdmin.from('audits').update({ generated_fixes: fixes }).eq('id', auditId);
         if (updateError) {
           console.error('generate-fixes: DB save failed (will rely on client PATCH):', updateError.message);
         } else {
