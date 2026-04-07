@@ -93,13 +93,13 @@ Return ONLY a JSON array. No markdown, no backticks, no explanation outside the 
 
       if (!res.ok) {
         const errBody = await res.text();
-        console.error('Generate fixes API error:', { status: res.status, body: errBody });
-        return NextResponse.json({ fixes: [] });
+        console.error('generate-fixes: Claude API error:', { status: res.status, body: errBody });
+        return NextResponse.json({ fixes: [], saved: false });
       }
 
       const data = await res.json();
       const rawText = data.content?.[0]?.text || '';
-      console.log('generate-fixes: Claude response length:', rawText.length, 'chars, first 200:', rawText.substring(0, 200));
+      console.log('generate-fixes: Claude response length:', rawText.length);
 
       let fixes: GeneratedFix[] = [];
       try {
@@ -111,33 +111,34 @@ Return ONLY a JSON array. No markdown, no backticks, no explanation outside the 
             implementation: String(f.implementation || ''),
             explanation: String(f.explanation || ''),
           }));
-          console.log('generate-fixes: parsed', fixes.length, 'fixes. Keys:', fixes.map(f => f.key).join(', '));
+          console.log('generate-fixes: parsed', fixes.length, 'fixes');
         } else {
-          console.error('generate-fixes: parsed result is not an array, type:', typeof parsed);
+          console.error('generate-fixes: not an array:', typeof parsed);
         }
       } catch (parseErr) {
-        console.error('generate-fixes: JSON parse failed:', parseErr instanceof Error ? parseErr.message : parseErr, 'raw start:', rawText.substring(0, 300));
+        console.error('generate-fixes: parse failed:', parseErr instanceof Error ? parseErr.message : parseErr);
       }
 
-      // Save to database
+      // Try to save to DB — may fail due to RLS or missing column
+      let saved = false;
       if (fixes.length > 0) {
         const { error: updateError } = await supabase.from('audits').update({ generated_fixes: fixes }).eq('id', auditId);
         if (updateError) {
-          console.error('generate-fixes: DB save failed:', updateError.message, updateError.details, updateError.hint, '— Run: ALTER TABLE audits ADD COLUMN IF NOT EXISTS generated_fixes JSONB DEFAULT NULL');
+          console.error('generate-fixes: DB save failed (will rely on client PATCH):', updateError.message);
         } else {
-          console.log('generate-fixes: saved', fixes.length, 'fixes to audit', auditId);
+          saved = true;
+          console.log('generate-fixes: saved to DB, audit:', auditId);
         }
-      } else {
-        console.error('generate-fixes: 0 fixes generated — nothing to save');
       }
 
-      return NextResponse.json({ fixes });
+      // Return fixes + saved flag so client knows whether to PATCH
+      return NextResponse.json({ fixes, saved });
     } catch (fetchErr) {
-      console.error('Generate fixes fetch error:', fetchErr instanceof Error ? fetchErr.message : fetchErr);
-      return NextResponse.json({ fixes: [] });
+      console.error('generate-fixes: fetch error:', fetchErr instanceof Error ? fetchErr.message : fetchErr);
+      return NextResponse.json({ fixes: [], saved: false });
     }
   } catch (error) {
-    console.error('Generate fixes error:', error);
+    console.error('generate-fixes: error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

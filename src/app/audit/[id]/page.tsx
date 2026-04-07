@@ -682,8 +682,14 @@ export default function AuditResultPage() {
       const result = await res.json();
       if (res.ok && result.fixes && result.fixes.length > 0) {
         setGeneratedFixes(result.fixes);
-      } else {
-        console.error('Generate fixes response:', { status: res.status, result });
+        // If server-side DB save failed, persist via PATCH as fallback
+        if (!result.saved) {
+          fetch(`/api/audit/${params.id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ generatedFixes: result.fixes }),
+          }).catch(() => {});
+        }
       }
     } catch (err) {
       console.error('loadGeneratedFixes error:', err);

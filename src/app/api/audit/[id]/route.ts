@@ -143,6 +143,7 @@ export async function PATCH(
     if (body.userId) updateData.user_id = body.userId;
     if ('perceptionData' in body) updateData.perception_data = body.perceptionData;
     if ('growthData' in body) updateData.growth_data = body.growthData;
+    if ('generatedFixes' in body) updateData.generated_fixes = body.generatedFixes;
 
     if (Object.keys(updateData).length > 0) {
       await supabase.from('audits').update(updateData).eq('id', id);
