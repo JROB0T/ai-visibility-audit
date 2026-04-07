@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import ScoreRing, { ScoreBar, scoreToGrade, getScoreColor } from '@/components/ScoreRing';
@@ -471,13 +471,14 @@ export default function AuditResultPage() {
   const [growthLoading, setGrowthLoading] = useState(false);
   const [generatedFixes, setGeneratedFixes] = useState<Array<{ key: string; implementation: string; explanation: string }> | null>(null);
   const [fixesLoading, setFixesLoading] = useState(false);
+  const fixesRequested = useRef(false);
 
   function switchTab(tab: ReportTab) {
     setActiveTab(tab);
     if (tab === 'fix-plan') {
       setViewMode('category');
       if (!growthData && !growthLoading && hasPaid) loadGrowthStrategy();
-      if (!generatedFixes && !fixesLoading && hasPaid) loadGeneratedFixes();
+      if (!generatedFixes && !fixesRequested.current && hasPaid) loadGeneratedFixes();
     }
     else if (tab === 'ai-perception' && !perceptionQuestions && !perceptionLoading) loadPerceptionQuestions();
   }
@@ -647,12 +648,14 @@ export default function AuditResultPage() {
   }
 
   async function loadGeneratedFixes() {
-    if (!data || fixesLoading) return;
+    if (!data || fixesRequested.current) return;
     // Check if fixes are already loaded from audit data
     if (data.audit?.generated_fixes && data.audit.generated_fixes.length > 0) {
       setGeneratedFixes(data.audit.generated_fixes);
+      fixesRequested.current = true;
       return;
     }
+    fixesRequested.current = true;
     setFixesLoading(true);
     try {
       const a = data.audit;
@@ -691,11 +694,11 @@ export default function AuditResultPage() {
 
   // Auto-trigger fix generation when Fix Plan tab is active and user has paid
   useEffect(() => {
-    if (activeTab === 'fix-plan' && hasPaid && data && !generatedFixes && !fixesLoading) {
+    if (activeTab === 'fix-plan' && hasPaid && data && !generatedFixes && !fixesRequested.current) {
       loadGeneratedFixes();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, hasPaid, data, generatedFixes, fixesLoading]);
+  }, [activeTab, hasPaid, data, generatedFixes]);
 
   useEffect(() => {
     async function load() {

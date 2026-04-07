@@ -99,6 +99,7 @@ Return ONLY a JSON array. No markdown, no backticks, no explanation outside the 
 
       const data = await res.json();
       const rawText = data.content?.[0]?.text || '';
+      console.log('generate-fixes: Claude response length:', rawText.length, 'chars, first 200:', rawText.substring(0, 200));
 
       let fixes: GeneratedFix[] = [];
       try {
@@ -110,21 +111,24 @@ Return ONLY a JSON array. No markdown, no backticks, no explanation outside the 
             implementation: String(f.implementation || ''),
             explanation: String(f.explanation || ''),
           }));
+          console.log('generate-fixes: parsed', fixes.length, 'fixes. Keys:', fixes.map(f => f.key).join(', '));
+        } else {
+          console.error('generate-fixes: parsed result is not an array, type:', typeof parsed);
         }
       } catch (parseErr) {
-        console.error('Failed to parse generated fixes:', parseErr instanceof Error ? parseErr.message : parseErr);
+        console.error('generate-fixes: JSON parse failed:', parseErr instanceof Error ? parseErr.message : parseErr, 'raw start:', rawText.substring(0, 300));
       }
-
-      console.log('generate-fixes: parsed', fixes.length, 'fixes for', domain);
 
       // Save to database
       if (fixes.length > 0) {
         const { error: updateError } = await supabase.from('audits').update({ generated_fixes: fixes }).eq('id', auditId);
         if (updateError) {
-          console.error('generate-fixes: DB save failed:', updateError.message, '— column may not exist. Run: ALTER TABLE audits ADD COLUMN IF NOT EXISTS generated_fixes JSONB DEFAULT NULL');
+          console.error('generate-fixes: DB save failed:', updateError.message, updateError.details, updateError.hint, '— Run: ALTER TABLE audits ADD COLUMN IF NOT EXISTS generated_fixes JSONB DEFAULT NULL');
         } else {
-          console.log('generate-fixes: saved to audit', auditId);
+          console.log('generate-fixes: saved', fixes.length, 'fixes to audit', auditId);
         }
+      } else {
+        console.error('generate-fixes: 0 fixes generated — nothing to save');
       }
 
       return NextResponse.json({ fixes });
