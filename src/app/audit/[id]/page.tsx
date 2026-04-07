@@ -700,8 +700,10 @@ export default function AuditResultPage() {
 
   // Auto-trigger fix generation when Fix Plan tab is active and user has paid
   useEffect(() => {
+    console.log('[fix-plan] useEffect fired, activeTab:', activeTab, 'fixesRequested:', fixesRequested.current);
     if (fixesRequested.current) return;
     if (activeTab === 'fix-plan' && hasPaid && data && !generatedFixes) {
+      console.log('[fix-plan] Making generate-fixes request');
       fixesRequested.current = true;
       loadGeneratedFixes();
     }

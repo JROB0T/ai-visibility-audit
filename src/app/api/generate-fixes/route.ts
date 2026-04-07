@@ -25,6 +25,8 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { auditId, siteId, domain, vertical, homepageTitle, homepageH1, homepageDescription, businessDescription, recommendations, missingPages, existingPages } = body;
 
+    console.log('[generate-fixes] Handler called, auditId:', auditId);
+
     if (!auditId || !domain) {
       return NextResponse.json({ error: 'auditId and domain are required' }, { status: 400 });
     }
@@ -130,10 +132,13 @@ Generate a fix for EVERY issue listed. Return ONLY a JSON array. No markdown, no
       // Try to save to DB — may fail due to RLS or missing column
       let saved = false;
       if (fixes.length > 0) {
+        console.log('[generate-fixes] Attempting DB write with service role client');
         const { error: updateError } = await supabaseAdmin.from('audits').update({ generated_fixes: fixes }).eq('id', auditId);
         if (updateError) {
+          console.error('[generate-fixes] DB write failed:', updateError.message);
           console.error('generate-fixes: DB save failed (will rely on client PATCH):', updateError.message);
         } else {
+          console.log('[generate-fixes] DB write succeeded');
           saved = true;
           console.log('generate-fixes: saved to DB, audit:', auditId);
         }

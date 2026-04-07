@@ -38,6 +38,8 @@ export async function POST(request: NextRequest) {
   const supabase = getAdminSupabase();
 
   try {
+    console.log('[stripe-webhook] Event received:', event.type);
+
     switch (event.type) {
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session;
@@ -52,7 +54,8 @@ export async function POST(request: NextRequest) {
 
         if (priceType === 'initial_scan') {
           // Grant full entitlements
-          await supabase.from('entitlements').upsert({
+          console.log('[stripe-webhook] Writing entitlement for user:', userId);
+          const { error: entitlementError } = await supabase.from('entitlements').upsert({
             user_id: userId,
             site_id: siteId,
             can_view_core: true,
@@ -61,6 +64,11 @@ export async function POST(request: NextRequest) {
             can_export: true,
             updated_at: new Date().toISOString(),
           }, { onConflict: 'user_id,site_id' });
+          if (entitlementError) {
+            console.error('[stripe-webhook] Entitlement write failed:', entitlementError);
+          } else {
+            console.log('[stripe-webhook] Entitlement write succeeded');
+          }
 
           // Update site plan
           await supabase.from('sites').update({
@@ -137,7 +145,8 @@ export async function POST(request: NextRequest) {
           const subscriptionId = session.subscription as string || null;
 
           // Update entitlements
-          await supabase.from('entitlements').upsert({
+          console.log('[stripe-webhook] Writing entitlement for user:', userId);
+          const { error: monthlyEntitlementError } = await supabase.from('entitlements').upsert({
             user_id: userId,
             site_id: siteId,
             can_view_core: true,
@@ -149,6 +158,11 @@ export async function POST(request: NextRequest) {
             stripe_subscription_id: subscriptionId,
             updated_at: new Date().toISOString(),
           }, { onConflict: 'user_id,site_id' });
+          if (monthlyEntitlementError) {
+            console.error('[stripe-webhook] Entitlement write failed:', monthlyEntitlementError);
+          } else {
+            console.log('[stripe-webhook] Entitlement write succeeded');
+          }
 
           // Update site
           const nextScan = new Date();
@@ -186,17 +200,23 @@ export async function POST(request: NextRequest) {
           .single();
 
         if (site) {
+          console.log('[stripe-webhook] Writing entitlement for user:', site.user_id);
           await supabase.from('sites').update({
             has_monthly_monitoring: false,
             next_scheduled_scan_at: null,
           }).eq('id', site.id);
 
-          await supabase.from('entitlements').update({
+          const { error: deleteEntitlementError } = await supabase.from('entitlements').update({
             has_monthly_monitoring: false,
             monthly_scope: null,
             stripe_subscription_id: null,
             updated_at: new Date().toISOString(),
           }).eq('site_id', site.id).eq('user_id', site.user_id);
+          if (deleteEntitlementError) {
+            console.error('[stripe-webhook] Entitlement write failed:', deleteEntitlementError);
+          } else {
+            console.log('[stripe-webhook] Entitlement write succeeded');
+          }
         }
 
         break;

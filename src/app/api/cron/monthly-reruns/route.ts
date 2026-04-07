@@ -22,6 +22,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  console.log('[cron] Monthly rerun job started');
   const supabase = getAdminSupabase();
   const now = new Date().toISOString();
 
@@ -75,7 +76,10 @@ export async function GET(request: NextRequest) {
         .select()
         .single();
 
+      console.log('[cron] Rerunning audit:', audit?.id || '(creation pending)', 'for site:', site.domain);
+
       if (auditError || !audit) {
+        console.error('[cron] Error during rerun:', auditError);
         console.error(`Audit creation failed for site ${site.domain}:`, auditError);
         failed++;
         continue;
@@ -194,10 +198,13 @@ export async function GET(request: NextRequest) {
       console.log(`Monthly rerun completed for ${site.domain}: score ${scores.overall}/100`);
       succeeded++;
     } catch (error) {
+      console.error('[cron] Error during rerun:', error);
       console.error(`Unexpected error processing ${site.domain}:`, error);
       failed++;
     }
   }
+
+  console.log('[cron] Monthly rerun job finished, processed:', eligibleSites.length, 'audits');
 
   return NextResponse.json({
     processed: eligibleSites.length,
