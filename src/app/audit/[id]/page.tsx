@@ -689,6 +689,14 @@ export default function AuditResultPage() {
     }
   }
 
+  // Auto-trigger fix generation when Fix Plan tab is active and user has paid
+  useEffect(() => {
+    if (activeTab === 'fix-plan' && hasPaid && data && !generatedFixes && !fixesLoading) {
+      loadGeneratedFixes();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, hasPaid, data, generatedFixes, fixesLoading]);
+
   useEffect(() => {
     async function load() {
       try {
@@ -700,10 +708,12 @@ export default function AuditResultPage() {
         const auditData = await res.json();
         setData(auditData);
         setHasPaid(!!auditData.hasEntitlement);
-        // Restore previously saved perception and growth data
+        // Restore previously saved data
         if (auditData.perceptionData) setPerceptionQuestions(auditData.perceptionData);
         if (auditData.growthData) setGrowthData(auditData.growthData);
-        if (auditData.audit?.generated_fixes) setGeneratedFixes(auditData.audit.generated_fixes);
+        if (auditData.audit?.generated_fixes && auditData.audit.generated_fixes.length > 0) {
+          setGeneratedFixes(auditData.audit.generated_fixes);
+        }
         if (user && auditData.audit && !auditData.audit.user_id) {
           await fetch(`/api/audit/${params.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: user.id }) }).catch(() => {});
         }
@@ -712,6 +722,8 @@ export default function AuditResultPage() {
     }
     load();
   }, [params.id]);
+
+  // Fix generation useEffect is defined after loadGeneratedFixes below
 
   const allFindings = useMemo(() => {
     if (!data) return [];

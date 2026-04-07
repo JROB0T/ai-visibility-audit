@@ -114,20 +114,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Could not scan this site.', auditId: audit.id }, { status: 422 });
     }
 
-    // Auto-detect vertical using AI classification (overrides keyword-based scanner fallback)
-    if (!site.vertical || site.vertical === 'other') {
-      const homepage = scanResult.pages.find(p => p.pageType === 'homepage');
-      const aiVertical = await classifyBusiness({
-        domain,
-        title: homepage?.title || null,
-        h1: homepage?.h1Text || null,
-        metaDescription: homepage?.metaDescription || null,
-        bodySnippet: homepage?.firstParagraphText || null,
-        pageUrls: scanResult.pages.map(p => p.url),
-        schemaTypes: scanResult.pages.flatMap(p => p.schemaTypes),
-      });
-      await supabase.from('sites').update({ vertical: aiVertical }).eq('id', site.id);
-    }
+    // Auto-detect vertical using AI classification — runs every scan
+    const homepage = scanResult.pages.find(p => p.pageType === 'homepage');
+    const aiVertical = await classifyBusiness({
+      domain,
+      title: homepage?.title || null,
+      h1: homepage?.h1Text || null,
+      metaDescription: homepage?.metaDescription || null,
+      bodySnippet: homepage?.firstParagraphText || null,
+      pageUrls: scanResult.pages.map(p => p.url),
+      schemaTypes: scanResult.pages.flatMap(p => p.schemaTypes),
+    });
+    await supabase.from('sites').update({ vertical: aiVertical }).eq('id', site.id);
 
     const scores = calculateScores(scanResult);
     const rawRecommendations = generateRecommendations(scanResult);
