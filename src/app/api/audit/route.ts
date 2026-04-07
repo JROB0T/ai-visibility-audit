@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabase } from '@/lib/supabase/server';
 import { scanSite } from '@/lib/scanner';
 import { calculateScores, generateRecommendations, enrichWithCodeSnippets } from '@/lib/scoring';
+import { classifyBusiness } from '@/lib/classify';
 
 export const maxDuration = 60;
 
@@ -113,10 +114,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Could not scan this site.', auditId: audit.id }, { status: 422 });
     }
 
-    // Auto-detect vertical from scan results and save to site if not already set
-    const detectedVertical = scanResult.detectedVertical || 'other';
+    // Auto-detect vertical using AI classification (overrides keyword-based scanner fallback)
     if (!site.vertical || site.vertical === 'other') {
-      await supabase.from('sites').update({ vertical: detectedVertical }).eq('id', site.id);
+      const homepage = scanResult.pages.find(p => p.pageType === 'homepage');
+      const aiVertical = await classifyBusiness({
+        domain,
+        title: homepage?.title || null,
+        h1: homepage?.h1Text || null,
+        metaDescription: homepage?.metaDescription || null,
+        bodySnippet: homepage?.firstParagraphText || null,
+        pageUrls: scanResult.pages.map(p => p.url),
+        schemaTypes: scanResult.pages.flatMap(p => p.schemaTypes),
+      });
+      await supabase.from('sites').update({ vertical: aiVertical }).eq('id', site.id);
     }
 
     const scores = calculateScores(scanResult);

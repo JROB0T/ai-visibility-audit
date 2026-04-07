@@ -613,6 +613,7 @@ export default function AuditResultPage() {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           domain: audit.site?.domain,
+          vertical: audit.site?.vertical || 'other',
           h1: homepage?.h1_text,
           metaDescription: homepage?.meta_description,
           pageTypes: Array.from(new Set(pages.map((p: { page_type: string }) => p.page_type))),

@@ -16,8 +16,9 @@ interface CompetitorEstimate {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { domain, h1, metaDescription, pageTypes, scores, recommendations, siteId } = body;
+    const { domain, vertical, h1, metaDescription, pageTypes, scores, recommendations, siteId } = body;
     if (!domain) return NextResponse.json({ error: 'Domain required' }, { status: 400 });
+    const businessType = vertical || 'other';
 
     // Entitlement check (admin bypass first)
     const supabase = await createServerSupabase();
@@ -47,12 +48,26 @@ export async function POST(request: NextRequest) {
     let competitorEstimates: CompetitorEstimate[] = [];
     if (apiKey) {
       try {
+        const verticalHints: Record<string, string> = {
+          restaurant: 'This is a RESTAURANT/food service business. Competitors must be other restaurants, cafes, or food businesses — NOT retail stores or tech companies.',
+          saas: 'This is a SOFTWARE/SaaS company. Competitors must be other software companies in the same category.',
+          ecommerce: 'This is an E-COMMERCE/retail business. Competitors must be other online retailers in the same product category.',
+          healthcare: 'This is a HEALTHCARE business. Competitors must be other healthcare providers or clinics.',
+          law_firm: 'This is a LAW FIRM. Competitors must be other law firms or legal service providers.',
+          professional_services: 'This is a PROFESSIONAL SERVICES firm. Competitors must be other firms in the same industry.',
+          local_service: 'This is a LOCAL SERVICE business. Competitors must be other local service providers in the same trade.',
+        };
+        const verticalHint = verticalHints[businessType] || 'Pick competitors in the same industry as this business.';
+
         const compPrompt = `Based on this website info, identify exactly 2 likely direct competitors. For each competitor, estimate their AI visibility scores based on your knowledge of their web presence.
 
+Business type: ${businessType}
 Domain: ${domain}
 Homepage heading: "${h1 || 'unknown'}"
 Meta description: "${metaDescription || 'unknown'}"
 Page types found: ${(pageTypes || []).join(', ')}
+
+${verticalHint}
 
 Return ONLY a JSON array of 2 objects, each with these fields:
 - "domain": the competitor's domain name
@@ -64,9 +79,10 @@ Return ONLY a JSON array of 2 objects, each with these fields:
 - "rationale": one sentence explaining why you picked this competitor and how you estimated their scores
 
 Rules:
-- Pick real, well-known companies in the same category
+- Competitors MUST be in the same business category (${businessType})
+- Pick real businesses that are actual competitors, not tangentially related companies
+- A restaurant's competitors are other restaurants, not retail stores
 - Base scores on what you know about their website structure, content quality, and AI readiness
-- Large established companies typically score 70-90, smaller ones 40-70
 - No markdown, no backticks, just the JSON array`;
 
         console.log('Growth strategy: requesting competitor estimates for', domain);
