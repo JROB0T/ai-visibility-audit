@@ -31,6 +31,7 @@ interface AuditData {
     commercial_clarity_score: number | null; trust_clarity_score: number | null;
     pages_scanned: number; summary: string | null; created_at: string;
     completed_at: string | null; site: { id?: string; domain: string; url: string; vertical?: string | null };
+    generated_fixes?: Array<{ key: string; implementation: string; explanation: string }> | null;
   };
   pages: Array<{
     id: string; url: string; page_type: string; title: string | null;
@@ -62,6 +63,7 @@ interface AuditData {
   } | null;
   hasEntitlement?: boolean;
   totalRecommendationCount?: number;
+  generatedFixes?: Array<{ key: string; implementation: string; explanation: string }> | null;
 }
 
 type ViewMode = 'priority' | 'page' | 'category';
@@ -467,13 +469,15 @@ export default function AuditResultPage() {
   const [perceptionLoading, setPerceptionLoading] = useState(false);
   const [growthData, setGrowthData] = useState<{ competitors: Array<{ domain: string; overall: number; crawl: number; read: number; commercial: number; trust: number; rationale?: string }>; yourScores: { overall: number; crawl: number; read: number; commercial: number; trust: number }; marketingStrategy: { queries: string[]; pages_to_create: Array<{ title: string; why: string }>; content_to_optimize: Array<{ page: string; action: string }>; schema_actions: Array<{ action: string; impact: string }>; trust_actions: Array<{ action: string; impact: string }> } } | null>(null);
   const [growthLoading, setGrowthLoading] = useState(false);
+  const [generatedFixes, setGeneratedFixes] = useState<Array<{ key: string; implementation: string; explanation: string }> | null>(null);
+  const [fixesLoading, setFixesLoading] = useState(false);
 
   function switchTab(tab: ReportTab) {
     setActiveTab(tab);
     if (tab === 'fix-plan') {
       setViewMode('category');
-      // Auto-load growth data for fix plan if not loaded
       if (!growthData && !growthLoading && hasPaid) loadGrowthStrategy();
+      if (!generatedFixes && !fixesLoading && hasPaid) loadGeneratedFixes();
     }
     else if (tab === 'ai-perception' && !perceptionQuestions && !perceptionLoading) loadPerceptionQuestions();
   }
@@ -642,6 +646,45 @@ export default function AuditResultPage() {
     finally { setGrowthLoading(false); }
   }
 
+  async function loadGeneratedFixes() {
+    if (!data || fixesLoading) return;
+    // Check if fixes are already in the audit data
+    if (data.audit && (data.audit as Record<string, unknown>).generated_fixes) {
+      setGeneratedFixes((data.audit as Record<string, unknown>).generated_fixes as typeof generatedFixes);
+      return;
+    }
+    setFixesLoading(true);
+    try {
+      const { audit: a, pages: p, recommendations: recs } = data;
+      const homepage = p.find((pg: { page_type: string }) => pg.page_type === 'homepage');
+      const siteVertical = a.site?.vertical || 'other';
+      const res = await fetch('/api/generate-fixes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          auditId: a.id,
+          siteId: a.site_id,
+          domain: a.site?.domain,
+          vertical: siteVertical,
+          homepageTitle: homepage?.title,
+          homepageH1: homepage?.h1_text,
+          homepageDescription: homepage?.meta_description,
+          businessDescription: homepage?.h1_text,
+          recommendations: recs.map((r: { title: string; category: string; severity: string }) => ({ title: r.title, category: r.category, severity: r.severity })),
+          missingPages: [],
+          existingPages: p.slice(0, 10).map((pg: { url: string; title: string | null; page_type: string }) => ({ url: pg.url, title: pg.title, pageType: pg.page_type })),
+        }),
+      });
+      if (res.ok) {
+        const result = await res.json();
+        if (result.fixes && result.fixes.length > 0) {
+          setGeneratedFixes(result.fixes);
+        }
+      }
+    } catch { /* skip — fall back to generic snippets */ }
+    finally { setFixesLoading(false); }
+  }
+
   useEffect(() => {
     async function load() {
       try {
@@ -656,6 +699,7 @@ export default function AuditResultPage() {
         // Restore previously saved perception and growth data
         if (auditData.perceptionData) setPerceptionQuestions(auditData.perceptionData);
         if (auditData.growthData) setGrowthData(auditData.growthData);
+        if (auditData.audit?.generated_fixes) setGeneratedFixes(auditData.audit.generated_fixes);
         if (user && auditData.audit && !auditData.audit.user_id) {
           await fetch(`/api/audit/${params.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: user.id }) }).catch(() => {});
         }
@@ -747,7 +791,11 @@ export default function AuditResultPage() {
   }
 
   function renderFindingCard(finding: typeof allFindings[0], index?: number) {
-    const hasSnippet = !!finding.codeSnippet;
+    // Look up AI-generated customized fix for this finding
+    const customFix = generatedFixes?.find(f => f.key === finding.title || finding.title.includes(f.key) || f.key.includes(finding.title));
+    const snippetToShow = customFix?.implementation || finding.codeSnippet;
+    const hasSnippet = !!snippetToShow;
+    const isCustom = !!customFix;
     const stateBadge = getFindingStateBadge(finding);
     return (
       <div key={finding.id} className={`rounded-xl border p-5 finding-${finding.severity}`} style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
@@ -768,12 +816,19 @@ export default function AuditResultPage() {
                 <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>{finding.fix}</p>
               </div>
               {hasSnippet && (
-                <div className="mt-3 rounded-lg p-3 overflow-x-auto border" style={{ background: '#0F172A', borderColor: '#1E293B' }}>
+                <div className="mt-3 rounded-lg p-3 overflow-x-auto border" style={{ background: '#0F172A', borderColor: isCustom ? 'rgba(16,185,129,0.3)' : '#1E293B' }}>
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-medium flex items-center gap-1" style={{ color: '#818CF8' }}><Code className="w-3 h-3" />Copy &amp; paste this code:</span>
-                    <CopyButton text={finding.codeSnippet!} />
+                    {isCustom ? (
+                      <span className="text-xs font-medium flex items-center gap-1" style={{ color: '#10B981' }}><Code className="w-3 h-3" />Custom implementation for {audit.site?.domain}</span>
+                    ) : (
+                      <span className="text-xs font-medium flex items-center gap-1" style={{ color: '#818CF8' }}><Code className="w-3 h-3" />Code template:</span>
+                    )}
+                    <CopyButton text={snippetToShow!} />
                   </div>
-                  <pre className="text-xs leading-relaxed whitespace-pre-wrap" style={{ color: '#E2E8F0', fontFamily: 'var(--font-mono)' }}>{finding.codeSnippet}</pre>
+                  {isCustom && customFix.explanation && (
+                    <p className="text-xs mb-2" style={{ color: '#94A3B8' }}>{customFix.explanation}</p>
+                  )}
+                  <pre className="text-xs leading-relaxed whitespace-pre-wrap" style={{ color: '#E2E8F0', fontFamily: 'var(--font-mono)' }}>{snippetToShow}</pre>
                 </div>
               )}
               {finding.affectedUrls.length > 0 && (
@@ -1139,6 +1194,17 @@ export default function AuditResultPage() {
         />
       )}
       {isAuthenticated && activeTab === 'fix-plan' && hasPaid && (<>
+
+      {/* Generating fixes loading state */}
+      {fixesLoading && (
+        <div className="mb-4 p-4 rounded-lg border flex items-center gap-3" style={{ background: 'rgba(99,102,241,0.04)', borderColor: 'rgba(99,102,241,0.15)' }}>
+          <div className="w-5 h-5 border-2 rounded-full animate-spin shrink-0" style={{ borderColor: '#6366F1', borderTopColor: 'transparent' }} />
+          <div>
+            <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Generating your customized fix plan...</p>
+            <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>AI is writing implementation code specific to {audit.site?.domain}</p>
+          </div>
+        </div>
+      )}
 
       {/* FIX PLAN HEADER — changes since last scan */}
       {auditDelta && (
