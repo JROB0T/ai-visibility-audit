@@ -817,7 +817,19 @@ export default function AuditResultPage() {
 
   function renderFindingCard(finding: typeof allFindings[0], index?: number) {
     // Look up AI-generated customized fix for this finding
-    const customFix = generatedFixes?.find(f => f.key === finding.title || finding.title.includes(f.key) || f.key.includes(finding.title));
+    const customFix = generatedFixes?.find(f => {
+      // Strip any "[category]" prefix Claude may have added
+      const cleanKey = f.key.replace(/^\[.*?\]\s*/, '').trim();
+      const titleLower = finding.title.toLowerCase();
+      const keyLower = cleanKey.toLowerCase();
+      // Exact match
+      if (titleLower === keyLower) return true;
+      // Containment match
+      if (titleLower.includes(keyLower) || keyLower.includes(titleLower)) return true;
+      // First 30 chars match
+      if (titleLower.substring(0, 30) === keyLower.substring(0, 30) && titleLower.length > 10) return true;
+      return false;
+    });
     const snippetToShow = customFix?.implementation || finding.codeSnippet;
     const hasSnippet = !!snippetToShow;
     const isCustom = !!customFix;

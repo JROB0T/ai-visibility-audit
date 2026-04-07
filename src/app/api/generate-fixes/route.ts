@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
 
     console.log('generate-fixes: starting for', domain, 'audit:', auditId, 'recs:', (recommendations || []).length);
 
-    const recList = (recommendations || []).slice(0, 15).map((r: { title: string; category: string }) => `- [${r.category}] ${r.title}`).join('\n');
+    const recList = (recommendations || []).slice(0, 25).map((r: { title: string }) => `- ${r.title}`).join('\n');
     const missingList = (missingPages || []).map((p: string) => `- ${p}`).join('\n');
     const existingList = (existingPages || []).slice(0, 10).map((p: { url: string; title: string; pageType: string }) => `- ${p.url} (${p.pageType}): "${p.title || 'untitled'}"`).join('\n');
 
@@ -76,19 +76,21 @@ ${recList}
 ${missingList ? `Missing pages they need:\n${missingList}` : ''}
 
 For each issue, return a JSON object with:
-- "key": the exact issue title from above (so we can match it back)
+- "key": the EXACT issue title from the list above, copied verbatim with no modifications, no category prefixes, no rewording
 - "implementation": the actual code/content to implement (HTML, JSON-LD, meta tags, robots.txt rules, page copy, etc.)
 - "explanation": one sentence explaining what this code does and where to put it
 
-Be specific. Use the business's actual name, actual domain, actual content. For meta descriptions, write the real description based on what you know about them. For schema markup, fill in real values. For page copy suggestions, write actual paragraphs.
+CRITICAL: The "key" field MUST be the exact title string from the issues list. Do not add prefixes like "[commercial]" or "[crawlability]". Do not paraphrase. Copy the title exactly.
 
-Return ONLY a JSON array. No markdown, no backticks, no explanation outside the array.`;
+Be specific. Use the business's actual name, actual domain, actual content. For meta descriptions, write the real description. For schema markup, fill in real values. For page copy, write actual paragraphs.
+
+Generate a fix for EVERY issue listed. Return ONLY a JSON array. No markdown, no backticks.`;
 
     try {
       const res = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
-        body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 4000, messages: [{ role: 'user', content: prompt }] }),
+        body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 8000, messages: [{ role: 'user', content: prompt }] }),
       });
 
       if (!res.ok) {
