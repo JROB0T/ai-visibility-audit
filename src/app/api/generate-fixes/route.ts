@@ -48,8 +48,11 @@ export async function POST(request: NextRequest) {
 
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) {
+      console.log('generate-fixes: no ANTHROPIC_API_KEY');
       return NextResponse.json({ fixes: [] });
     }
+
+    console.log('generate-fixes: starting for', domain, 'audit:', auditId, 'recs:', (recommendations || []).length);
 
     const recList = (recommendations || []).slice(0, 15).map((r: { title: string; category: string }) => `- [${r.category}] ${r.title}`).join('\n');
     const missingList = (missingPages || []).map((p: string) => `- ${p}`).join('\n');
@@ -112,9 +115,16 @@ Return ONLY a JSON array. No markdown, no backticks, no explanation outside the 
         console.error('Failed to parse generated fixes:', parseErr instanceof Error ? parseErr.message : parseErr);
       }
 
+      console.log('generate-fixes: parsed', fixes.length, 'fixes for', domain);
+
       // Save to database
       if (fixes.length > 0) {
-        await supabase.from('audits').update({ generated_fixes: fixes }).eq('id', auditId);
+        const { error: updateError } = await supabase.from('audits').update({ generated_fixes: fixes }).eq('id', auditId);
+        if (updateError) {
+          console.error('generate-fixes: DB save failed:', updateError.message, '— column may not exist. Run: ALTER TABLE audits ADD COLUMN IF NOT EXISTS generated_fixes JSONB DEFAULT NULL');
+        } else {
+          console.log('generate-fixes: saved to audit', auditId);
+        }
       }
 
       return NextResponse.json({ fixes });

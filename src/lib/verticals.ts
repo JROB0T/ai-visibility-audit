@@ -117,7 +117,7 @@ const VERTICAL_CONFIG: Record<VerticalType, VerticalConfig> = {
     },
   },
   restaurant: {
-    label: 'Restaurant / Food Service',
+    label: 'Restaurant / Food & Beverage',
     expectedPages: [
       { type: 'product', label: 'Menu', why: 'AI needs your menu to answer "what does this restaurant serve?" and price questions' },
       { type: 'contact', label: 'Location / Hours', why: 'AI needs address and hours to recommend you for "restaurants near me" queries' },
@@ -157,7 +157,7 @@ export const VERTICAL_OPTIONS: { value: VerticalType; label: string }[] = [
   { value: 'ecommerce', label: 'E-commerce' },
   { value: 'healthcare', label: 'Healthcare / Clinic' },
   { value: 'law_firm', label: 'Law Firm' },
-  { value: 'restaurant', label: 'Restaurant / Food Service' },
+  { value: 'restaurant', label: 'Restaurant / Food & Beverage' },
   { value: 'other', label: 'Other' },
 ];
 

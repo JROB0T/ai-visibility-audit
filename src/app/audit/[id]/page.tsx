@@ -648,16 +648,17 @@ export default function AuditResultPage() {
 
   async function loadGeneratedFixes() {
     if (!data || fixesLoading) return;
-    // Check if fixes are already in the audit data
-    if (data.audit && (data.audit as Record<string, unknown>).generated_fixes) {
-      setGeneratedFixes((data.audit as Record<string, unknown>).generated_fixes as typeof generatedFixes);
+    // Check if fixes are already loaded from audit data
+    if (data.audit?.generated_fixes && data.audit.generated_fixes.length > 0) {
+      setGeneratedFixes(data.audit.generated_fixes);
       return;
     }
     setFixesLoading(true);
     try {
-      const { audit: a, pages: p, recommendations: recs } = data;
-      const homepage = p.find((pg: { page_type: string }) => pg.page_type === 'homepage');
-      const siteVertical = a.site?.vertical || 'other';
+      const a = data.audit;
+      const p = data.pages;
+      const recs = data.recommendations;
+      const homepage = p.find((pg) => pg.page_type === 'homepage');
       const res = await fetch('/api/generate-fixes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -665,24 +666,27 @@ export default function AuditResultPage() {
           auditId: a.id,
           siteId: a.site_id,
           domain: a.site?.domain,
-          vertical: siteVertical,
+          vertical: a.site?.vertical || 'other',
           homepageTitle: homepage?.title,
           homepageH1: homepage?.h1_text,
           homepageDescription: homepage?.meta_description,
-          businessDescription: homepage?.h1_text,
-          recommendations: recs.map((r: { title: string; category: string; severity: string }) => ({ title: r.title, category: r.category, severity: r.severity })),
+          businessDescription: homepage?.meta_description || homepage?.h1_text || '',
+          recommendations: recs.map((r) => ({ title: r.title, category: r.category, severity: r.severity })),
           missingPages: [],
-          existingPages: p.slice(0, 10).map((pg: { url: string; title: string | null; page_type: string }) => ({ url: pg.url, title: pg.title, pageType: pg.page_type })),
+          existingPages: p.slice(0, 10).map((pg) => ({ url: pg.url, title: pg.title, pageType: pg.page_type })),
         }),
       });
-      if (res.ok) {
-        const result = await res.json();
-        if (result.fixes && result.fixes.length > 0) {
-          setGeneratedFixes(result.fixes);
-        }
+      const result = await res.json();
+      if (res.ok && result.fixes && result.fixes.length > 0) {
+        setGeneratedFixes(result.fixes);
+      } else {
+        console.error('Generate fixes response:', { status: res.status, result });
       }
-    } catch { /* skip — fall back to generic snippets */ }
-    finally { setFixesLoading(false); }
+    } catch (err) {
+      console.error('loadGeneratedFixes error:', err);
+    } finally {
+      setFixesLoading(false);
+    }
   }
 
   useEffect(() => {
