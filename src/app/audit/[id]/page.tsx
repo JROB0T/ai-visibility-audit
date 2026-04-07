@@ -730,13 +730,10 @@ export default function AuditResultPage() {
   if (loading) return (<div className="max-w-4xl mx-auto px-4 py-20 text-center"><div className="animate-spin w-8 h-8 border-2 rounded-full mx-auto" style={{ borderColor: '#6366F1', borderTopColor: 'transparent' }} /><p className="mt-4" style={{ color: 'var(--text-tertiary)' }}>Loading audit results…</p></div>);
   if (error || !data) return (<div className="max-w-4xl mx-auto px-4 py-20 text-center"><AlertTriangle className="w-10 h-10 text-amber-500 mx-auto" /><p className="mt-4 font-medium" style={{ color: 'var(--text-primary)' }}>{error || 'Something went wrong'}</p><a href="/" className="mt-4 inline-block" style={{ color: '#6366F1' }}>← Try another URL</a></div>);
 
-  const { audit, pages, recommendations, crawlerStatuses, keyPagesStatus } = data;
+  const { audit, pages, crawlerStatuses } = data;
   if (audit.status === 'failed') return (<div className="max-w-4xl mx-auto px-4 py-20 text-center"><AlertTriangle className="w-10 h-10 text-red-500 mx-auto" /><h2 className="mt-4 text-xl font-semibold" style={{ color: 'var(--text-primary)' }}>Scan failed</h2><p className="mt-2" style={{ color: 'var(--text-secondary)' }}>{audit.summary || 'The site could not be scanned.'}</p><a href="/" className="mt-6 inline-block" style={{ color: '#6366F1' }}>← Try another URL</a></div>);
 
-  // visibleRecs and gatedCount removed — old findings tab replaced by Fix Plan
   const highCount = allFindings.filter(f => f.severity === 'high').length;
-  const medCount = allFindings.filter(f => f.severity === 'medium').length;
-  const lowCount = allFindings.filter(f => f.severity === 'low').length;
 
   function getFindingStateBadge(finding: typeof allFindings[0]) {
     if (!data?.previousAudit) return null;
