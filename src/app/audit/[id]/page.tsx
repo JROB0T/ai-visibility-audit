@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import ScoreRing, { ScoreBar, scoreToGrade, getScoreColor } from '@/components/ScoreRing';
 import SeverityBadge, { EffortBadge } from '@/components/SeverityBadge';
-import { Lock, ArrowRight, ArrowLeft, CheckCircle, XCircle, ExternalLink, FileText, AlertTriangle, RefreshCw, ChevronDown, ChevronRight, Filter, Shield, Code, Eye, Bot, Copy, Check, Globe, Minus, LayoutGrid, Wrench, Zap, MonitorSmartphone, X, Download, Target, Users, CalendarCheck } from 'lucide-react';
+import { Lock, ArrowRight, ArrowLeft, CheckCircle, XCircle, ExternalLink, FileText, AlertTriangle, RefreshCw, ChevronDown, ChevronRight, Filter, Shield, Code, Eye, Bot, Copy, Check, Globe, Minus, LayoutGrid, Wrench, Zap, MonitorSmartphone, X, Download, Target, Users, CalendarCheck, TrendingUp } from 'lucide-react';
 import { compareAudits, classifyFinding, generateMonthlyActions } from '@/lib/deltas';
 import { getExpectedPages, getVerticalConfig } from '@/lib/verticals';
 
@@ -472,6 +472,7 @@ export default function AuditResultPage() {
   const [generatedFixes, setGeneratedFixes] = useState<Array<{ key: string; implementation: string; explanation: string }> | null>(null);
   const [fixesLoading, setFixesLoading] = useState(false);
   const fixesRequested = useRef(false);
+  const [animateProjections, setAnimateProjections] = useState(false);
 
   function switchTab(tab: ReportTab) {
     setActiveTab(tab);
@@ -708,6 +709,17 @@ export default function AuditResultPage() {
       loadGeneratedFixes();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
+
+  // Trigger projection animations when Fix Plan tab becomes active
+  useEffect(() => {
+    if (activeTab === 'fix-plan') {
+      setAnimateProjections(false);
+      const timer = setTimeout(() => setAnimateProjections(true), 50);
+      return () => clearTimeout(timer);
+    } else {
+      setAnimateProjections(false);
+    }
   }, [activeTab]);
 
   useEffect(() => {
@@ -981,7 +993,7 @@ export default function AuditResultPage() {
         </div>
       </div>
 
-      {/* PROJECTED IMPROVEMENT — paid only */}
+      {/* PROJECTED IMPROVEMENT — premium animated dashboard */}
       {isAuthenticated && hasPaid && allFindings.length > 0 && (() => {
         const severityOrder: Record<string, number> = { high: 0, medium: 1, low: 2 };
         const effortOrder: Record<string, number> = { easy: 0, medium: 1, harder: 2 };
@@ -999,36 +1011,194 @@ export default function AuditResultPage() {
           commercial_clarity: audit.commercial_clarity_score ?? 0, trust_clarity: audit.trust_clarity_score ?? 0,
         };
         const projectedScores: Record<string, number> = { ...currentScores };
-        const improvements: { label: string; current: number; projected: number }[] = [];
         for (const [cat, boost] of Object.entries(categoryBoosts)) {
-          const proj = Math.min(100, (currentScores[cat] ?? 0) + boost);
-          projectedScores[cat] = proj;
-          if (proj > (currentScores[cat] ?? 0)) improvements.push({ label: CATEGORY_LABELS[cat] || cat, current: currentScores[cat] ?? 0, projected: proj });
+          projectedScores[cat] = Math.min(100, (currentScores[cat] ?? 0) + boost);
         }
         const weights: Record<string, number> = { crawlability: 0.3, machine_readability: 0.25, commercial_clarity: 0.3, trust_clarity: 0.15 };
         const currentOverall = audit.overall_score ?? 0;
         const projectedOverall = Math.min(100, Math.round(Object.entries(weights).reduce((sum, [cat, w]) => sum + (projectedScores[cat] ?? 0) * w, 0)));
         if (projectedOverall <= currentOverall) return null;
+
+        const totalGain = projectedOverall - currentOverall;
+        const currentGrade = scoreToGrade(currentOverall);
+        const projectedGrade = scoreToGrade(projectedOverall);
+        const fixDetails = top5.map(fix => ({
+          title: fix.title,
+          points: impactMap[fix.severity] || 3,
+          category: CATEGORY_LABELS[fix.category] || fix.category,
+          owner: getFixOwner(fix.title, fix.category),
+        }));
+        const maxPoints = Math.max(...fixDetails.map(f => f.points), 1);
+
+        // Arc gauge geometry
+        const arcRadius = 90;
+        const arcStroke = 12;
+        const arcCx = 150;
+        const arcCy = 110;
+        const arcStartAngle = -210;
+        const arcEndAngle = 30;
+        const arcTotalDeg = arcEndAngle - arcStartAngle;
+        const toRad = (deg: number) => (deg * Math.PI) / 180;
+        const scoreToAngle = (score: number) => arcStartAngle + (score / 100) * arcTotalDeg;
+        const arcPoint = (angle: number) => ({
+          x: arcCx + arcRadius * Math.cos(toRad(angle)),
+          y: arcCy + arcRadius * Math.sin(toRad(angle)),
+        });
+        const describeArc = (startAngle: number, endAngle: number) => {
+          const start = arcPoint(startAngle);
+          const end = arcPoint(endAngle);
+          const largeArc = (endAngle - startAngle) > 180 ? 1 : 0;
+          return `M ${start.x} ${start.y} A ${arcRadius} ${arcRadius} 0 ${largeArc} 1 ${end.x} ${end.y}`;
+        };
+        const getArcColor = (score: number) => {
+          if (score < 50) return '#EF4444';
+          if (score < 65) return '#F59E0B';
+          if (score < 80) return '#10B981';
+          return '#3B82F6';
+        };
+
+        const bgArcPath = describeArc(arcStartAngle, arcEndAngle);
+        const currentAngle = scoreToAngle(currentOverall);
+        const projectedAngle = scoreToAngle(projectedOverall);
+        const currentArcPath = describeArc(arcStartAngle, currentAngle);
+        const projectedArcPath = describeArc(currentAngle, projectedAngle);
+        const currentArcLen = (Math.abs(currentAngle - arcStartAngle) / 360) * 2 * Math.PI * arcRadius;
+        const projectedArcLen = (Math.abs(projectedAngle - currentAngle) / 360) * 2 * Math.PI * arcRadius;
+
+        const projEndPt = arcPoint(projectedAngle);
+
         return (
-          <div className="rounded-lg border p-4 mb-6" style={{ borderColor: 'rgba(16,185,129,0.2)', background: 'rgba(16,185,129,0.04)' }}>
-            <p className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: '#10B981' }}>Projected improvement from your top 5 fixes</p>
-            <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Overall:</span>
-                <span className="text-sm font-bold" style={{ color: getScoreColor(currentOverall), fontFamily: 'var(--font-mono)' }}>{scoreToGrade(currentOverall)}</span>
-                <ArrowRight className="w-3 h-3" style={{ color: 'var(--text-tertiary)' }} />
-                <span className="text-sm font-bold" style={{ color: '#10B981', fontFamily: 'var(--font-mono)' }}>{scoreToGrade(projectedOverall)}</span>
-              </div>
-              {improvements.map((imp) => (
-                <div key={imp.label} className="flex items-center gap-1.5">
-                  <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>{imp.label}:</span>
-                  <span className="text-xs font-bold" style={{ color: getScoreColor(imp.current), fontFamily: 'var(--font-mono)' }}>{scoreToGrade(imp.current)}</span>
-                  <ArrowRight className="w-3 h-3" style={{ color: 'var(--text-tertiary)' }} />
-                  <span className="text-xs font-bold" style={{ color: '#10B981', fontFamily: 'var(--font-mono)' }}>{scoreToGrade(imp.projected)}</span>
+          <div className="rounded-2xl border p-6 mb-6" style={{ background: '#111827', borderColor: '#374151' }}>
+            <p className="text-xs font-semibold uppercase tracking-wider mb-5" style={{ color: '#10B981' }}>Projected improvement from your top 5 fixes</p>
+
+            {/* PART A — Arc Gauge */}
+            <div className="flex justify-center mb-6">
+              <svg width="300" height="160" viewBox="0 0 300 160">
+                <defs>
+                  <linearGradient id="projArcGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stopColor="#F59E0B" />
+                    <stop offset="100%" stopColor="#10B981" />
+                  </linearGradient>
+                  <filter id="projGlow">
+                    <feGaussianBlur stdDeviation="4" result="blur" />
+                    <feMerge>
+                      <feMergeNode in="blur" />
+                      <feMergeNode in="SourceGraphic" />
+                    </feMerge>
+                  </filter>
+                </defs>
+                {/* Background dashed arc */}
+                <path d={bgArcPath} fill="none" stroke="#374151" strokeWidth={arcStroke} strokeLinecap="round" strokeDasharray="6 4" />
+                {/* Current score arc */}
+                <path d={currentArcPath} fill="none" stroke="#4B5563" strokeWidth={arcStroke} strokeLinecap="round"
+                  style={{
+                    strokeDasharray: currentArcLen,
+                    strokeDashoffset: animateProjections ? 0 : currentArcLen,
+                    transition: 'stroke-dashoffset 600ms ease-out',
+                  }}
+                />
+                {/* Projected improvement arc */}
+                <path d={projectedArcPath} fill="none" stroke="url(#projArcGrad)" strokeWidth={arcStroke} strokeLinecap="round"
+                  filter="url(#projGlow)"
+                  style={{
+                    strokeDasharray: projectedArcLen,
+                    strokeDashoffset: animateProjections ? 0 : projectedArcLen,
+                    transition: 'stroke-dashoffset 600ms ease-out 300ms',
+                  }}
+                />
+                {/* Glow dot at projected end */}
+                <circle cx={projEndPt.x} cy={projEndPt.y} r="6" fill="#10B981"
+                  style={{
+                    opacity: animateProjections ? 1 : 0,
+                    transition: 'opacity 400ms ease-out 700ms',
+                    filter: 'drop-shadow(0 0 6px rgba(16,185,129,0.6))',
+                  }}
+                />
+                {/* Current score label — left side */}
+                <text x="45" y="145" textAnchor="middle" fill="#9CA3AF" fontSize="10" fontWeight="500">Your Score</text>
+                <text x="45" y="130" textAnchor="middle" fill={getArcColor(currentOverall)} fontSize="28" fontWeight="700" fontFamily="var(--font-mono)">{currentOverall}</text>
+                <text x="45" y="155" textAnchor="middle" fill="#6B7280" fontSize="11" fontWeight="600">{currentGrade}</text>
+                {/* Projected score label — right side */}
+                <text x="255" y="145" textAnchor="middle" fill="#9CA3AF" fontSize="10" fontWeight="500">After Fixes</text>
+                <text x="255" y="130" textAnchor="middle" fontSize="28" fontWeight="700" fontFamily="var(--font-mono)"
+                  style={{
+                    fill: animateProjections ? '#10B981' : '#6B7280',
+                    transition: 'fill 400ms ease-out 600ms',
+                  }}
+                >{projectedOverall}</text>
+                <text x="255" y="155" textAnchor="middle" fontSize="11" fontWeight="600"
+                  style={{
+                    fill: animateProjections ? '#10B981' : '#6B7280',
+                    transition: 'fill 400ms ease-out 600ms',
+                  }}
+                >{projectedGrade}</text>
+                {/* Center delta */}
+                <text x={arcCx} y="90" textAnchor="middle" fill="#10B981" fontSize="14" fontWeight="700"
+                  style={{
+                    opacity: animateProjections ? 1 : 0,
+                    transition: 'opacity 400ms ease-out 800ms',
+                  }}
+                >+{totalGain} pts</text>
+              </svg>
+            </div>
+
+            {/* PART B — Per-Fix Horizontal Bar Chart */}
+            <div className="space-y-2 mb-6">
+              {fixDetails.map((fix, i) => {
+                const barPct = (fix.points / maxPoints) * 100;
+                return (
+                  <div key={i} className="rounded-xl p-3 transition-colors" style={{ background: '#1F2937' }}
+                    onMouseEnter={e => (e.currentTarget.style.background = '#283141')}
+                    onMouseLeave={e => (e.currentTarget.style.background = '#1F2937')}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate" style={{ color: '#E5E7EB', maxWidth: 200 }}>{fix.title}</p>
+                        <p className="text-xs mt-0.5" style={{ color: '#6B7280' }}>{fix.category}</p>
+                      </div>
+                      <span className="text-xs px-2 py-0.5 rounded-full font-medium shrink-0" style={{ color: fix.owner.color, background: `${fix.owner.color}20` }}>{fix.owner.label}</span>
+                    </div>
+                    <div className="mt-2 flex items-center gap-2">
+                      <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: '#374151' }}>
+                        <div className="h-full rounded-full" style={{
+                          background: 'linear-gradient(90deg, #F59E0B, #10B981)',
+                          width: animateProjections ? `${barPct}%` : '0%',
+                          transition: `width 500ms ease-out ${300 + i * 100}ms`,
+                        }} />
+                      </div>
+                      <span className="text-xs font-bold shrink-0" style={{
+                        color: '#10B981',
+                        opacity: animateProjections ? 1 : 0,
+                        transition: `opacity 300ms ease-out ${500 + i * 100}ms`,
+                        fontFamily: 'var(--font-mono)',
+                      }}>+{fix.points} pts</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* PART C — Summary Stat Row */}
+            <div className="grid grid-cols-3 gap-3">
+              {[
+                { label: 'Total Point Gain', value: `+${totalGain}`, icon: <TrendingUp className="w-4 h-4" style={{ color: '#10B981' }} /> },
+                { label: 'Grade Jump', value: `${currentGrade} → ${projectedGrade}`, icon: <ArrowRight className="w-4 h-4" style={{ color: '#6366F1' }} /> },
+                { label: 'Fixes Required', value: `${top5.length} changes`, icon: <Wrench className="w-4 h-4" style={{ color: '#F59E0B' }} /> },
+              ].map((stat, i) => (
+                <div key={stat.label} className="rounded-xl p-3 text-center" style={{
+                  background: '#1F2937',
+                  opacity: animateProjections ? 1 : 0,
+                  transform: animateProjections ? 'translateY(0)' : 'translateY(8px)',
+                  transition: `opacity 400ms ease-out ${800 + i * 100}ms, transform 400ms ease-out ${800 + i * 100}ms`,
+                }}>
+                  <div className="flex justify-center mb-1">{stat.icon}</div>
+                  <p className="text-lg font-bold" style={{ color: '#F9FAFB', fontFamily: 'var(--font-mono)' }}>{stat.value}</p>
+                  <p className="text-xs" style={{ color: '#6B7280' }}>{stat.label}</p>
                 </div>
               ))}
             </div>
-            <p className="text-xs mt-2" style={{ color: 'var(--text-tertiary)' }}>Estimates based on issue severity. Actual improvement may vary.</p>
+
+            <p className="text-xs mt-4 text-center" style={{ color: '#4B5563' }}>Estimates based on issue severity. Actual improvement may vary.</p>
           </div>
         );
       })()}

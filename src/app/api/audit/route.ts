@@ -3,6 +3,7 @@ import { createServerSupabase } from '@/lib/supabase/server';
 import { scanSite } from '@/lib/scanner';
 import { calculateScores, generateRecommendations, enrichWithCodeSnippets } from '@/lib/scoring';
 import { classifyBusiness } from '@/lib/classify';
+import { isAdminAccount } from '@/lib/entitlements';
 
 export const maxDuration = 60;
 
@@ -65,8 +66,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if user has paid entitlements for this site (admin bypass first)
-    const ADMIN_EMAILS = ['demo@aivisibility.test', 'mikedaman@gmail.com'];
-    const isAdmin = !!(user.email && ADMIN_EMAILS.includes(user.email));
+    const isAdmin = isAdminAccount(user.email);
     let hasPaidEntitlement = isAdmin;
     if (!hasPaidEntitlement) {
       const { data: entitlement } = await supabase

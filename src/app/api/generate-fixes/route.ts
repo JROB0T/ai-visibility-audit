@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabase } from '@/lib/supabase/server';
 import { createClient } from '@supabase/supabase-js';
+import { isAdminAccount } from '@/lib/entitlements';
 
 export const maxDuration = 60;
 
@@ -11,8 +12,6 @@ const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
-
-const ADMIN_EMAILS = ['demo@aivisibility.test', 'mikedaman@gmail.com'];
 
 interface GeneratedFix {
   key: string;
@@ -39,7 +38,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Admin bypass + entitlement check
-    const isAdmin = !!(user.email && ADMIN_EMAILS.includes(user.email));
+    const isAdmin = isAdminAccount(user.email);
     if (!isAdmin && siteId) {
       const { data: entitlement } = await supabase
         .from('entitlements')

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabase } from '@/lib/supabase/server';
+import { isAdminAccount } from '@/lib/entitlements';
 
 export async function GET(
   request: NextRequest,
@@ -79,8 +80,7 @@ export async function GET(
 
     // Check entitlements for this user + site
     const { data: { user } } = await supabase.auth.getUser();
-    const ADMIN_EMAILS = ['demo@aivisibility.test', 'mikedaman@gmail.com'];
-    const isAdmin = !!(user?.email && ADMIN_EMAILS.includes(user.email));
+    const isAdmin = isAdminAccount(user?.email);
     let hasEntitlement = isAdmin;
     if (!hasEntitlement && user && audit.site_id) {
       const { data: entitlement } = await supabase

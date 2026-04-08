@@ -1,8 +1,16 @@
 import type { Entitlement, PlanStatus } from '@/lib/types';
 
+export const ADMIN_EMAILS = ['demo@aivisibility.test', 'mikedaman@gmail.com'];
+
+export function isAdminAccount(email: string | null | undefined): boolean {
+  if (!email) return false;
+  return ADMIN_EMAILS.includes(email.toLowerCase());
+}
+
 type Feature = 'core' | 'growth_strategy' | 'marketing_perception' | 'export';
 
-export function checkEntitlement(entitlement: Entitlement | null, feature: Feature): boolean {
+export function checkEntitlement(entitlement: Entitlement | null, feature: Feature, userEmail?: string | null): boolean {
+  if (isAdminAccount(userEmail)) return true;
   if (!entitlement) return false;
   switch (feature) {
     case 'core': return entitlement.can_view_core;

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabase } from '@/lib/supabase/server';
+import { isAdminAccount } from '@/lib/entitlements';
 
 export const maxDuration = 60;
 
@@ -23,8 +24,7 @@ export async function POST(request: NextRequest) {
     // Entitlement check (admin bypass first)
     const supabase = await createServerSupabase();
     const { data: { user } } = await supabase.auth.getUser();
-    const ADMIN_EMAILS = ['demo@aivisibility.test', 'mikedaman@gmail.com'];
-    const isAdmin = !!(user?.email && ADMIN_EMAILS.includes(user.email));
+    const isAdmin = isAdminAccount(user?.email);
     if (!isAdmin) {
       if (user && siteId) {
         const { data: entitlement } = await supabase
