@@ -472,7 +472,7 @@ export default function AuditResultPage() {
   const [generatedFixes, setGeneratedFixes] = useState<Array<{ key: string; implementation: string; explanation: string }> | null>(null);
   const [fixesLoading, setFixesLoading] = useState(false);
   const fixesRequested = useRef(false);
-  const [animateProjections, setAnimateProjections] = useState(false);
+  const [animateProjections, setAnimateProjections] = useState(true);
 
   function switchTab(tab: ReportTab) {
     setActiveTab(tab);
