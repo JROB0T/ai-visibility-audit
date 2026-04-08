@@ -472,7 +472,7 @@ export default function AuditResultPage() {
   const [generatedFixes, setGeneratedFixes] = useState<Array<{ key: string; implementation: string; explanation: string }> | null>(null);
   const [fixesLoading, setFixesLoading] = useState(false);
   const fixesRequested = useRef(false);
-  const [animateProjections, setAnimateProjections] = useState(true);
+  // animateProjections state removed — card design doesn't need it
 
   function switchTab(tab: ReportTab) {
     setActiveTab(tab);
@@ -711,16 +711,7 @@ export default function AuditResultPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
 
-  // Trigger projection animations when Overview tab becomes active
-  useEffect(() => {
-    if (activeTab === 'overview') {
-      setAnimateProjections(false);
-      const timer = setTimeout(() => setAnimateProjections(true), 50);
-      return () => clearTimeout(timer);
-    } else {
-      setAnimateProjections(false);
-    }
-  }, [activeTab]);
+  // animateProjections useEffect removed — card design doesn't need it
 
   useEffect(() => {
     async function load() {
@@ -1226,11 +1217,7 @@ export default function AuditResultPage() {
         const currentGrade = scoreToGrade(currentOverall);
         const projectedGrade = scoreToGrade(projectedOverall);
 
-        // Donut geometry constants
-        const donutR = 40;
-        const donutCirc = 2 * Math.PI * donutR; // ~251.2
-
-        // Build the list of donut rings: Overall first, then all 4 categories
+        // Build the list of items: Overall first, then all 4 categories
         const donutItems: { label: string; current: number; projected: number; gain: number }[] = [
           { label: 'Overall', current: currentOverall, projected: projectedOverall, gain: totalGain },
         ];
@@ -1242,111 +1229,29 @@ export default function AuditResultPage() {
 
         return (
           <div className="rounded-2xl border p-6 mb-6" style={{ background: '#111827', borderColor: '#374151' }}>
-            <style>{`
-              @keyframes gainPulse {
-                0%, 100% { stroke-opacity: 1; stroke-width: 10px; filter: drop-shadow(0 0 4px #34d399); }
-                50% { stroke-opacity: 0.6; stroke-width: 13px; filter: drop-shadow(0 0 10px #34d399); }
-              }
-              .gain-segment {
-                animation: gainPulse 2s ease-in-out infinite;
-                animation-delay: 1200ms;
-              }
-            `}</style>
-
             <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-6">
               Projected Improvement From Your Top 5 Fixes
             </h3>
 
-            <div className="flex flex-wrap justify-center gap-8">
-              {donutItems.map((item) => {
-                const circ = donutCirc;
-                const seg1 = (item.current / 100) * circ;
-                const seg2 = (item.gain / 100) * circ;
-                const seg3 = circ - seg1 - seg2;
-                const seg1Offset = animateProjections ? circ - seg1 : circ;
-                const seg2Offset = animateProjections ? circ - seg2 : circ;
-                const seg3Offset = animateProjections ? circ - seg3 : circ;
-
-                return (
-                  <div key={item.label} className="flex flex-col items-center gap-2" style={{ width: 120 }}>
-                    <svg width="110" height="110" viewBox="0 0 110 110">
-                      {/* Track */}
-                      <circle cx="55" cy="55" r={donutR} fill="none" stroke="#1f2937" strokeWidth="10" />
-                      {/* Segment 3 - Remaining headroom (dark) */}
-                      <circle
-                        cx="55" cy="55" r={donutR} fill="none"
-                        stroke="#374151" strokeWidth="10"
-                        strokeDasharray={`${seg3} ${circ}`}
-                        strokeDashoffset={seg3Offset}
-                        strokeLinecap="butt"
-                        transform="rotate(-90 55 55)"
-                        style={{
-                          transition: animateProjections ? 'stroke-dashoffset 0.3s ease-out 1.1s' : 'none',
-                          transformOrigin: '55px 55px'
-                        }}
-                      />
-                      {/* Segment 1 - Current score (amber) */}
-                      <circle
-                        cx="55" cy="55" r={donutR} fill="none"
-                        stroke="#fbbf24" strokeWidth="10"
-                        strokeDasharray={`${seg1} ${circ}`}
-                        strokeDashoffset={seg1Offset}
-                        strokeLinecap="butt"
-                        transform="rotate(-90 55 55)"
-                        style={{
-                          transition: animateProjections ? 'stroke-dashoffset 0.6s ease-out 0s' : 'none',
-                          transformOrigin: '55px 55px'
-                        }}
-                      />
-                      {/* Segment 2 - Projected gain (green) - starts after seg1 */}
-                      <circle
-                        cx="55" cy="55" r={donutR} fill="none"
-                        stroke="#34d399" strokeWidth="10"
-                        strokeDasharray={`${seg2} ${circ}`}
-                        strokeDashoffset={seg2Offset}
-                        strokeLinecap="butt"
-                        transform={`rotate(${-90 + (item.current / 100) * 360} 55 55)`}
-                        className={animateProjections && item.gain > 0 ? 'gain-segment' : ''}
-                        style={{
-                          transition: animateProjections ? 'stroke-dashoffset 0.4s ease-out 0.7s' : 'none',
-                          transformOrigin: '55px 55px'
-                        }}
-                      />
-                      {/* Center text */}
-                      <text x="55" y="50" textAnchor="middle" fill="#f9fafb" fontSize="18" fontWeight="bold">
-                        {item.gain > 0 ? `+${item.gain}` : scoreToGrade(item.current)}
-                      </text>
-                      <text x="55" y="66" textAnchor="middle" fill="#9ca3af" fontSize="10">
-                        {item.gain > 0 ? 'pts' : 'no change'}
-                      </text>
-                    </svg>
-                    <span className="text-xs text-gray-400 text-center leading-tight">{item.label}</span>
-                    <span className="text-sm font-bold text-emerald-400">
-                      {scoreToGrade(item.current)} → {scoreToGrade(item.projected)}
-                    </span>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
+              {donutItems.map((item) => (
+                <div key={item.label} className="rounded-xl p-4 text-center" style={{ background: '#1f2937', border: '1px solid #374151' }}>
+                  {/* Category label */}
+                  <div className="text-xs text-gray-500 uppercase tracking-wide mb-3">{item.label}</div>
+                  {/* Current grade — muted */}
+                  <div className="text-2xl font-bold text-gray-500">{scoreToGrade(item.current)}</div>
+                  {/* Gain */}
+                  <div className="my-2 text-emerald-400 font-bold text-sm">
+                    {item.gain > 0 ? `+${item.gain} pts` : 'Optimized'}
                   </div>
-                );
-              })}
-            </div>
-
-            {/* Legend */}
-            <div className="flex justify-center gap-6 mt-6">
-              <div className="flex items-center gap-1.5">
-                <div className="w-2.5 h-2.5 rounded-full" style={{ background: '#fbbf24' }} />
-                <span className="text-xs text-gray-500">Current Score</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <div className="w-2.5 h-2.5 rounded-full" style={{ background: '#34d399' }} />
-                <span className="text-xs text-gray-500">Projected Gain</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <div className="w-2.5 h-2.5 rounded-full" style={{ background: '#374151' }} />
-                <span className="text-xs text-gray-500">Remaining Headroom</span>
-              </div>
+                  {/* Projected grade — bright and prominent */}
+                  <div className="text-3xl font-bold text-emerald-400">{scoreToGrade(item.projected)}</div>
+                </div>
+              ))}
             </div>
 
             {/* Summary stats */}
-            <div className="grid grid-cols-3 gap-4 mt-6">
+            <div className="grid grid-cols-3 gap-4">
               <div className="rounded-xl p-3 text-center" style={{ background: '#1f2937' }}>
                 <div className="text-xl font-bold text-emerald-400">+{totalGain}</div>
                 <div className="text-xs text-gray-500 mt-0.5">Total Point Gain</div>

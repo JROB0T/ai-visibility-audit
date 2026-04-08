@@ -3,7 +3,7 @@
   "configurations": [
     {
       "name": "dev",
-      "runtimeExecutable": "npm",
+      "runtimeExecutable": "npx",
       "runtimeArgs": ["run", "dev"],
       "port": 3000
     }
