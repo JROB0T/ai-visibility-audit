@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import ScoreRing, { ScoreBar, scoreToGrade, getScoreColor } from '@/components/ScoreRing';
 import SeverityBadge, { EffortBadge } from '@/components/SeverityBadge';
-import { Lock, ArrowRight, ArrowLeft, CheckCircle, XCircle, ExternalLink, FileText, AlertTriangle, RefreshCw, ChevronDown, ChevronRight, Filter, Shield, Code, Eye, Bot, Copy, Check, Globe, Minus, LayoutGrid, Wrench, Zap, MonitorSmartphone, X, Download, Target, Users, CalendarCheck, TrendingUp } from 'lucide-react';
+import { Lock, ArrowRight, ArrowLeft, CheckCircle, XCircle, ExternalLink, FileText, AlertTriangle, RefreshCw, ChevronDown, ChevronRight, Filter, Shield, Code, Eye, Bot, Copy, Check, Globe, Minus, LayoutGrid, Wrench, Zap, MonitorSmartphone, X, Download, Target, Users, CalendarCheck } from 'lucide-react';
 import { compareAudits, classifyFinding, generateMonthlyActions } from '@/lib/deltas';
 import { getExpectedPages, getVerticalConfig } from '@/lib/verticals';
 
