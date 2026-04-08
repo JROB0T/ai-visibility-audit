@@ -1244,94 +1244,126 @@ export default function AuditResultPage() {
           <div className="rounded-2xl border p-6 mb-6" style={{ background: '#111827', borderColor: '#374151' }}>
             <style>{`
               @keyframes gainPulse {
-                0%, 100% { stroke-opacity: 1; stroke-width: 10px; filter: drop-shadow(0 0 3px #34d399); }
-                50% { stroke-opacity: 0.65; stroke-width: 13px; filter: drop-shadow(0 0 8px #34d399); }
+                0%, 100% { stroke-opacity: 1; stroke-width: 10px; filter: drop-shadow(0 0 4px #34d399); }
+                50% { stroke-opacity: 0.6; stroke-width: 13px; filter: drop-shadow(0 0 10px #34d399); }
               }
-              .gain-segment { animation: gainPulse 2s ease-in-out infinite; animation-delay: 1200ms; }
+              .gain-segment {
+                animation: gainPulse 2s ease-in-out infinite;
+                animation-delay: 1200ms;
+              }
             `}</style>
-            <p className="text-xs font-semibold uppercase tracking-wider mb-5" style={{ color: '#10B981' }}>Projected improvement from your top 5 fixes</p>
 
-            {/* Donut circles row */}
-            <div className="flex flex-wrap justify-center gap-6 mb-6">
+            <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-6">
+              Projected Improvement From Your Top 5 Fixes
+            </h3>
+
+            <div className="flex flex-wrap justify-center gap-8">
               {donutItems.map((item) => {
-                const seg1Len = (item.current / 100) * donutCirc;
-                const seg2Len = (item.gain / 100) * donutCirc;
-                const seg3Len = donutCirc - seg1Len - seg2Len;
+                const circ = donutCirc;
+                const seg1 = (item.current / 100) * circ;
+                const seg2 = (item.gain / 100) * circ;
+                const seg3 = circ - seg1 - seg2;
+                const seg1Offset = animateProjections ? circ - seg1 : circ;
+                const seg2Offset = animateProjections ? circ - seg2 : circ;
+                const seg3Offset = animateProjections ? circ - seg3 : circ;
+
                 return (
-                  <div key={item.label} className="flex flex-col items-center">
+                  <div key={item.label} className="flex flex-col items-center gap-2" style={{ width: 120 }}>
                     <svg width="110" height="110" viewBox="0 0 110 110">
-                      {/* Background track */}
+                      {/* Track */}
                       <circle cx="55" cy="55" r={donutR} fill="none" stroke="#1f2937" strokeWidth="10" />
-                      {/* Segment 3 — dark remainder (draws last) */}
-                      <circle cx="55" cy="55" r={donutR} fill="none" stroke="#374151" strokeWidth="10"
-                        strokeLinecap="round"
+                      {/* Segment 3 - Remaining headroom (dark) */}
+                      <circle
+                        cx="55" cy="55" r={donutR} fill="none"
+                        stroke="#374151" strokeWidth="10"
+                        strokeDasharray={`${seg3} ${circ}`}
+                        strokeDashoffset={seg3Offset}
+                        strokeLinecap="butt"
                         transform="rotate(-90 55 55)"
                         style={{
-                          strokeDasharray: `${seg3Len} ${donutCirc - seg3Len}`,
-                          strokeDashoffset: animateProjections ? -(seg1Len + seg2Len) : -donutCirc,
-                          transition: 'stroke-dashoffset 700ms ease-out 1100ms',
+                          transition: animateProjections ? 'stroke-dashoffset 0.3s ease-out 1.1s' : 'none',
+                          transformOrigin: '55px 55px'
                         }}
                       />
-                      {/* Segment 2 — emerald gain (draws second) */}
-                      <circle cx="55" cy="55" r={donutR} fill="none" stroke="#34d399" strokeWidth="10"
-                        className={animateProjections ? 'gain-segment' : undefined}
-                        strokeLinecap="round"
+                      {/* Segment 1 - Current score (amber) */}
+                      <circle
+                        cx="55" cy="55" r={donutR} fill="none"
+                        stroke="#fbbf24" strokeWidth="10"
+                        strokeDasharray={`${seg1} ${circ}`}
+                        strokeDashoffset={seg1Offset}
+                        strokeLinecap="butt"
                         transform="rotate(-90 55 55)"
                         style={{
-                          strokeDasharray: `${seg2Len} ${donutCirc - seg2Len}`,
-                          strokeDashoffset: animateProjections ? -seg1Len : -donutCirc,
-                          transition: 'stroke-dashoffset 700ms ease-out 700ms',
+                          transition: animateProjections ? 'stroke-dashoffset 0.6s ease-out 0s' : 'none',
+                          transformOrigin: '55px 55px'
                         }}
                       />
-                      {/* Segment 1 — amber current score (draws first) */}
-                      <circle cx="55" cy="55" r={donutR} fill="none" stroke="#fbbf24" strokeWidth="10"
-                        strokeLinecap="round"
-                        transform="rotate(-90 55 55)"
+                      {/* Segment 2 - Projected gain (green) - starts after seg1 */}
+                      <circle
+                        cx="55" cy="55" r={donutR} fill="none"
+                        stroke="#34d399" strokeWidth="10"
+                        strokeDasharray={`${seg2} ${circ}`}
+                        strokeDashoffset={seg2Offset}
+                        strokeLinecap="butt"
+                        transform={`rotate(${-90 + (item.current / 100) * 360} 55 55)`}
+                        className={animateProjections && item.gain > 0 ? 'gain-segment' : ''}
                         style={{
-                          strokeDasharray: `${seg1Len} ${donutCirc - seg1Len}`,
-                          strokeDashoffset: animateProjections ? 0 : donutCirc,
-                          transition: 'stroke-dashoffset 700ms ease-out',
+                          transition: animateProjections ? 'stroke-dashoffset 0.4s ease-out 0.7s' : 'none',
+                          transformOrigin: '55px 55px'
                         }}
                       />
-                      {/* Center text: projected grade */}
-                      <text x="55" y={item.gain > 0 ? 52 : 55} textAnchor="middle" dominantBaseline="central" fill={item.gain > 0 ? '#f9fafb' : '#9ca3af'} fontSize="20" fontWeight="700" fontFamily="var(--font-mono)">{scoreToGrade(item.gain > 0 ? item.projected : item.current)}</text>
-                      {/* Gain label below grade */}
-                      {item.gain > 0 && (
-                        <text x="55" y="70" textAnchor="middle" dominantBaseline="central" fill="#34d399" fontSize="10" fontWeight="600" fontFamily="var(--font-mono)">+{item.gain} pts</text>
-                      )}
+                      {/* Center text */}
+                      <text x="55" y="50" textAnchor="middle" fill="#f9fafb" fontSize="18" fontWeight="bold">
+                        {item.gain > 0 ? `+${item.gain}` : scoreToGrade(item.current)}
+                      </text>
+                      <text x="55" y="66" textAnchor="middle" fill="#9ca3af" fontSize="10">
+                        {item.gain > 0 ? 'pts' : 'no change'}
+                      </text>
                     </svg>
-                    <p className="text-xs font-medium mt-1" style={{ color: '#d1d5db' }}>{item.label}</p>
-                    {item.gain > 0 ? (
-                      <p className="text-xs" style={{ color: '#6b7280' }}>{scoreToGrade(item.current)} → {scoreToGrade(item.projected)}</p>
-                    ) : (
-                      <p className="text-xs" style={{ color: '#4b5563' }}>Already optimized</p>
-                    )}
+                    <span className="text-xs text-gray-400 text-center leading-tight">{item.label}</span>
+                    <span className="text-sm font-bold text-emerald-400">
+                      {scoreToGrade(item.current)} → {scoreToGrade(item.projected)}
+                    </span>
                   </div>
                 );
               })}
             </div>
 
-            {/* Summary stat row */}
-            <div className="grid grid-cols-3 gap-3">
-              {[
-                { label: 'Total Point Gain', value: `+${totalGain}`, icon: <TrendingUp className="w-4 h-4" style={{ color: '#10B981' }} /> },
-                { label: 'Grade Jump', value: `${currentGrade} → ${projectedGrade}`, icon: <ArrowRight className="w-4 h-4" style={{ color: '#6366F1' }} /> },
-                { label: 'Fixes Required', value: `${top5.length} changes`, icon: <Wrench className="w-4 h-4" style={{ color: '#F59E0B' }} /> },
-              ].map((stat, i) => (
-                <div key={stat.label} className="rounded-xl p-3 text-center" style={{
-                  background: '#1F2937',
-                  opacity: animateProjections ? 1 : 0,
-                  transform: animateProjections ? 'translateY(0)' : 'translateY(8px)',
-                  transition: `opacity 400ms ease-out ${1400 + i * 100}ms, transform 400ms ease-out ${1400 + i * 100}ms`,
-                }}>
-                  <div className="flex justify-center mb-1">{stat.icon}</div>
-                  <p className="text-lg font-bold" style={{ color: '#F9FAFB', fontFamily: 'var(--font-mono)' }}>{stat.value}</p>
-                  <p className="text-xs" style={{ color: '#6B7280' }}>{stat.label}</p>
-                </div>
-              ))}
+            {/* Legend */}
+            <div className="flex justify-center gap-6 mt-6">
+              <div className="flex items-center gap-1.5">
+                <div className="w-2.5 h-2.5 rounded-full" style={{ background: '#fbbf24' }} />
+                <span className="text-xs text-gray-500">Current Score</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-2.5 h-2.5 rounded-full" style={{ background: '#34d399' }} />
+                <span className="text-xs text-gray-500">Projected Gain</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-2.5 h-2.5 rounded-full" style={{ background: '#374151' }} />
+                <span className="text-xs text-gray-500">Remaining Headroom</span>
+              </div>
             </div>
 
-            <p className="text-xs mt-4 text-center" style={{ color: '#4B5563' }}>Estimates based on issue severity. Actual improvement may vary.</p>
+            {/* Summary stats */}
+            <div className="grid grid-cols-3 gap-4 mt-6">
+              <div className="rounded-xl p-3 text-center" style={{ background: '#1f2937' }}>
+                <div className="text-xl font-bold text-emerald-400">+{totalGain}</div>
+                <div className="text-xs text-gray-500 mt-0.5">Total Point Gain</div>
+              </div>
+              <div className="rounded-xl p-3 text-center" style={{ background: '#1f2937' }}>
+                <div className="text-xl font-bold text-white">{currentGrade} → {projectedGrade}</div>
+                <div className="text-xs text-gray-500 mt-0.5">Grade Jump</div>
+              </div>
+              <div className="rounded-xl p-3 text-center" style={{ background: '#1f2937' }}>
+                <div className="text-xl font-bold text-white">5</div>
+                <div className="text-xs text-gray-500 mt-0.5">Fixes Required</div>
+              </div>
+            </div>
+
+            <p className="text-xs text-gray-600 text-center mt-4">
+              Estimates based on issue severity. Actual improvement may vary.
+            </p>
           </div>
         );
       })()}
