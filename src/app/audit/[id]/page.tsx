@@ -711,9 +711,9 @@ export default function AuditResultPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
 
-  // Trigger projection animations when Fix Plan tab becomes active
+  // Trigger projection animations when Overview tab becomes active
   useEffect(() => {
-    if (activeTab === 'fix-plan') {
+    if (activeTab === 'overview') {
       setAnimateProjections(false);
       const timer = setTimeout(() => setAnimateProjections(true), 50);
       return () => clearTimeout(timer);
