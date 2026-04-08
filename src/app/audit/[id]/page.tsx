@@ -993,142 +993,6 @@ export default function AuditResultPage() {
         </div>
       </div>
 
-      {/* PROJECTED IMPROVEMENT — donut circles per category */}
-      {isAuthenticated && hasPaid && allFindings.length > 0 && (() => {
-        const severityOrder: Record<string, number> = { high: 0, medium: 1, low: 2 };
-        const effortOrder: Record<string, number> = { easy: 0, medium: 1, harder: 2 };
-        const top5 = [...allFindings]
-          .sort((a, b) => (severityOrder[a.severity] ?? 9) - (severityOrder[b.severity] ?? 9) || (effortOrder[a.effort] ?? 9) - (effortOrder[b.effort] ?? 9))
-          .slice(0, 5);
-        const impactMap: Record<string, number> = { high: 10, medium: 5, low: 2 };
-        const categoryBoosts: Record<string, number> = {};
-        for (const fix of top5) {
-          const pts = impactMap[fix.severity] || 3;
-          categoryBoosts[fix.category] = (categoryBoosts[fix.category] || 0) + pts;
-        }
-        const currentScores: Record<string, number> = {
-          crawlability: audit.crawlability_score ?? 0, machine_readability: audit.machine_readability_score ?? 0,
-          commercial_clarity: audit.commercial_clarity_score ?? 0, trust_clarity: audit.trust_clarity_score ?? 0,
-        };
-        const projectedScores: Record<string, number> = { ...currentScores };
-        for (const [cat, boost] of Object.entries(categoryBoosts)) {
-          projectedScores[cat] = Math.min(100, (currentScores[cat] ?? 0) + boost);
-        }
-        const weights: Record<string, number> = { crawlability: 0.3, machine_readability: 0.25, commercial_clarity: 0.3, trust_clarity: 0.15 };
-        const currentOverall = audit.overall_score ?? 0;
-        const projectedOverall = Math.min(100, Math.round(Object.entries(weights).reduce((sum, [cat, w]) => sum + (projectedScores[cat] ?? 0) * w, 0)));
-        if (projectedOverall <= currentOverall) return null;
-
-        const totalGain = projectedOverall - currentOverall;
-        const currentGrade = scoreToGrade(currentOverall);
-        const projectedGrade = scoreToGrade(projectedOverall);
-
-        // Donut geometry constants
-        const donutR = 40;
-        const donutCirc = 2 * Math.PI * donutR; // ~251.2
-
-        // Build the list of donut rings: Overall first, then each boosted category
-        const donutItems: { label: string; current: number; projected: number; gain: number }[] = [
-          { label: 'Overall', current: currentOverall, projected: projectedOverall, gain: totalGain },
-        ];
-        for (const [cat] of Object.entries(categoryBoosts)) {
-          const cur = currentScores[cat] ?? 0;
-          const proj = projectedScores[cat] ?? 0;
-          if (proj > cur) {
-            donutItems.push({ label: CATEGORY_LABELS[cat] || cat, current: cur, projected: proj, gain: proj - cur });
-          }
-        }
-
-        return (
-          <div className="rounded-2xl border p-6 mb-6" style={{ background: '#111827', borderColor: '#374151' }}>
-            <style>{`
-              @keyframes gainPulse {
-                0%, 100% { stroke-opacity: 1; stroke-width: 10px; filter: drop-shadow(0 0 3px #34d399); }
-                50% { stroke-opacity: 0.65; stroke-width: 13px; filter: drop-shadow(0 0 8px #34d399); }
-              }
-              .gain-segment { animation: gainPulse 2s ease-in-out infinite; animation-delay: 1200ms; }
-            `}</style>
-            <p className="text-xs font-semibold uppercase tracking-wider mb-5" style={{ color: '#10B981' }}>Projected improvement from your top 5 fixes</p>
-
-            {/* Donut circles row */}
-            <div className="flex flex-wrap justify-center gap-6 mb-6">
-              {donutItems.map((item) => {
-                const seg1Len = (item.current / 100) * donutCirc;
-                const seg2Len = (item.gain / 100) * donutCirc;
-                const seg3Len = donutCirc - seg1Len - seg2Len;
-                return (
-                  <div key={item.label} className="flex flex-col items-center">
-                    <svg width="110" height="110" viewBox="0 0 110 110">
-                      {/* Background track */}
-                      <circle cx="55" cy="55" r={donutR} fill="none" stroke="#1f2937" strokeWidth="10" />
-                      {/* Segment 3 — dark remainder (draws last) */}
-                      <circle cx="55" cy="55" r={donutR} fill="none" stroke="#374151" strokeWidth="10"
-                        strokeLinecap="round"
-                        transform="rotate(-90 55 55)"
-                        style={{
-                          strokeDasharray: `${seg3Len} ${donutCirc - seg3Len}`,
-                          strokeDashoffset: animateProjections ? -(seg1Len + seg2Len) : -donutCirc,
-                          transition: 'stroke-dashoffset 700ms ease-out 1100ms',
-                        }}
-                      />
-                      {/* Segment 2 — emerald gain (draws second) */}
-                      <circle cx="55" cy="55" r={donutR} fill="none" stroke="#34d399" strokeWidth="10"
-                        className={animateProjections ? 'gain-segment' : undefined}
-                        strokeLinecap="round"
-                        transform="rotate(-90 55 55)"
-                        style={{
-                          strokeDasharray: `${seg2Len} ${donutCirc - seg2Len}`,
-                          strokeDashoffset: animateProjections ? -seg1Len : -donutCirc,
-                          transition: 'stroke-dashoffset 700ms ease-out 700ms',
-                        }}
-                      />
-                      {/* Segment 1 — amber current score (draws first) */}
-                      <circle cx="55" cy="55" r={donutR} fill="none" stroke="#fbbf24" strokeWidth="10"
-                        strokeLinecap="round"
-                        transform="rotate(-90 55 55)"
-                        style={{
-                          strokeDasharray: `${seg1Len} ${donutCirc - seg1Len}`,
-                          strokeDashoffset: animateProjections ? 0 : donutCirc,
-                          transition: 'stroke-dashoffset 700ms ease-out',
-                        }}
-                      />
-                      {/* Center text: projected grade */}
-                      <text x="55" y="52" textAnchor="middle" dominantBaseline="central" fill="#f9fafb" fontSize="20" fontWeight="700" fontFamily="var(--font-mono)">{scoreToGrade(item.projected)}</text>
-                      {/* Gain label below grade */}
-                      <text x="55" y="70" textAnchor="middle" dominantBaseline="central" fill="#34d399" fontSize="10" fontWeight="600" fontFamily="var(--font-mono)">+{item.gain} pts</text>
-                    </svg>
-                    <p className="text-xs font-medium mt-1" style={{ color: '#d1d5db' }}>{item.label}</p>
-                    <p className="text-xs" style={{ color: '#6b7280' }}>{scoreToGrade(item.current)} → {scoreToGrade(item.projected)}</p>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Summary stat row */}
-            <div className="grid grid-cols-3 gap-3">
-              {[
-                { label: 'Total Point Gain', value: `+${totalGain}`, icon: <TrendingUp className="w-4 h-4" style={{ color: '#10B981' }} /> },
-                { label: 'Grade Jump', value: `${currentGrade} → ${projectedGrade}`, icon: <ArrowRight className="w-4 h-4" style={{ color: '#6366F1' }} /> },
-                { label: 'Fixes Required', value: `${top5.length} changes`, icon: <Wrench className="w-4 h-4" style={{ color: '#F59E0B' }} /> },
-              ].map((stat, i) => (
-                <div key={stat.label} className="rounded-xl p-3 text-center" style={{
-                  background: '#1F2937',
-                  opacity: animateProjections ? 1 : 0,
-                  transform: animateProjections ? 'translateY(0)' : 'translateY(8px)',
-                  transition: `opacity 400ms ease-out ${1400 + i * 100}ms, transform 400ms ease-out ${1400 + i * 100}ms`,
-                }}>
-                  <div className="flex justify-center mb-1">{stat.icon}</div>
-                  <p className="text-lg font-bold" style={{ color: '#F9FAFB', fontFamily: 'var(--font-mono)' }}>{stat.value}</p>
-                  <p className="text-xs" style={{ color: '#6B7280' }}>{stat.label}</p>
-                </div>
-              ))}
-            </div>
-
-            <p className="text-xs mt-4 text-center" style={{ color: '#4B5563' }}>Estimates based on issue severity. Actual improvement may vary.</p>
-          </div>
-        );
-      })()}
-
       {/* COMPETITOR BENCHMARK — paid only, on Overview */}
       {isAuthenticated && hasPaid && growthData && growthData.competitors.length > 0 && (
         <div className="card p-6 mb-6">
@@ -1331,6 +1195,142 @@ export default function AuditResultPage() {
         />
       )}
       {isAuthenticated && activeTab === 'fix-plan' && hasPaid && (<>
+
+      {/* PROJECTED IMPROVEMENT — donut circles per category */}
+      {allFindings.length > 0 && (() => {
+        const severityOrder: Record<string, number> = { high: 0, medium: 1, low: 2 };
+        const effortOrder: Record<string, number> = { easy: 0, medium: 1, harder: 2 };
+        const top5 = [...allFindings]
+          .sort((a, b) => (severityOrder[a.severity] ?? 9) - (severityOrder[b.severity] ?? 9) || (effortOrder[a.effort] ?? 9) - (effortOrder[b.effort] ?? 9))
+          .slice(0, 5);
+        const impactMap: Record<string, number> = { high: 10, medium: 5, low: 2 };
+        const categoryBoosts: Record<string, number> = {};
+        for (const fix of top5) {
+          const pts = impactMap[fix.severity] || 3;
+          categoryBoosts[fix.category] = (categoryBoosts[fix.category] || 0) + pts;
+        }
+        const currentScores: Record<string, number> = {
+          crawlability: audit.crawlability_score ?? 0, machine_readability: audit.machine_readability_score ?? 0,
+          commercial_clarity: audit.commercial_clarity_score ?? 0, trust_clarity: audit.trust_clarity_score ?? 0,
+        };
+        const projectedScores: Record<string, number> = { ...currentScores };
+        for (const [cat] of Object.entries(categoryBoosts)) {
+          projectedScores[cat] = Math.min(100, (currentScores[cat] ?? 0) + (categoryBoosts[cat] ?? 0));
+        }
+        const weights: Record<string, number> = { crawlability: 0.3, machine_readability: 0.25, commercial_clarity: 0.3, trust_clarity: 0.15 };
+        const currentOverall = audit.overall_score ?? 0;
+        const projectedOverall = Math.min(100, Math.round(Object.entries(weights).reduce((sum, [cat, w]) => sum + (projectedScores[cat] ?? 0) * w, 0)));
+        if (projectedOverall <= currentOverall) return null;
+
+        const totalGain = projectedOverall - currentOverall;
+        const currentGrade = scoreToGrade(currentOverall);
+        const projectedGrade = scoreToGrade(projectedOverall);
+
+        // Donut geometry constants
+        const donutR = 40;
+        const donutCirc = 2 * Math.PI * donutR; // ~251.2
+
+        // Build the list of donut rings: Overall first, then each boosted category
+        const donutItems: { label: string; current: number; projected: number; gain: number }[] = [
+          { label: 'Overall', current: currentOverall, projected: projectedOverall, gain: totalGain },
+        ];
+        for (const [cat] of Object.entries(categoryBoosts)) {
+          const cur = currentScores[cat] ?? 0;
+          const proj = projectedScores[cat] ?? 0;
+          if (proj > cur) {
+            donutItems.push({ label: CATEGORY_LABELS[cat] || cat, current: cur, projected: proj, gain: proj - cur });
+          }
+        }
+
+        return (
+          <div className="rounded-2xl border p-6 mb-6" style={{ background: '#111827', borderColor: '#374151' }}>
+            <style>{`
+              @keyframes gainPulse {
+                0%, 100% { stroke-opacity: 1; stroke-width: 10px; filter: drop-shadow(0 0 3px #34d399); }
+                50% { stroke-opacity: 0.65; stroke-width: 13px; filter: drop-shadow(0 0 8px #34d399); }
+              }
+              .gain-segment { animation: gainPulse 2s ease-in-out infinite; animation-delay: 1200ms; }
+            `}</style>
+            <p className="text-xs font-semibold uppercase tracking-wider mb-5" style={{ color: '#10B981' }}>Projected improvement from your top 5 fixes</p>
+
+            {/* Donut circles row */}
+            <div className="flex flex-wrap justify-center gap-6 mb-6">
+              {donutItems.map((item) => {
+                const seg1Len = (item.current / 100) * donutCirc;
+                const seg2Len = (item.gain / 100) * donutCirc;
+                const seg3Len = donutCirc - seg1Len - seg2Len;
+                return (
+                  <div key={item.label} className="flex flex-col items-center">
+                    <svg width="110" height="110" viewBox="0 0 110 110">
+                      {/* Background track */}
+                      <circle cx="55" cy="55" r={donutR} fill="none" stroke="#1f2937" strokeWidth="10" />
+                      {/* Segment 3 — dark remainder (draws last) */}
+                      <circle cx="55" cy="55" r={donutR} fill="none" stroke="#374151" strokeWidth="10"
+                        strokeLinecap="round"
+                        transform="rotate(-90 55 55)"
+                        style={{
+                          strokeDasharray: `${seg3Len} ${donutCirc - seg3Len}`,
+                          strokeDashoffset: animateProjections ? -(seg1Len + seg2Len) : -donutCirc,
+                          transition: 'stroke-dashoffset 700ms ease-out 1100ms',
+                        }}
+                      />
+                      {/* Segment 2 — emerald gain (draws second) */}
+                      <circle cx="55" cy="55" r={donutR} fill="none" stroke="#34d399" strokeWidth="10"
+                        className={animateProjections ? 'gain-segment' : undefined}
+                        strokeLinecap="round"
+                        transform="rotate(-90 55 55)"
+                        style={{
+                          strokeDasharray: `${seg2Len} ${donutCirc - seg2Len}`,
+                          strokeDashoffset: animateProjections ? -seg1Len : -donutCirc,
+                          transition: 'stroke-dashoffset 700ms ease-out 700ms',
+                        }}
+                      />
+                      {/* Segment 1 — amber current score (draws first) */}
+                      <circle cx="55" cy="55" r={donutR} fill="none" stroke="#fbbf24" strokeWidth="10"
+                        strokeLinecap="round"
+                        transform="rotate(-90 55 55)"
+                        style={{
+                          strokeDasharray: `${seg1Len} ${donutCirc - seg1Len}`,
+                          strokeDashoffset: animateProjections ? 0 : donutCirc,
+                          transition: 'stroke-dashoffset 700ms ease-out',
+                        }}
+                      />
+                      {/* Center text: projected grade */}
+                      <text x="55" y="52" textAnchor="middle" dominantBaseline="central" fill="#f9fafb" fontSize="20" fontWeight="700" fontFamily="var(--font-mono)">{scoreToGrade(item.projected)}</text>
+                      {/* Gain label below grade */}
+                      <text x="55" y="70" textAnchor="middle" dominantBaseline="central" fill="#34d399" fontSize="10" fontWeight="600" fontFamily="var(--font-mono)">+{item.gain} pts</text>
+                    </svg>
+                    <p className="text-xs font-medium mt-1" style={{ color: '#d1d5db' }}>{item.label}</p>
+                    <p className="text-xs" style={{ color: '#6b7280' }}>{scoreToGrade(item.current)} → {scoreToGrade(item.projected)}</p>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Summary stat row */}
+            <div className="grid grid-cols-3 gap-3">
+              {[
+                { label: 'Total Point Gain', value: `+${totalGain}`, icon: <TrendingUp className="w-4 h-4" style={{ color: '#10B981' }} /> },
+                { label: 'Grade Jump', value: `${currentGrade} → ${projectedGrade}`, icon: <ArrowRight className="w-4 h-4" style={{ color: '#6366F1' }} /> },
+                { label: 'Fixes Required', value: `${top5.length} changes`, icon: <Wrench className="w-4 h-4" style={{ color: '#F59E0B' }} /> },
+              ].map((stat, i) => (
+                <div key={stat.label} className="rounded-xl p-3 text-center" style={{
+                  background: '#1F2937',
+                  opacity: animateProjections ? 1 : 0,
+                  transform: animateProjections ? 'translateY(0)' : 'translateY(8px)',
+                  transition: `opacity 400ms ease-out ${1400 + i * 100}ms, transform 400ms ease-out ${1400 + i * 100}ms`,
+                }}>
+                  <div className="flex justify-center mb-1">{stat.icon}</div>
+                  <p className="text-lg font-bold" style={{ color: '#F9FAFB', fontFamily: 'var(--font-mono)' }}>{stat.value}</p>
+                  <p className="text-xs" style={{ color: '#6B7280' }}>{stat.label}</p>
+                </div>
+              ))}
+            </div>
+
+            <p className="text-xs mt-4 text-center" style={{ color: '#4B5563' }}>Estimates based on issue severity. Actual improvement may vary.</p>
+          </div>
+        );
+      })()}
 
       {/* Generating fixes loading state */}
       {fixesLoading && (
