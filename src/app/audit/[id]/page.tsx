@@ -993,7 +993,7 @@ export default function AuditResultPage() {
         </div>
       </div>
 
-      {/* PROJECTED IMPROVEMENT — premium animated dashboard */}
+      {/* PROJECTED IMPROVEMENT — donut circles per category */}
       {isAuthenticated && hasPaid && allFindings.length > 0 && (() => {
         const severityOrder: Record<string, number> = { high: 0, medium: 1, low: 2 };
         const effortOrder: Record<string, number> = { easy: 0, medium: 1, harder: 2 };
@@ -1022,182 +1022,89 @@ export default function AuditResultPage() {
         const totalGain = projectedOverall - currentOverall;
         const currentGrade = scoreToGrade(currentOverall);
         const projectedGrade = scoreToGrade(projectedOverall);
-        const fixDetails = top5.map(fix => ({
-          title: fix.title,
-          points: impactMap[fix.severity] || 3,
-          category: CATEGORY_LABELS[fix.category] || fix.category,
-          owner: getFixOwner(fix.title, fix.category),
-        }));
-        const maxPoints = Math.max(...fixDetails.map(f => f.points), 1);
 
-        // Arc gauge geometry
-        const arcRadius = 90;
-        const arcStroke = 12;
-        const arcCx = 150;
-        const arcCy = 110;
-        const arcStartAngle = -210;
-        const arcEndAngle = 30;
-        const arcTotalDeg = arcEndAngle - arcStartAngle;
-        const toRad = (deg: number) => (deg * Math.PI) / 180;
-        const scoreToAngle = (score: number) => arcStartAngle + (score / 100) * arcTotalDeg;
-        const arcPoint = (angle: number) => ({
-          x: arcCx + arcRadius * Math.cos(toRad(angle)),
-          y: arcCy + arcRadius * Math.sin(toRad(angle)),
-        });
-        const describeArc = (startAngle: number, endAngle: number) => {
-          const start = arcPoint(startAngle);
-          const end = arcPoint(endAngle);
-          const largeArc = (endAngle - startAngle) > 180 ? 1 : 0;
-          return `M ${start.x} ${start.y} A ${arcRadius} ${arcRadius} 0 ${largeArc} 1 ${end.x} ${end.y}`;
-        };
-        const getArcColor = (score: number) => {
-          if (score < 50) return '#EF4444';
-          if (score < 65) return '#F59E0B';
-          if (score < 80) return '#10B981';
-          return '#3B82F6';
-        };
+        // Donut geometry constants
+        const donutR = 40;
+        const donutCirc = 2 * Math.PI * donutR; // ~251.2
 
-        const bgArcPath = describeArc(arcStartAngle, arcEndAngle);
-        const currentAngle = scoreToAngle(currentOverall);
-        const projectedAngle = scoreToAngle(projectedOverall);
-        const currentArcPath = describeArc(arcStartAngle, currentAngle);
-        const projectedArcPath = describeArc(currentAngle, projectedAngle);
-        const currentArcLen = (Math.abs(currentAngle - arcStartAngle) / 360) * 2 * Math.PI * arcRadius;
-        const projectedArcLen = (Math.abs(projectedAngle - currentAngle) / 360) * 2 * Math.PI * arcRadius;
-
-        const projEndPt = arcPoint(projectedAngle);
+        // Build the list of donut rings: Overall first, then each boosted category
+        const donutItems: { label: string; current: number; projected: number; gain: number }[] = [
+          { label: 'Overall', current: currentOverall, projected: projectedOverall, gain: totalGain },
+        ];
+        for (const [cat, boost] of Object.entries(categoryBoosts)) {
+          const cur = currentScores[cat] ?? 0;
+          const proj = projectedScores[cat] ?? 0;
+          if (proj > cur) {
+            donutItems.push({ label: CATEGORY_LABELS[cat] || cat, current: cur, projected: proj, gain: proj - cur });
+          }
+        }
 
         return (
           <div className="rounded-2xl border p-6 mb-6" style={{ background: '#111827', borderColor: '#374151' }}>
             <style>{`
               @keyframes gainPulse {
-                0%, 100% {
-                  stroke-opacity: 1;
-                  stroke-width: 10px;
-                  filter: drop-shadow(0 0 3px #34d399);
-                }
-                50% {
-                  stroke-opacity: 0.65;
-                  stroke-width: 13px;
-                  filter: drop-shadow(0 0 8px #34d399);
-                }
+                0%, 100% { stroke-opacity: 1; stroke-width: 10px; filter: drop-shadow(0 0 3px #34d399); }
+                50% { stroke-opacity: 0.65; stroke-width: 13px; filter: drop-shadow(0 0 8px #34d399); }
               }
-              .gain-segment {
-                animation: gainPulse 2s ease-in-out infinite;
-                animation-delay: 1100ms;
-              }
+              .gain-segment { animation: gainPulse 2s ease-in-out infinite; animation-delay: 1200ms; }
             `}</style>
             <p className="text-xs font-semibold uppercase tracking-wider mb-5" style={{ color: '#10B981' }}>Projected improvement from your top 5 fixes</p>
 
-            {/* PART A — Arc Gauge */}
-            <div className="flex justify-center mb-6">
-              <svg width="300" height="160" viewBox="0 0 300 160">
-                <defs>
-                  <linearGradient id="projArcGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-                    <stop offset="0%" stopColor="#F59E0B" />
-                    <stop offset="100%" stopColor="#10B981" />
-                  </linearGradient>
-                  <filter id="projGlow">
-                    <feGaussianBlur stdDeviation="4" result="blur" />
-                    <feMerge>
-                      <feMergeNode in="blur" />
-                      <feMergeNode in="SourceGraphic" />
-                    </feMerge>
-                  </filter>
-                </defs>
-                {/* Background dashed arc */}
-                <path d={bgArcPath} fill="none" stroke="#374151" strokeWidth={arcStroke} strokeLinecap="round" strokeDasharray="6 4" />
-                {/* Current score arc */}
-                <path d={currentArcPath} fill="none" stroke="#4B5563" strokeWidth={arcStroke} strokeLinecap="round"
-                  style={{
-                    strokeDasharray: currentArcLen,
-                    strokeDashoffset: animateProjections ? 0 : currentArcLen,
-                    transition: 'stroke-dashoffset 600ms ease-out',
-                  }}
-                />
-                {/* Projected improvement arc */}
-                <path d={projectedArcPath} fill="none" stroke="url(#projArcGrad)" strokeWidth={arcStroke} strokeLinecap="round"
-                  className={animateProjections ? 'gain-segment' : undefined}
-                  filter="url(#projGlow)"
-                  style={{
-                    strokeDasharray: projectedArcLen,
-                    strokeDashoffset: animateProjections ? 0 : projectedArcLen,
-                    transition: 'stroke-dashoffset 600ms ease-out 300ms',
-                  }}
-                />
-                {/* Glow dot at projected end */}
-                <circle cx={projEndPt.x} cy={projEndPt.y} r="6" fill="#10B981"
-                  style={{
-                    opacity: animateProjections ? 1 : 0,
-                    transition: 'opacity 400ms ease-out 700ms',
-                    filter: 'drop-shadow(0 0 6px rgba(16,185,129,0.6))',
-                  }}
-                />
-                {/* Current score label — left side */}
-                <text x="45" y="145" textAnchor="middle" fill="#9CA3AF" fontSize="10" fontWeight="500">Your Score</text>
-                <text x="45" y="130" textAnchor="middle" fill={getArcColor(currentOverall)} fontSize="28" fontWeight="700" fontFamily="var(--font-mono)">{currentOverall}</text>
-                <text x="45" y="155" textAnchor="middle" fill="#6B7280" fontSize="11" fontWeight="600">{currentGrade}</text>
-                {/* Projected score label — right side */}
-                <text x="255" y="145" textAnchor="middle" fill="#9CA3AF" fontSize="10" fontWeight="500">After Fixes</text>
-                <text x="255" y="130" textAnchor="middle" fontSize="28" fontWeight="700" fontFamily="var(--font-mono)"
-                  style={{
-                    fill: animateProjections ? '#10B981' : '#6B7280',
-                    transition: 'fill 400ms ease-out 600ms',
-                  }}
-                >{projectedOverall}</text>
-                <text x="255" y="155" textAnchor="middle" fontSize="11" fontWeight="600"
-                  style={{
-                    fill: animateProjections ? '#10B981' : '#6B7280',
-                    transition: 'fill 400ms ease-out 600ms',
-                  }}
-                >{projectedGrade}</text>
-                {/* Center delta */}
-                <text x={arcCx} y="90" textAnchor="middle" fill="#10B981" fontSize="14" fontWeight="700"
-                  style={{
-                    opacity: animateProjections ? 1 : 0,
-                    transition: 'opacity 400ms ease-out 800ms',
-                  }}
-                >+{totalGain} pts</text>
-              </svg>
-            </div>
-
-            {/* PART B — Per-Fix Horizontal Bar Chart */}
-            <div className="space-y-2 mb-6">
-              {fixDetails.map((fix, i) => {
-                const barPct = (fix.points / maxPoints) * 100;
+            {/* Donut circles row */}
+            <div className="flex flex-wrap justify-center gap-6 mb-6">
+              {donutItems.map((item) => {
+                const seg1Len = (item.current / 100) * donutCirc;
+                const seg2Len = (item.gain / 100) * donutCirc;
+                const seg3Len = donutCirc - seg1Len - seg2Len;
                 return (
-                  <div key={i} className="rounded-xl p-3 transition-colors" style={{ background: '#1F2937' }}
-                    onMouseEnter={e => (e.currentTarget.style.background = '#283141')}
-                    onMouseLeave={e => (e.currentTarget.style.background = '#1F2937')}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate" style={{ color: '#E5E7EB', maxWidth: 200 }}>{fix.title}</p>
-                        <p className="text-xs mt-0.5" style={{ color: '#6B7280' }}>{fix.category}</p>
-                      </div>
-                      <span className="text-xs px-2 py-0.5 rounded-full font-medium shrink-0" style={{ color: fix.owner.color, background: `${fix.owner.color}20` }}>{fix.owner.label}</span>
-                    </div>
-                    <div className="mt-2 flex items-center gap-2">
-                      <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: '#374151' }}>
-                        <div className="h-full rounded-full" style={{
-                          background: 'linear-gradient(90deg, #F59E0B, #10B981)',
-                          width: animateProjections ? `${barPct}%` : '0%',
-                          transition: `width 500ms ease-out ${300 + i * 100}ms`,
-                        }} />
-                      </div>
-                      <span className="text-xs font-bold shrink-0" style={{
-                        color: '#10B981',
-                        opacity: animateProjections ? 1 : 0,
-                        transition: `opacity 300ms ease-out ${500 + i * 100}ms`,
-                        fontFamily: 'var(--font-mono)',
-                      }}>+{fix.points} pts</span>
-                    </div>
+                  <div key={item.label} className="flex flex-col items-center">
+                    <svg width="110" height="110" viewBox="0 0 110 110">
+                      {/* Background track */}
+                      <circle cx="55" cy="55" r={donutR} fill="none" stroke="#1f2937" strokeWidth="10" />
+                      {/* Segment 3 — dark remainder (draws last) */}
+                      <circle cx="55" cy="55" r={donutR} fill="none" stroke="#374151" strokeWidth="10"
+                        strokeLinecap="round"
+                        transform="rotate(-90 55 55)"
+                        style={{
+                          strokeDasharray: `${seg3Len} ${donutCirc - seg3Len}`,
+                          strokeDashoffset: animateProjections ? -(seg1Len + seg2Len) : -donutCirc,
+                          transition: 'stroke-dashoffset 700ms ease-out 1100ms',
+                        }}
+                      />
+                      {/* Segment 2 — emerald gain (draws second) */}
+                      <circle cx="55" cy="55" r={donutR} fill="none" stroke="#34d399" strokeWidth="10"
+                        className={animateProjections ? 'gain-segment' : undefined}
+                        strokeLinecap="round"
+                        transform="rotate(-90 55 55)"
+                        style={{
+                          strokeDasharray: `${seg2Len} ${donutCirc - seg2Len}`,
+                          strokeDashoffset: animateProjections ? -seg1Len : -donutCirc,
+                          transition: 'stroke-dashoffset 700ms ease-out 700ms',
+                        }}
+                      />
+                      {/* Segment 1 — amber current score (draws first) */}
+                      <circle cx="55" cy="55" r={donutR} fill="none" stroke="#fbbf24" strokeWidth="10"
+                        strokeLinecap="round"
+                        transform="rotate(-90 55 55)"
+                        style={{
+                          strokeDasharray: `${seg1Len} ${donutCirc - seg1Len}`,
+                          strokeDashoffset: animateProjections ? 0 : donutCirc,
+                          transition: 'stroke-dashoffset 700ms ease-out',
+                        }}
+                      />
+                      {/* Center text: projected grade */}
+                      <text x="55" y="52" textAnchor="middle" dominantBaseline="central" fill="#f9fafb" fontSize="20" fontWeight="700" fontFamily="var(--font-mono)">{scoreToGrade(item.projected)}</text>
+                      {/* Gain label below grade */}
+                      <text x="55" y="70" textAnchor="middle" dominantBaseline="central" fill="#34d399" fontSize="10" fontWeight="600" fontFamily="var(--font-mono)">+{item.gain} pts</text>
+                    </svg>
+                    <p className="text-xs font-medium mt-1" style={{ color: '#d1d5db' }}>{item.label}</p>
+                    <p className="text-xs" style={{ color: '#6b7280' }}>{scoreToGrade(item.current)} → {scoreToGrade(item.projected)}</p>
                   </div>
                 );
               })}
             </div>
 
-            {/* PART C — Summary Stat Row */}
+            {/* Summary stat row */}
             <div className="grid grid-cols-3 gap-3">
               {[
                 { label: 'Total Point Gain', value: `+${totalGain}`, icon: <TrendingUp className="w-4 h-4" style={{ color: '#10B981' }} /> },
@@ -1208,7 +1115,7 @@ export default function AuditResultPage() {
                   background: '#1F2937',
                   opacity: animateProjections ? 1 : 0,
                   transform: animateProjections ? 'translateY(0)' : 'translateY(8px)',
-                  transition: `opacity 400ms ease-out ${800 + i * 100}ms, transform 400ms ease-out ${800 + i * 100}ms`,
+                  transition: `opacity 400ms ease-out ${1400 + i * 100}ms, transform 400ms ease-out ${1400 + i * 100}ms`,
                 }}>
                   <div className="flex justify-center mb-1">{stat.icon}</div>
                   <p className="text-lg font-bold" style={{ color: '#F9FAFB', fontFamily: 'var(--font-mono)' }}>{stat.value}</p>
