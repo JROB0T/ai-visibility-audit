@@ -1069,6 +1069,24 @@ export default function AuditResultPage() {
 
         return (
           <div className="rounded-2xl border p-6 mb-6" style={{ background: '#111827', borderColor: '#374151' }}>
+            <style>{`
+              @keyframes gainPulse {
+                0%, 100% {
+                  stroke-opacity: 1;
+                  stroke-width: 10px;
+                  filter: drop-shadow(0 0 3px #34d399);
+                }
+                50% {
+                  stroke-opacity: 0.65;
+                  stroke-width: 13px;
+                  filter: drop-shadow(0 0 8px #34d399);
+                }
+              }
+              .gain-segment {
+                animation: gainPulse 2s ease-in-out infinite;
+                animation-delay: 1100ms;
+              }
+            `}</style>
             <p className="text-xs font-semibold uppercase tracking-wider mb-5" style={{ color: '#10B981' }}>Projected improvement from your top 5 fixes</p>
 
             {/* PART A — Arc Gauge */}
@@ -1099,6 +1117,7 @@ export default function AuditResultPage() {
                 />
                 {/* Projected improvement arc */}
                 <path d={projectedArcPath} fill="none" stroke="url(#projArcGrad)" strokeWidth={arcStroke} strokeLinecap="round"
+                  className={animateProjections ? 'gain-segment' : undefined}
                   filter="url(#projGlow)"
                   style={{
                     strokeDasharray: projectedArcLen,
