@@ -1220,9 +1220,9 @@ export default function AuditResultPage() {
         const weights: Record<string, number> = { crawlability: 0.3, machine_readability: 0.25, commercial_clarity: 0.3, trust_clarity: 0.15 };
         const currentOverall = audit.overall_score ?? 0;
         const projectedOverall = Math.min(100, Math.round(Object.entries(weights).reduce((sum, [cat, w]) => sum + (projectedScores[cat] ?? 0) * w, 0)));
-        if (projectedOverall <= currentOverall) return null;
+        if (projectedOverall <= currentOverall && Object.keys(categoryBoosts).length === 0) return null;
 
-        const totalGain = projectedOverall - currentOverall;
+        const totalGain = Math.max(0, projectedOverall - currentOverall);
         const currentGrade = scoreToGrade(currentOverall);
         const projectedGrade = scoreToGrade(projectedOverall);
 
@@ -1230,16 +1230,14 @@ export default function AuditResultPage() {
         const donutR = 40;
         const donutCirc = 2 * Math.PI * donutR; // ~251.2
 
-        // Build the list of donut rings: Overall first, then each boosted category
+        // Build the list of donut rings: Overall first, then all 4 categories
         const donutItems: { label: string; current: number; projected: number; gain: number }[] = [
           { label: 'Overall', current: currentOverall, projected: projectedOverall, gain: totalGain },
         ];
-        for (const [cat] of Object.entries(categoryBoosts)) {
+        for (const cat of Object.keys(currentScores)) {
           const cur = currentScores[cat] ?? 0;
           const proj = projectedScores[cat] ?? 0;
-          if (proj > cur) {
-            donutItems.push({ label: CATEGORY_LABELS[cat] || cat, current: cur, projected: proj, gain: proj - cur });
-          }
+          donutItems.push({ label: CATEGORY_LABELS[cat] || cat, current: cur, projected: proj, gain: Math.max(0, proj - cur) });
         }
 
         return (
@@ -1296,12 +1294,18 @@ export default function AuditResultPage() {
                         }}
                       />
                       {/* Center text: projected grade */}
-                      <text x="55" y="52" textAnchor="middle" dominantBaseline="central" fill="#f9fafb" fontSize="20" fontWeight="700" fontFamily="var(--font-mono)">{scoreToGrade(item.projected)}</text>
+                      <text x="55" y={item.gain > 0 ? 52 : 55} textAnchor="middle" dominantBaseline="central" fill={item.gain > 0 ? '#f9fafb' : '#9ca3af'} fontSize="20" fontWeight="700" fontFamily="var(--font-mono)">{scoreToGrade(item.gain > 0 ? item.projected : item.current)}</text>
                       {/* Gain label below grade */}
-                      <text x="55" y="70" textAnchor="middle" dominantBaseline="central" fill="#34d399" fontSize="10" fontWeight="600" fontFamily="var(--font-mono)">+{item.gain} pts</text>
+                      {item.gain > 0 && (
+                        <text x="55" y="70" textAnchor="middle" dominantBaseline="central" fill="#34d399" fontSize="10" fontWeight="600" fontFamily="var(--font-mono)">+{item.gain} pts</text>
+                      )}
                     </svg>
                     <p className="text-xs font-medium mt-1" style={{ color: '#d1d5db' }}>{item.label}</p>
-                    <p className="text-xs" style={{ color: '#6b7280' }}>{scoreToGrade(item.current)} → {scoreToGrade(item.projected)}</p>
+                    {item.gain > 0 ? (
+                      <p className="text-xs" style={{ color: '#6b7280' }}>{scoreToGrade(item.current)} → {scoreToGrade(item.projected)}</p>
+                    ) : (
+                      <p className="text-xs" style={{ color: '#4b5563' }}>Already optimized</p>
+                    )}
                   </div>
                 );
               })}
