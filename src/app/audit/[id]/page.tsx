@@ -1031,7 +1031,7 @@ export default function AuditResultPage() {
         const donutItems: { label: string; current: number; projected: number; gain: number }[] = [
           { label: 'Overall', current: currentOverall, projected: projectedOverall, gain: totalGain },
         ];
-        for (const [cat, boost] of Object.entries(categoryBoosts)) {
+        for (const [cat] of Object.entries(categoryBoosts)) {
           const cur = currentScores[cat] ?? 0;
           const proj = projectedScores[cat] ?? 0;
           if (proj > cur) {
