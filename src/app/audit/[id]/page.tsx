@@ -370,6 +370,25 @@ ${pages.map(p => { let path = p.url; try { path = new URL(p.url).pathname; } cat
 <li><strong>Re-scan in 2-4 weeks</strong> — after implementing fixes, run another audit to measure progress.</li>
 </ol>
 
+<div style="margin-top: 40px; padding: 24px; background: linear-gradient(135deg, #1e3a5f, #0f2137); border: 1px solid #2d5a8e; border-radius: 16px; text-align: center; font-family: sans-serif;">
+  <h3 style="color: white; font-size: 18px; font-weight: bold; margin: 0 0 8px 0;">Take Action On Your Results</h3>
+  <p style="color: #d1d5db; font-size: 14px; margin: 0 0 20px 0;">Your report is ready — now let's improve your score.</p>
+  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; max-width: 600px; margin: 0 auto;">
+    <div style="background: #0f2137; border: 1px solid #2d5a8e; border-radius: 12px; padding: 16px; text-align: left;">
+      <div style="color: white; font-weight: 600; font-size: 14px; margin-bottom: 8px;">🔁 Monthly Monitoring</div>
+      <div style="color: #9ca3af; font-size: 12px; margin-bottom: 12px;">Automated monthly re-scans, score tracking, and change alerts.</div>
+      <div style="color: white; font-size: 22px; font-weight: bold;">$25<span style="font-size: 12px; color: #9ca3af;">/month</span></div>
+      <div style="color: #6b7280; font-size: 11px; margin-top: 4px;">Visit aivisibility.io to get started</div>
+    </div>
+    <div style="background: #0f2137; border: 1px solid #2d5a8e; border-radius: 12px; padding: 16px; text-align: left;">
+      <div style="color: white; font-weight: 600; font-size: 14px; margin-bottom: 8px;">🤝 Work With a Specialist</div>
+      <div style="color: #9ca3af; font-size: 12px; margin-bottom: 12px;">Get matched with a tech or marketing specialist to implement your fixes.</div>
+      <div style="color: #7dd3fc; font-size: 13px; font-weight: 500;">Free consultation</div>
+      <div style="color: #6b7280; font-size: 11px; margin-top: 4px;">help@aivisibility.io</div>
+    </div>
+  </div>
+</div>
+
 <div class="footer">
 <p>AI Visibility Audit — aivisibilityaudit.com</p>
 <p>This report was generated automatically. Recommendations are based on automated scanning and should be reviewed by your development team before implementation.</p>
