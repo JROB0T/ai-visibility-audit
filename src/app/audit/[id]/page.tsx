@@ -370,23 +370,56 @@ ${pages.map(p => { let path = p.url; try { path = new URL(p.url).pathname; } cat
 <li><strong>Re-scan in 2-4 weeks</strong> — after implementing fixes, run another audit to measure progress.</li>
 </ol>
 
-<div style="margin-top: 40px; padding: 24px; background: linear-gradient(135deg, #1e3a5f, #0f2137); border: 1px solid #2d5a8e; border-radius: 16px; text-align: center; font-family: sans-serif;">
-  <h3 style="color: white; font-size: 18px; font-weight: bold; margin: 0 0 8px 0;">Take Action On Your Results</h3>
-  <p style="color: #d1d5db; font-size: 14px; margin: 0 0 20px 0;">Your report is ready — now let's improve your score.</p>
-  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; max-width: 600px; margin: 0 auto;">
-    <div style="background: #0f2137; border: 1px solid #2d5a8e; border-radius: 12px; padding: 16px; text-align: left;">
-      <div style="color: white; font-weight: 600; font-size: 14px; margin-bottom: 8px;">🔁 Monthly Monitoring</div>
-      <div style="color: #9ca3af; font-size: 12px; margin-bottom: 12px;">Automated monthly re-scans, score tracking, and change alerts.</div>
-      <div style="color: white; font-size: 22px; font-weight: bold;">$25<span style="font-size: 12px; color: #9ca3af;">/month</span></div>
-      <div style="color: #6b7280; font-size: 11px; margin-top: 4px;">Visit aivisibility.io to get started</div>
+<div style="margin-top: 40px; padding: 32px; background: #f8fafc; border: 2px solid #e2e8f0; border-radius: 12px; font-family: system-ui, -apple-system, sans-serif;">
+
+  <h3 style="color: #1a1a2e; font-size: 18px; font-weight: 600; margin: 0 0 6px 0; text-align: center;">
+    Ready to improve your AI visibility score?
+  </h3>
+  <p style="color: #64748b; font-size: 14px; text-align: center; margin: 0 0 24px 0;">
+    Two ways to take action on this report
+  </p>
+
+  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+
+    <div style="background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px;">
+      <div style="font-size: 13px; font-weight: 600; color: #1a1a2e; margin-bottom: 8px;">
+        Automated Monthly Monitoring
+      </div>
+      <div style="font-size: 12px; color: #64748b; margin-bottom: 16px; line-height: 1.6;">
+        We re-scan your site every month, track your score over time, and alert you to changes in your AI visibility.
+      </div>
+      <div style="font-size: 22px; font-weight: 700; color: #1a1a2e; margin-bottom: 4px;">
+        $25<span style="font-size: 13px; font-weight: 400; color: #94a3b8;">/month</span>
+      </div>
+      <div style="font-size: 11px; color: #94a3b8; margin-bottom: 14px;">Cancel anytime · No contracts</div>
+      <div style="background: #f1f5f9; border-radius: 6px; padding: 8px 12px; font-size: 12px; color: #475569; text-align: center;">
+        Visit aivisibility.io to get started
+      </div>
     </div>
-    <div style="background: #0f2137; border: 1px solid #2d5a8e; border-radius: 12px; padding: 16px; text-align: left;">
-      <div style="color: white; font-weight: 600; font-size: 14px; margin-bottom: 8px;">🤝 Work With a Specialist</div>
-      <div style="color: #9ca3af; font-size: 12px; margin-bottom: 12px;">Get matched with a tech or marketing specialist to implement your fixes.</div>
-      <div style="color: #7dd3fc; font-size: 13px; font-weight: 500;">Free consultation</div>
-      <div style="color: #6b7280; font-size: 11px; margin-top: 4px;">help@aivisibility.io</div>
+
+    <div style="background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px;">
+      <div style="font-size: 13px; font-weight: 600; color: #1a1a2e; margin-bottom: 8px;">
+        Work With a Specialist
+      </div>
+      <div style="font-size: 12px; color: #64748b; margin-bottom: 16px; line-height: 1.6;">
+        Get matched with a vetted tech specialist or marketing strategist who can implement your fixes for you.
+      </div>
+      <div style="font-size: 13px; font-weight: 600; color: #6366F1; margin-bottom: 4px;">
+        Free consultation
+      </div>
+      <div style="font-size: 11px; color: #94a3b8; margin-bottom: 14px;">We review your report and find the right match</div>
+      <div style="background: #f1f5f9; border-radius: 6px; padding: 8px 12px; font-size: 12px; color: #475569; text-align: center;">
+        help@aivisibility.io
+      </div>
     </div>
+
   </div>
+
+  <p style="color: #94a3b8; font-size: 11px; text-align: center; margin: 20px 0 0 0;">
+    <!-- TODO: Replace help@aivisibility.io with actual contact email before launch -->
+    AI Visibility Audit · aivisibility.io
+  </p>
+
 </div>
 
 <div class="footer">
