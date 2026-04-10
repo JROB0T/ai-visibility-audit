@@ -526,7 +526,7 @@ export default function AuditResultPage() {
   const [generatedFixes, setGeneratedFixes] = useState<Array<{ key: string; implementation: string; explanation: string }> | null>(null);
   const [fixesLoading, setFixesLoading] = useState(false);
   const fixesRequested = useRef(false);
-  // animateProjections state removed — card design doesn't need it
+  const [animateProjections, setAnimateProjections] = useState(false);
 
   function switchTab(tab: ReportTab) {
     setActiveTab(tab);
@@ -765,7 +765,16 @@ export default function AuditResultPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
 
-  // animateProjections useEffect removed — card design doesn't need it
+  // Trigger projection animations when Fix Plan tab becomes active
+  useEffect(() => {
+    if (activeTab === 'fix-plan') {
+      setAnimateProjections(false);
+      const timer = setTimeout(() => setAnimateProjections(true), 50);
+      return () => clearTimeout(timer);
+    } else {
+      setAnimateProjections(false);
+    }
+  }, [activeTab]);
 
   useEffect(() => {
     async function load() {
@@ -1369,45 +1378,94 @@ export default function AuditResultPage() {
         }
 
         return (
-          <div className="rounded-2xl border p-6 mb-6" style={{ background: '#111827', borderColor: '#374151' }}>
-            <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-6">
-              Projected Improvement From Your Top 5 Fixes
-            </h3>
+          <div style={{ background: '#111827', border: '1px solid #374151', borderRadius: 16, padding: 24, marginBottom: 24 }}>
+            <style>{`
+              @keyframes gainPulse {
+                0%, 100% { stroke-opacity: 1; filter: drop-shadow(0 0 4px #34d399); }
+                50% { stroke-opacity: 0.5; filter: drop-shadow(0 0 10px #34d399); }
+              }
+              .gain-arc { animation: gainPulse 2s ease-in-out infinite; animation-delay: 1400ms; }
+            `}</style>
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
-              {donutItems.map((item) => (
-                <div key={item.label} className="rounded-xl p-4 text-center" style={{ background: '#1f2937', border: '1px solid #374151' }}>
-                  {/* Category label */}
-                  <div className="text-xs text-gray-500 uppercase tracking-wide mb-3">{item.label}</div>
-                  {/* Current grade — muted */}
-                  <div className="text-2xl font-bold text-gray-500">{scoreToGrade(item.current)}</div>
-                  {/* Gain */}
-                  <div className="my-2 text-emerald-400 font-bold text-sm">
-                    {item.gain > 0 ? `+${item.gain} pts` : 'Optimized'}
+            <p style={{ color: '#6b7280', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 20 }}>
+              Projected improvement from your top 5 fixes
+            </p>
+
+            <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 24 }}>
+              {donutItems.map((item) => {
+                const circ = 251.2;
+                const r = 40;
+                const s1 = (item.current / 100) * circ;
+                const s2 = (item.gain / 100) * circ;
+                const s3 = Math.max(0, circ - s1 - s2);
+                const rotate1 = -90;
+                const rotate2 = -90 + (item.current / 100) * 360;
+                const rotate3 = rotate2 + (item.gain / 100) * 360;
+                const isAnimating = animateProjections;
+                return (
+                  <div key={item.label} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, width: 110 }}>
+                    <svg width="110" height="110" viewBox="0 0 110 110">
+                      <circle cx="55" cy="55" r={r} fill="none" stroke="#1f2937" strokeWidth="10" />
+                      <circle cx="55" cy="55" r={r} fill="none" stroke="#374151" strokeWidth="10"
+                        strokeDasharray={`${s3} ${circ}`}
+                        strokeDashoffset={isAnimating ? 0 : circ}
+                        transform={`rotate(${rotate3} 55 55)`}
+                        style={{ transition: isAnimating ? 'stroke-dashoffset 0.3s ease-out 1.1s' : 'none' }}
+                      />
+                      <circle cx="55" cy="55" r={r} fill="none" stroke="#fbbf24" strokeWidth="10"
+                        strokeDasharray={`${s1} ${circ}`}
+                        strokeDashoffset={isAnimating ? 0 : circ}
+                        transform={`rotate(${rotate1} 55 55)`}
+                        style={{ transition: isAnimating ? 'stroke-dashoffset 0.6s ease-out 0s' : 'none' }}
+                      />
+                      <circle cx="55" cy="55" r={r} fill="none" stroke="#34d399" strokeWidth="10"
+                        strokeDasharray={`${s2} ${circ}`}
+                        strokeDashoffset={isAnimating ? 0 : circ}
+                        transform={`rotate(${rotate2} 55 55)`}
+                        className={isAnimating && item.gain > 0 ? 'gain-arc' : ''}
+                        style={{ transition: isAnimating ? 'stroke-dashoffset 0.4s ease-out 0.7s' : 'none' }}
+                      />
+                      <text x="55" y="50" textAnchor="middle" fill="#f9fafb" fontSize="16" fontWeight="bold">
+                        {item.gain > 0 ? `+${item.gain}` : scoreToGrade(item.current)}
+                      </text>
+                      <text x="55" y="64" textAnchor="middle" fill="#6b7280" fontSize="10">
+                        {item.gain > 0 ? 'pts' : 'no change'}
+                      </text>
+                    </svg>
+                    <span style={{ color: '#9ca3af', fontSize: 11, textAlign: 'center', lineHeight: 1.3 }}>{item.label}</span>
+                    <span style={{ color: '#34d399', fontSize: 12, fontWeight: 500 }}>
+                      {scoreToGrade(item.current)} → {scoreToGrade(item.projected)}
+                    </span>
                   </div>
-                  {/* Projected grade — bright and prominent */}
-                  <div className="text-3xl font-bold text-emerald-400">{scoreToGrade(item.projected)}</div>
+                );
+              })}
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'center', gap: 20, marginTop: 20 }}>
+              {([['#fbbf24','Current score'],['#34d399','Projected gain'],['#374151','Remaining headroom']] as const).map(([color, label]) => (
+                <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <div style={{ width: 8, height: 8, borderRadius: '50%', background: color }} />
+                  <span style={{ color: '#6b7280', fontSize: 11 }}>{label}</span>
                 </div>
               ))}
             </div>
 
-            {/* Summary stats */}
-            <div className="grid grid-cols-3 gap-4">
-              <div className="rounded-xl p-3 text-center" style={{ background: '#1f2937' }}>
-                <div className="text-xl font-bold text-emerald-400">+{totalGain}</div>
-                <div className="text-xs text-gray-500 mt-0.5">Total Point Gain</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginTop: 20 }}>
+              <div style={{ background: '#1f2937', borderRadius: 10, padding: 12, textAlign: 'center' }}>
+                <div style={{ color: '#34d399', fontSize: 20, fontWeight: 500 }}>+{totalGain}</div>
+                <div style={{ color: '#6b7280', fontSize: 11, marginTop: 4 }}>Total points</div>
               </div>
-              <div className="rounded-xl p-3 text-center" style={{ background: '#1f2937' }}>
-                <div className="text-xl font-bold text-white">{currentGrade} → {projectedGrade}</div>
-                <div className="text-xs text-gray-500 mt-0.5">Grade Jump</div>
+              <div style={{ background: '#1f2937', borderRadius: 10, padding: 12, textAlign: 'center' }}>
+                <div style={{ color: '#f9fafb', fontSize: 20, fontWeight: 500 }}>{currentGrade} → {projectedGrade}</div>
+                <div style={{ color: '#6b7280', fontSize: 11, marginTop: 4 }}>Grade jump</div>
               </div>
-              <div className="rounded-xl p-3 text-center" style={{ background: '#1f2937' }}>
-                <div className="text-xl font-bold text-white">5</div>
-                <div className="text-xs text-gray-500 mt-0.5">Fixes Required</div>
+              <div style={{ background: '#1f2937', borderRadius: 10, padding: 12, textAlign: 'center' }}>
+                <div style={{ color: '#f9fafb', fontSize: 20, fontWeight: 500 }}>5</div>
+                <div style={{ color: '#6b7280', fontSize: 11, marginTop: 4 }}>Fixes required</div>
               </div>
             </div>
 
-            <p className="text-xs text-gray-600 text-center mt-4">
+            <p style={{ color: '#4b5563', fontSize: 11, textAlign: 'center', marginTop: 16 }}>
               Estimates based on issue severity. Actual improvement may vary.
             </p>
           </div>
