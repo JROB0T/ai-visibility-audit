@@ -62,6 +62,7 @@ interface AuditData {
     pages: Array<{ url: string }>;
   } | null;
   hasEntitlement?: boolean;
+  hasMonitoring?: boolean;
   totalRecommendationCount?: number;
   generatedFixes?: Array<{ key: string; implementation: string; explanation: string }> | null;
 }
@@ -425,6 +426,8 @@ export default function AuditResultPage() {
   const [selectedKeyPage, setSelectedKeyPage] = useState<KeyPageStatus | null>(null);
   const [selectedPerceptionQ, setSelectedPerceptionQ] = useState<number | null>(null);
   const [showAllMissing, setShowAllMissing] = useState(false);
+  const [monitoringLoading, setMonitoringLoading] = useState(false);
+  const [hasMonitoring, setHasMonitoring] = useState(false);
 
   function handleExportReport() {
     if (!data) return;
@@ -464,6 +467,38 @@ export default function AuditResultPage() {
       setCheckoutLoading(false);
     }
   }
+
+  const handleStartMonitoring = async () => {
+    if (!data) return;
+    const siteId = data.audit.site_id || data.audit.site?.id;
+    if (!siteId) {
+      console.error('[monitoring] No siteId available for checkout');
+      return;
+    }
+    try {
+      setMonitoringLoading(true);
+      const response = await fetch('/api/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          siteId,
+          priceType: 'monthly',
+          auditId: data.audit.id,
+        }),
+      });
+      const result = await response.json();
+      if (result.url) {
+        window.location.href = result.url;
+      } else {
+        console.error('[monitoring] No checkout URL returned:', result);
+        setMonitoringLoading(false);
+      }
+    } catch (err) {
+      console.error('[monitoring] Checkout error:', err);
+      setMonitoringLoading(false);
+    }
+  };
+
   const [activeTab, setActiveTab] = useState<ReportTab>('overview');
   const [perceptionQuestions, setPerceptionQuestions] = useState<Array<{ question: string; intent: string; what_ai_needs: string; status: 'pass' | 'partial' | 'fail'; assessment: string; fix: string; codeSnippet: string | null }> | null>(null);
   const [perceptionLoading, setPerceptionLoading] = useState(false);
@@ -724,6 +759,9 @@ export default function AuditResultPage() {
         const auditData = await res.json();
         setData(auditData);
         setHasPaid(!!auditData.hasEntitlement);
+        if (auditData.hasMonitoring) {
+          setHasMonitoring(true);
+        }
         // Restore previously saved data
         if (auditData.perceptionData) setPerceptionQuestions(auditData.perceptionData);
         if (auditData.growthData) setGrowthData(auditData.growthData);
@@ -810,6 +848,85 @@ export default function AuditResultPage() {
   if (audit.status === 'failed') return (<div className="max-w-4xl mx-auto px-4 py-20 text-center"><AlertTriangle className="w-10 h-10 text-red-500 mx-auto" /><h2 className="mt-4 text-xl font-semibold" style={{ color: 'var(--text-primary)' }}>Scan failed</h2><p className="mt-2" style={{ color: 'var(--text-secondary)' }}>{audit.summary || 'The site could not be scanned.'}</p><a href="/" className="mt-6 inline-block" style={{ color: '#6366F1' }}>← Try another URL</a></div>);
 
   const highCount = allFindings.filter(f => f.severity === 'high').length;
+
+  const ctaBanner = (
+    <div className="rounded-2xl p-6 mt-6" style={{ background: 'linear-gradient(135deg, #1e3a5f 0%, #1a2e4a 50%, #0f2137 100%)', border: '1px solid #2d5a8e' }}>
+
+      {/* Main heading */}
+      <h3 className="text-lg font-bold text-white text-center mb-2">
+        Take Action On Your Results
+      </h3>
+      <p className="text-sm text-gray-300 text-center mb-6 max-w-lg mx-auto">
+        Your report is ready — now let&apos;s improve your score. Choose how you want to move forward.
+      </p>
+
+      {/* Two column layout on larger screens */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+        {/* Left card — Monitoring upsell */}
+        <div className="rounded-xl p-4" style={{ background: '#0f2137', border: '1px solid #2d5a8e' }}>
+          <div className="text-sm font-semibold text-white mb-1">🔁 Automated Monthly Monitoring</div>
+          <div className="text-xs text-gray-400 mb-3">
+            We re-scan your site every month, track your progress, and alert you when your AI visibility score changes.
+          </div>
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <span className="text-2xl font-bold text-white">$25</span>
+              <span className="text-xs text-gray-400">/month</span>
+            </div>
+            <div className="text-xs text-gray-500 text-right">
+              Cancel anytime<br/>No contracts
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2 mb-4">
+            <span className="px-2 py-1 rounded-full text-xs" style={{ background: '#1e4d7b', color: '#7dd3fc' }}>Monthly re-scan</span>
+            <span className="px-2 py-1 rounded-full text-xs" style={{ background: '#1e4d7b', color: '#7dd3fc' }}>Score tracking</span>
+            <span className="px-2 py-1 rounded-full text-xs" style={{ background: '#1e4d7b', color: '#7dd3fc' }}>Change alerts</span>
+          </div>
+          <button
+            onClick={handleStartMonitoring}
+            disabled={monitoringLoading || hasMonitoring}
+            className="w-full py-2.5 rounded-xl font-semibold text-sm transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+            style={{ background: hasMonitoring ? '#1f2937' : 'linear-gradient(135deg, #059669, #0891b2)', color: 'white' }}
+          >
+            {hasMonitoring ? '✅ Monitoring Active' : monitoringLoading ? 'Redirecting...' : '🚀 Start Monitoring — $25/mo'}
+          </button>
+        </div>
+
+        {/* Right card — Human help CTA */}
+        <div className="rounded-xl p-4" style={{ background: '#0f2137', border: '1px solid #2d5a8e' }}>
+          <div className="text-sm font-semibold text-white mb-1">🤝 Work With a Specialist</div>
+          <div className="text-xs text-gray-400 mb-3">
+            We&apos;ll match you with a vetted tech specialist or marketing strategist who can implement your fixes and improve your AI visibility.
+          </div>
+          <div className="flex flex-wrap gap-2 mb-4">
+            <span className="px-2 py-1 rounded-full text-xs" style={{ background: '#1e4d7b', color: '#7dd3fc' }}>🔧 Technical fixes</span>
+            <span className="px-2 py-1 rounded-full text-xs" style={{ background: '#1e4d7b', color: '#7dd3fc' }}>📈 Strategy session</span>
+            <span className="px-2 py-1 rounded-full text-xs" style={{ background: '#1e4d7b', color: '#7dd3fc' }}>📋 Implementation plan</span>
+          </div>
+          <div className="text-xs text-gray-500 mb-3">
+            Free consultation — we review your report and match you with the right person.
+          </div>
+          {/* TODO: Replace help@aivisibility.io with actual contact email before launch */}
+          <a
+            href="mailto:help@aivisibility.io?subject=I need help implementing my AI Visibility fixes&body=Hi, I just reviewed my AI Visibility Audit report and would like to discuss options for implementing the recommended fixes."
+            className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl font-semibold text-sm transition-all hover:scale-105"
+            style={{ background: 'linear-gradient(135deg, #2563eb, #0891b2)', color: 'white' }}
+          >
+            📬 Get Matched With a Specialist
+          </a>
+          <p className="text-xs text-gray-600 text-center mt-2">help@aivisibility.io</p>
+        </div>
+
+      </div>
+
+      {/* Print-only fallback for browser print dialogs */}
+      <div className="hidden print:block mt-8 p-4 border border-gray-300 rounded text-center">
+        <p className="font-bold text-gray-800">Need help implementing these fixes?</p>
+        <p className="text-sm text-gray-600 mt-1">Contact us at help@aivisibility.io to get matched with a specialist or start monthly monitoring at $25/mo.</p>
+      </div>
+    </div>
+  );
 
   function getFindingStateBadge(finding: typeof allFindings[0]) {
     if (!data?.previousAudit) return null;
@@ -1173,6 +1290,8 @@ export default function AuditResultPage() {
           </div>
         </>
       )}
+
+      {ctaBanner}
 
       </>)}
 
@@ -1591,6 +1710,8 @@ export default function AuditResultPage() {
           </div>
         );
       })()}
+
+      {ctaBanner}
 
       </>)}
 

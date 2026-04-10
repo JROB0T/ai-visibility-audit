@@ -82,14 +82,16 @@ export async function GET(
     const { data: { user } } = await supabase.auth.getUser();
     const isAdmin = isAdminAccount(user?.email);
     let hasEntitlement = isAdmin;
-    if (!hasEntitlement && user && audit.site_id) {
+    let hasMonitoring = false;
+    if (user && audit.site_id) {
       const { data: entitlement } = await supabase
         .from('entitlements')
-        .select('can_view_core')
+        .select('can_view_core, has_monthly_monitoring')
         .eq('user_id', user.id)
         .eq('site_id', audit.site_id)
         .single();
-      hasEntitlement = !!entitlement?.can_view_core;
+      if (!hasEntitlement) hasEntitlement = !!entitlement?.can_view_core;
+      hasMonitoring = !!entitlement?.has_monthly_monitoring;
     }
 
     if (hasEntitlement) {
@@ -105,6 +107,7 @@ export async function GET(
         growthData: audit.growth_data || null,
         previousAudit,
         hasEntitlement: true,
+        hasMonitoring,
       });
     }
 
@@ -123,6 +126,7 @@ export async function GET(
       growthData: null,
       previousAudit: null,
       hasEntitlement: false,
+      hasMonitoring,
     });
   } catch (error) {
     console.error('Fetch audit error:', error);
