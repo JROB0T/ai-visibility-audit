@@ -1310,6 +1310,9 @@ export default function AuditResultPage() {
         </>
       )}
 
+      <div className="bg-red-600 text-white text-center p-4 text-xl font-bold">
+        ⬇️ CTA BANNER BELOW ⬇️
+      </div>
       {ctaBanner}
 
       </>)}
