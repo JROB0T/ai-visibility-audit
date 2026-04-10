@@ -1319,12 +1319,15 @@ export default function AuditResultPage() {
 
       {/* ===== FIX PLAN TAB ===== */}
       {isAuthenticated && activeTab === 'fix-plan' && !hasPaid && (
-        <LockedSection
-          title="Your Fix Plan"
-          description={`We found ${allFindings.length} improvements for your AI visibility. Unlock to see your prioritized fix plan with code snippets and action items.`}
-          onCheckout={() => handleCheckout('initial_scan')}
-          loading={checkoutLoading}
-        />
+        <>
+          <LockedSection
+            title="Your Fix Plan"
+            description={`We found ${allFindings.length} improvements for your AI visibility. Unlock to see your prioritized fix plan with code snippets and action items.`}
+            onCheckout={() => handleCheckout('initial_scan')}
+            loading={checkoutLoading}
+          />
+          {ctaBanner}
+        </>
       )}
       {isAuthenticated && activeTab === 'fix-plan' && hasPaid && (<>
 
@@ -1959,6 +1962,9 @@ export default function AuditResultPage() {
           </div>
         </div>
       )}
+
+      {/* CTA banner — always visible for unauthenticated users at bottom of landing state */}
+      {!isAuthenticated && ctaBanner}
       </>
       )}
     </div>
