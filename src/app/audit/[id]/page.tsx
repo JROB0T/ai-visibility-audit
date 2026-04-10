@@ -1313,6 +1313,9 @@ export default function AuditResultPage() {
       <div className="bg-red-600 text-white text-center p-4 text-xl font-bold">
         ⬇️ CTA BANNER BELOW ⬇️
       </div>
+      <div style={{ background: 'red', color: 'white', padding: '20px', fontSize: '24px', textAlign: 'center' }}>
+        TEST - CTA SHOULD BE BELOW THIS
+      </div>
       {ctaBanner}
 
       </>)}
