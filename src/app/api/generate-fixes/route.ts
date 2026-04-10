@@ -8,11 +8,6 @@ import { isAdminAccount } from '@/lib/entitlements';
 
 export const maxDuration = 60;
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
-
 interface GeneratedFix {
   key: string;
   implementation: string;
@@ -132,6 +127,10 @@ Generate a fix for EVERY issue listed. Return ONLY a JSON array. No markdown, no
       let saved = false;
       if (fixes.length > 0) {
         console.log('[generate-fixes] Attempting DB write with service role client');
+        const supabaseAdmin = createClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.SUPABASE_SERVICE_ROLE_KEY!
+        );
         const { error: updateError } = await supabaseAdmin.from('audits').update({ generated_fixes: fixes }).eq('id', auditId);
         if (updateError) {
           console.error('[generate-fixes] DB write failed:', updateError.message);
