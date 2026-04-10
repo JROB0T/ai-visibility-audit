@@ -1066,7 +1066,7 @@ export default function AuditResultPage() {
       )}
 
       {/* ===== OVERVIEW TAB ===== */}
-      {(!isAuthenticated || activeTab === 'overview') && (<>
+      {activeTab === 'overview' && (<>
 
       {/* 1. BUSINESS-FRIENDLY SUMMARY — always visible */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
@@ -1310,12 +1310,6 @@ export default function AuditResultPage() {
         </>
       )}
 
-      <div className="bg-red-600 text-white text-center p-4 text-xl font-bold">
-        ⬇️ CTA BANNER BELOW ⬇️
-      </div>
-      <div style={{ background: 'red', color: 'white', padding: '20px', fontSize: '24px', textAlign: 'center' }}>
-        TEST - CTA SHOULD BE BELOW THIS
-      </div>
       {ctaBanner}
 
       </>)}
