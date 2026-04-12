@@ -166,6 +166,10 @@ export async function POST(request: NextRequest) {
       crawlability_score: scores.crawlability.score, machine_readability_score: scores.machineReadability.score,
       commercial_clarity_score: scores.commercialClarity.score, trust_clarity_score: scores.trustClarity.score,
       pages_scanned: scanResult.pages.length, summary, completed_at: new Date().toISOString(),
+      key_pages_status: scanResult.keyPagesStatus || [],
+      home_evidence: homepage?.homeEvidence || null,
+      llms_txt: scanResult.llmsTxt || null,
+      scanner_summary: scanResult.scannerSummary || null,
     }).eq('id', audit.id);
 
     return NextResponse.json({ auditId: audit.id, siteId: site.id, score: scores.overall, status: 'completed' });

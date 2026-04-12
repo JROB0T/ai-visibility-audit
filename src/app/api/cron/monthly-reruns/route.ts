@@ -165,6 +165,7 @@ export async function GET(request: NextRequest) {
       const medCount = recommendations.filter((r) => r.severity === 'medium').length;
       const summary = `Monthly rerun: Scanned ${scanResult.pages.length} pages. Found ${highCount} high-priority and ${medCount} medium-priority issues. Score: ${scores.overall}/100.`;
 
+      const cronHomepage = scanResult.pages.find(p => p.pageType === 'homepage');
       await supabase.from('audits').update({
         status: 'completed',
         overall_score: scores.overall,
@@ -175,6 +176,10 @@ export async function GET(request: NextRequest) {
         pages_scanned: scanResult.pages.length,
         summary,
         completed_at: new Date().toISOString(),
+        key_pages_status: scanResult.keyPagesStatus || [],
+        home_evidence: cronHomepage?.homeEvidence || null,
+        llms_txt: scanResult.llmsTxt || null,
+        scanner_summary: scanResult.scannerSummary || null,
       }).eq('id', audit.id);
 
       // Update site scheduling

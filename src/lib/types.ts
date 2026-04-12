@@ -25,6 +25,10 @@ export interface Audit {
   created_at: string;
   completed_at: string | null;
   site?: Site;
+  key_pages_status?: KeyPageStatus[] | null;
+  home_evidence?: HomeEvidence | null;
+  llms_txt?: LlmsTxtResult | null;
+  scanner_summary?: ScannerSummary | null;
 }
 
 export interface AuditPage {

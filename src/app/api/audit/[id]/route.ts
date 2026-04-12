@@ -39,7 +39,10 @@ export async function GET(
       .order('priority_order');
 
     const crawlerStatuses = buildCrawlerStatusesFromFindings(findings || [], recommendations || []);
-    const keyPagesStatus = buildKeyPagesFromPages(pages || []);
+    // Use stored keyPagesStatus (includes homeEvidence fallbacks) if available, else reconstruct from pages
+    const keyPagesStatus = (audit.key_pages_status && Array.isArray(audit.key_pages_status) && audit.key_pages_status.length > 0)
+      ? audit.key_pages_status
+      : buildKeyPagesFromPages(pages || []);
     const pagePreviews = (pages || []).map((p: Record<string, unknown>) => ({
       url: p.url,
       title: p.title || '(no title)',
