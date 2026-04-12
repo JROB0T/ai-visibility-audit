@@ -24,6 +24,7 @@ export async function GET(req: NextRequest) {
       llmsTxt: scanResult.llmsTxt,
       napConsistency: scanResult.napConsistency,
       detectedVertical: scanResult.detectedVertical,
+      homeEvidence: scanResult.pages.find(p => p.pageType === 'homepage')?.homeEvidence || null,
       keyPagesStatus: scanResult.keyPagesStatus,
       pagesScanned: scanResult.pages.map(p => ({
         url: p.url,
@@ -43,6 +44,8 @@ export async function GET(req: NextRequest) {
         hasValueProposition: p.hasValueProposition,
         hasTrustSignalsAboveFold: p.hasTrustSignalsAboveFold,
         schemaTypes: p.schemaTypes,
+        hasDemoCTA: p.hasDemoCTA,
+        hasContactCTA: p.hasContactCTA,
       })),
       findingsCount: findings.length,
       findings: findings.map(f => ({

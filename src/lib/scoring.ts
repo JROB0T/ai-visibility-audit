@@ -563,6 +563,36 @@ export function generateRecommendations(scan: ScanResult): RecommendationInput[]
       codeSnippet: null, affectedUrls: [], confidence: 'inferred' });
   }
 
+  // === NEW FINDINGS FROM HOME EVIDENCE ===
+  const homepageForEvidence = scan.pages.find(p => p.pageType === 'homepage');
+  const hev = homepageForEvidence?.homeEvidence;
+  if (hev) {
+    // Funding announcement without schema
+    if (hev.hasFundingAnnouncement && !homepageForEvidence?.schemaTypes?.includes('NewsArticle')) {
+      recs.push({ category: 'trust_clarity', severity: 'medium', effort: 'easy',
+        title: 'Funding announcement detected but no NewsArticle schema',
+        whyItMatters: 'Your site mentions a funding round but has no structured data to help AI systems surface this as a news event.',
+        recommendedFix: 'Add NewsArticle or PressRelease schema to your funding announcement.',
+        codeSnippet: null, affectedUrls: [homepageForEvidence.url], confidence: 'estimated' });
+    }
+    // Demo CTA exists but no dedicated demo page
+    if (hev.hasBookDemoButton && !scan.pages.some(p => p.pageType === 'demo')) {
+      recs.push({ category: 'commercial_clarity', severity: 'low', effort: 'easy',
+        title: 'Demo CTA uses modal — consider a dedicated demo page',
+        whyItMatters: 'Your Book a Demo button opens a modal or anchor link. A dedicated /demo page would be more discoverable by AI crawlers.',
+        recommendedFix: 'Create a /demo or /book-a-demo page so AI crawlers can index your demo offering directly.',
+        codeSnippet: null, affectedUrls: [homepageForEvidence.url], confidence: 'verified' });
+    }
+    // Customer logos but no testimonials
+    if (hev.hasCustomerLogos && !hev.hasTestimonials) {
+      recs.push({ category: 'trust_clarity', severity: 'low', effort: 'medium',
+        title: 'Customer logos present but no testimonials with attribution',
+        whyItMatters: 'AI systems look for attributed quotes and case studies, not just logos. Named testimonials with job titles significantly boost trust signals.',
+        recommendedFix: 'Add customer testimonials with real names, titles, and companies to your homepage.',
+        codeSnippet: null, affectedUrls: [homepageForEvidence.url], confidence: 'estimated' });
+    }
+  }
+
   return verifyFindings(recs, scan);
 }
 
@@ -631,10 +661,28 @@ function verifyFindings(
   const hasPrivacyPage = matches(['privacy', 'data processing', 'gdpr']);
   const hasExplicitTerms = matches(['terms', 'conditions', 'tos']);
 
+  // homeEvidence-based false positive removal
+  const homepage = scan.pages.find(p => p.pageType === 'homepage');
+  const ev = homepage?.homeEvidence;
+  const anyPageHasDemoCTA = scan.pages.some(p => p.hasDemoCTA);
+  const anyPageHasContactCTA = scan.pages.some(p => p.hasContactCTA);
+
   return findings.reduce<RecommendationInput[]>((acc, finding) => {
     const titleLower = (finding.title || '').toLowerCase();
     const descLower = (finding.whyItMatters || '').toLowerCase();
     const findingText = `${titleLower} ${descLower}`;
+
+    // homeEvidence-based false positive removal
+    if (ev) {
+      if ((ev.hasBookDemoButton || ev.hasRequestDemoButton || anyPageHasDemoCTA) &&
+          (findingText.includes('no contact or demo') || findingText.includes('no demo'))) return acc;
+      if ((ev.hasContactForm || ev.hasContactEmail || anyPageHasContactCTA || homepage?.hasPhoneNumber) &&
+          (findingText.includes('no contact') && !findingText.includes('no contact or demo'))) return acc;
+      if (ev.hasIntegrationsSection && findingText.includes('no integrations')) return acc;
+      if (ev.hasPricingSection && findingText.includes('no pricing')) return acc;
+      if (ev.hasTestimonials && findingText.includes('no testimonials')) return acc;
+      if (ev.hasCustomerLogos && findingText.includes('no customer logos')) return acc;
+    }
 
     // Step 5: Terms/privacy special case — downgrade instead of remove
     if (!hasExplicitTerms && hasPrivacyPage) {

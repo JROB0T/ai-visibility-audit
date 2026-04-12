@@ -824,6 +824,34 @@ async function scanPage(url: string, pageType: PageType): Promise<PageScanResult
     $('[itemtype*="PostalAddress"]').length > 0 ||
     $('address').length > 0;
 
+  // === CTA DETECTION (all pages — Fix 5) ===
+  const allButtonText: string[] = [];
+  $('a, button').each((_, el) => {
+    const t = $(el).text().trim().toLowerCase();
+    if (t && t.length < 100) allButtonText.push(t);
+  });
+  const hasDemoCTA = allButtonText.some(t => /book\s*a?\s*demo|request\s*a?\s*demo|schedule\s*a?\s*demo|get\s*a?\s*demo|see\s*a?\s*demo/.test(t));
+  const hasContactCTA = allButtonText.some(t => /contact us|get in touch|talk to sales|talk to us|reach out|connect with/.test(t));
+
+  // === HOMEPAGE DEEP CONTENT EVIDENCE (Fix 1) ===
+  let homeEvidence: import('@/lib/types').HomeEvidence | undefined;
+  if (pageType === 'homepage') {
+    const bodyTextLower = bodyText.toLowerCase();
+    homeEvidence = {
+      hasBookDemoButton: allButtonText.some(t => /book\s*a?\s*demo|schedule\s*a?\s*demo|request\s*a?\s*demo|get\s*a?\s*demo|see\s*a?\s*demo/.test(t)),
+      hasRequestDemoButton: allButtonText.some(t => /request|get started|contact us|talk to us|get in touch|reach out|connect with/.test(t)),
+      hasContactForm: $('form').length > 0 || $('[data-form], [class*="form"], [id*="form"]').length > 0,
+      hasContactEmail: /[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/.test(bodyText),
+      hasPricingSection: /pricing|per month|per year|\$\d+\/mo|free plan|paid plan|starter plan|pro plan|enterprise plan/.test(bodyTextLower),
+      hasIntegrationsSection: /integrat|connect with|compatible with|works with|sync with|plug into/.test(bodyTextLower) &&
+        $('[class*="integrat"], [class*="partner"], [class*="logo"]').length > 3,
+      hasCustomerLogos: $('img[alt*="logo"], img[alt*="Logo"], [class*="logo-grid"], [class*="customer"], [class*="client"]').length > 2,
+      hasTestimonials: $('blockquote, [class*="testimonial"], [class*="quote"], [class*="review"]').length > 0 ||
+        /said|says|quote|testimonial/.test(bodyTextLower),
+      hasFundingAnnouncement: /\$\d+[mb]\s*(in\s*)?(funding|raised|round|series)|series\s*[a-e]|seed\s*round|announced/i.test(bodyTextLower),
+    };
+  }
+
   // === JS DEPENDENCY CHECK ===
   const scriptCount = $('script[src]').length;
   if (scriptCount > 15 && wordCount < 200) {
@@ -869,6 +897,10 @@ async function scanPage(url: string, pageType: PageType): Promise<PageScanResult
     hasPhoneNumber, hasEmailAddress, hasPhysicalAddress,
     // Above-the-fold analysis (Batch D)
     hasValueProposition, hasTrustSignalsAboveFold,
+    // Homepage deep content evidence + CTA detection
+    homeEvidence,
+    hasDemoCTA,
+    hasContactCTA,
   };
 }
 
@@ -1081,12 +1113,27 @@ function buildKeyPagesStatus(pages: PageScanResult[]): KeyPageStatus[] {
     const found = pages.find(p => p.pageType === kt.type);
     if (found) return { type: kt.type, label: kt.label, found: true, url: found.url };
 
-    // Fallback: if no page with the type exists, check link-based signals
+    // Fallback: check link-based signals
     if (kt.type === 'privacy' && pages.some(p => p.hasPrivacyLink)) {
-      return { type: kt.type, label: kt.label, found: true, url: homepage?.url || null };
+      return { type: kt.type, label: kt.label, found: true, url: homepage?.url || null, note: 'Privacy link found in page/footer' };
     }
     if (kt.type === 'terms' && pages.some(p => p.hasTermsLink)) {
-      return { type: kt.type, label: kt.label, found: true, url: homepage?.url || null };
+      return { type: kt.type, label: kt.label, found: true, url: homepage?.url || null, note: 'Terms link found in page/footer' };
+    }
+
+    // Fallback: check homeEvidence and CTA detection across all pages
+    const ev = homepage?.homeEvidence;
+    if (kt.type === 'demo' && (ev?.hasBookDemoButton || ev?.hasRequestDemoButton || pages.some(p => p.hasDemoCTA))) {
+      return { type: kt.type, label: kt.label, found: true, url: homepage?.url || null, note: 'Demo CTA found on site (modal/anchor link)' };
+    }
+    if (kt.type === 'contact' && (ev?.hasContactForm || ev?.hasContactEmail || homepage?.hasPhoneNumber || pages.some(p => p.hasContactCTA))) {
+      return { type: kt.type, label: kt.label, found: true, url: homepage?.url || null, note: 'Contact info found on homepage' };
+    }
+    if (kt.type === 'integrations' && ev?.hasIntegrationsSection) {
+      return { type: kt.type, label: kt.label, found: true, url: homepage?.url || null, note: 'Integrations section found on homepage' };
+    }
+    if (kt.type === 'pricing' && ev?.hasPricingSection) {
+      return { type: kt.type, label: kt.label, found: true, url: homepage?.url || null, note: 'Pricing section found on homepage' };
     }
 
     return { type: kt.type, label: kt.label, found: false, url: null };

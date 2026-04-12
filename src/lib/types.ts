@@ -159,6 +159,19 @@ export interface KeyPageStatus {
   label: string;
   found: boolean;
   url: string | null;
+  note?: string;
+}
+
+export interface HomeEvidence {
+  hasBookDemoButton: boolean;
+  hasRequestDemoButton: boolean;
+  hasContactForm: boolean;
+  hasContactEmail: boolean;
+  hasPricingSection: boolean;
+  hasIntegrationsSection: boolean;
+  hasCustomerLogos: boolean;
+  hasFundingAnnouncement: boolean;
+  hasTestimonials: boolean;
 }
 
 export interface RobotsTxtResult {
@@ -261,6 +274,12 @@ export interface PageScanResult {
   // Above-the-fold analysis (Batch D)
   hasValueProposition?: boolean;
   hasTrustSignalsAboveFold?: boolean;
+
+  // Homepage deep content evidence
+  homeEvidence?: HomeEvidence;
+  // CTA detection (all pages)
+  hasDemoCTA?: boolean;
+  hasContactCTA?: boolean;
 }
 
 export interface ScoreResult {
