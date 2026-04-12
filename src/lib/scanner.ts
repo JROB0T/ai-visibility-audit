@@ -461,10 +461,10 @@ async function scanPage(url: string, pageType: PageType): Promise<PageScanResult
 
   // Quality checks (Batch B)
   const titleLength = title ? title.length : null;
-  const hostname = new URL(url).hostname.replace(/^www\./, '');
-  const domainBase = hostname.replace(/\.(com|io|co|org|net|dev|app)$/, '');
+  const domainHostname = new URL(url).hostname.replace(/^www\./, '');
+  const domainBase = domainHostname.replace(/\.(com|io|co|org|net|dev|app)$/, '');
   const titleIsDomainOnly = !!(title && (
-    title.trim().toLowerCase() === hostname.toLowerCase() ||
+    title.trim().toLowerCase() === domainHostname.toLowerCase() ||
     title.trim().toLowerCase() === domainBase.toLowerCase() ||
     title.trim().toLowerCase() === 'home' ||
     /^home\s*[-–|·]\s*/i.test(title.trim())
