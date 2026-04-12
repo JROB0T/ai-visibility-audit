@@ -147,8 +147,8 @@ export async function scanSite(inputUrl: string): Promise<ScanResult> {
   let napConsistency: import('@/lib/types').NapConsistency | undefined;
   if (['local_service', 'restaurant', 'healthcare', 'law_firm'].includes(detectedVertical)) {
     // Extract NAP from schema
-    let schemaName: string | null = null;
-    let schemaPhone: string | null = null;
+    const schemaName: string | null = null;
+    const schemaPhone: string | null = null;
     for (const page of pageResults) {
       if (page.pageType === 'homepage' && page.hasSchema) {
         // Parse schema from raw HTML preview to find Organization/LocalBusiness data
