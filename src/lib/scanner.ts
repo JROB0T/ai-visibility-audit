@@ -465,7 +465,7 @@ async function checkLlmsTxt(baseUrl: string): Promise<import('@/lib/types').Llms
 // ============================================================
 function categorizeUrl(url: string): { type: PageType; priority: number } {
   const patterns: { regex: RegExp; type: PageType; priority: number }[] = [
-    { regex: /\/(pricing|plans|packages)/i, type: 'pricing', priority: 1 },
+    { regex: /\/(pricing|plans|packages|cost|rates|fees|subscription|tiers)(\/|$)/i, type: 'pricing', priority: 1 },
     { regex: /\/(demo|request-demo|book-demo|get-demo|schedule)/i, type: 'demo', priority: 2 },
     { regex: /\/(contact|contact-us|get-in-touch|talk-to-us)/i, type: 'contact', priority: 3 },
     { regex: /\/(product|products|features|platform|solutions?)\/?$/i, type: 'product', priority: 4 },
@@ -509,7 +509,15 @@ function reclassifyByContent(page: PageScanResult): PageType {
 
   if (/about us|our story|our team|our mission|who we are|company history/.test(text) ||
       page.schemaTypes.some(s => s === 'Organization')) return 'about';
-  if (/pricing|our plans|\$[\d]|per month|per year|subscription/.test(text)) return 'pricing';
+  // Pricing requires at least 2 signals to avoid false positives (e.g. "Valuation & Pricing Teams" pages)
+  {
+    let pricingSignals = 0;
+    if (/\$\d+|\d+\/mo|\d+\/month|\d+\/year/.test(text)) pricingSignals++;
+    if (/\b(starter|basic|pro|premium|enterprise|free plan|free tier)\b/.test(text)) pricingSignals++;
+    if (/pricing/.test((page.title || '').toLowerCase()) || /pricing/.test((page.h1Text || '').toLowerCase())) pricingSignals++;
+    if (/per month|per year|\/mo\b|\/yr\b|billed annually|billed monthly/.test(text)) pricingSignals++;
+    if (pricingSignals >= 2) return 'pricing';
+  }
   if (/contact us|get in touch|reach out|reach us|send us a message/.test(text)) return 'contact';
   if (/book a demo|schedule a demo|request a demo|view a demo|see it in action/.test(text)) return 'demo';
   if (/privacy policy|data protection|data processing|personal information/.test(text)) return 'privacy';
