@@ -427,7 +427,19 @@ async function checkLlmsTxt(baseUrl: string): Promise<import('@/lib/types').Llms
     });
     clearTimeout(timeout);
     if (!res.ok) return { exists: false, hasFullVersion: false };
+    // Validate content-type — reject HTML pages served at /llms.txt
+    const contentType = res.headers.get('content-type') || '';
     const content = await res.text();
+    if (!contentType.includes('text/plain') && !contentType.includes('text/markdown')) {
+      const trimmed = content.trim();
+      if (trimmed.startsWith('<!') || trimmed.startsWith('<html')) {
+        return { exists: false, hasFullVersion: false };
+      }
+    }
+    // Reject if content is too short to be a real llms.txt
+    if (content.trim().length < 50) {
+      return { exists: false, hasFullVersion: false };
+    }
     // Check for llms-full.txt
     const controller2 = new AbortController();
     const timeout2 = setTimeout(() => controller2.abort(), 5000);
