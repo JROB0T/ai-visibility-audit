@@ -87,6 +87,7 @@ export interface ScannerSummary {
   failedUrls: string[];
   checksVerified: number;
   checksInferred: number;
+  checksEstimated: number;
   confidencePercent: number;
 }
 

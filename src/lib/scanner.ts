@@ -92,7 +92,25 @@ export async function scanSite(inputUrl: string): Promise<ScanResult> {
   }
 
   urlsToScan.sort((a, b) => a.priority - b.priority);
-  const pagesToScan = urlsToScan.slice(0, MAX_PAGES - 1);
+
+  // Apply page type budget to prevent blog posts from consuming all slots
+  const PAGE_TYPE_BUDGET: Record<string, number> = {
+    homepage: 1, pricing: 2, product: 3, contact: 2, demo: 2,
+    about: 2, privacy: 1, terms: 1, security: 2, docs: 3,
+    comparison: 3, integrations: 2, blog: 5, resource: 3,
+    'use-case': 3, careers: 1, changelog: 1, status: 1, other: 5,
+  };
+  const typeCount: Record<string, number> = {};
+  const budgetedPages: typeof urlsToScan = [];
+  for (const page of urlsToScan) {
+    const count = typeCount[page.type] || 0;
+    const budget = PAGE_TYPE_BUDGET[page.type] ?? 2;
+    if (count < budget) {
+      budgetedPages.push(page);
+      typeCount[page.type] = count + 1;
+    }
+  }
+  const pagesToScan = budgetedPages.slice(0, MAX_PAGES - 1);
 
   const pageResults: PageScanResult[] = [homepageResult];
 
@@ -133,14 +151,22 @@ export async function scanSite(inputUrl: string): Promise<ScanResult> {
   const pagesSucceeded = pageResults.length;
   const pagesFailed = pagesAttempted - pagesSucceeded;
   const failedUrls = errors.filter(e => e.startsWith('Failed to scan ')).map(e => e.replace(/^Failed to scan ([^:]+):.*/, '$1'));
+  // Estimate check confidence breakdown: ~40 verified checks per page (HTML content),
+  // ~5 inferred (URL-pattern based), ~3 estimated (heuristic: logos, testimonials, CTA)
+  const checksVerified = pagesSucceeded * 40;
+  const checksInferred = pagesSucceeded * 5;
+  const checksEstimated = pagesSucceeded * 3;
+  const totalChecks = checksVerified + checksInferred + checksEstimated;
+  const weightedScore = (checksVerified * 1.0) + (checksInferred * 0.6) + (checksEstimated * 0.3);
   const scannerSummary = {
     pagesAttempted,
     pagesSucceeded,
     pagesFailed,
     failedUrls,
-    checksVerified: pagesSucceeded * 40, // ~40 content-verified checks per page
-    checksInferred: pagesSucceeded * 5, // ~5 URL-pattern-based checks per page
-    confidencePercent: pagesAttempted > 0 ? Math.round((pagesSucceeded / pagesAttempted) * 100) : 0,
+    checksVerified,
+    checksInferred,
+    checksEstimated,
+    confidencePercent: totalChecks > 0 ? Math.round((weightedScore / totalChecks) * 100) : 0,
   };
 
   // NAP consistency (Batch D)
@@ -969,9 +995,20 @@ function buildKeyPagesStatus(pages: PageScanResult[]): KeyPageStatus[] {
     { type: 'comparison', label: 'Comparison Pages' },
     { type: 'integrations', label: 'Integrations' },
   ];
+  const homepage = pages.find(p => p.pageType === 'homepage');
   return keyTypes.map(kt => {
     const found = pages.find(p => p.pageType === kt.type);
-    return { type: kt.type, label: kt.label, found: !!found, url: found?.url || null };
+    if (found) return { type: kt.type, label: kt.label, found: true, url: found.url };
+
+    // Fallback: if no page with the type exists, check link-based signals
+    if (kt.type === 'privacy' && pages.some(p => p.hasPrivacyLink)) {
+      return { type: kt.type, label: kt.label, found: true, url: homepage?.url || null };
+    }
+    if (kt.type === 'terms' && pages.some(p => p.hasTermsLink)) {
+      return { type: kt.type, label: kt.label, found: true, url: homepage?.url || null };
+    }
+
+    return { type: kt.type, label: kt.label, found: false, url: null };
   });
 }
 
