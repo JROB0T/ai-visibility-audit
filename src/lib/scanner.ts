@@ -93,12 +93,24 @@ export async function scanSite(inputUrl: string): Promise<ScanResult> {
 
   urlsToScan.sort((a, b) => a.priority - b.priority);
 
+  // Sort blog URLs to prefer recent content
+  const recentFirst = (u: string) => {
+    if (/\/(202[2-9]|203\d)\//.test(u)) return 0;
+    if (/\/(201[5-9]|202[0-1])\//.test(u)) return 1;
+    if (/\/bid\//.test(u)) return 3;
+    return 2;
+  };
+  urlsToScan.sort((a, b) => {
+    if (a.type === 'blog' && b.type === 'blog') return recentFirst(a.url) - recentFirst(b.url);
+    return a.priority - b.priority;
+  });
+
   // Apply page type budget to prevent blog posts from consuming all slots
   const PAGE_TYPE_BUDGET: Record<string, number> = {
     homepage: 1, pricing: 2, product: 3, contact: 2, demo: 2,
     about: 2, privacy: 1, terms: 1, security: 2, docs: 3,
     comparison: 3, integrations: 2, blog: 5, resource: 3,
-    'use-case': 3, careers: 1, changelog: 1, status: 1, other: 5,
+    'use-case': 3, careers: 1, changelog: 1, status: 1, other: 0,
   };
   const typeCount: Record<string, number> = {};
   const budgetedPages: typeof urlsToScan = [];
@@ -136,6 +148,41 @@ export async function scanSite(inputUrl: string): Promise<ScanResult> {
       if (reclassified !== 'other') {
         (page as { pageType: PageType }).pageType = reclassified;
       }
+    }
+  }
+
+  // Probe fallback URLs for missing key page types
+  const foundTypes = new Set(pageResults.map(p => p.pageType));
+  const FALLBACK_URLS: Record<string, string[]> = {
+    security: ['/security', '/trust', '/compliance', '/security-compliance'],
+    docs: ['/docs', '/documentation', '/help', '/support', '/knowledge-base'],
+    privacy: ['/privacy', '/privacy-policy', '/legal/privacy'],
+    terms: ['/terms', '/terms-of-service', '/legal/terms', '/tos'],
+  };
+  for (const [type, paths] of Object.entries(FALLBACK_URLS)) {
+    if (foundTypes.has(type as PageType)) continue;
+    for (const path of paths) {
+      const probeUrl = `${baseUrl}${path}`;
+      if (scannedUrls.has(probeUrl)) continue;
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 3000);
+        const probeRes = await fetch(probeUrl, {
+          headers: { 'User-Agent': USER_AGENT },
+          redirect: 'follow',
+          signal: controller.signal,
+        });
+        clearTimeout(timeout);
+        if (probeRes.ok) {
+          scannedUrls.add(probeUrl);
+          try {
+            const probePage = await scanPage(probeUrl, type as PageType);
+            pageResults.push(probePage);
+            foundTypes.add(type as PageType);
+          } catch { /* scan failed, skip */ }
+          break; // Found one for this type, move on
+        }
+      } catch { /* timeout or network error, try next URL */ }
     }
   }
 
@@ -729,9 +776,23 @@ async function scanPage(url: string, pageType: PageType): Promise<PageScanResult
     const heroText = `${h1Lower} ${firstPara}`;
     hasValueProposition = heroText.length > 20 &&
       !/^welcome|^home$|^hello/.test(heroText.trim());
-    const bodyFirst3000 = $('body').text().substring(0, 3000);
-    const trustPatterns = /trusted by|as seen in|customers|clients|years of|certified|award|rating|review|\d+\+?\s*(customer|user|client|company)/i;
-    hasTrustSignalsAboveFold = trustPatterns.test(bodyFirst3000);
+    const bodySlice = $('body').text().slice(0, 5000);
+    const trustPatternsArr = [
+      /trusted by/i,
+      /as seen in/i,
+      /\d[\d,]+\s*(customer|user|client|company|business)/i,
+      /join\s+\d/i,
+      /over\s+\d/i,
+      /more than\s+\d/i,
+      /g2|capterra|gartner|forrester/i,
+      /award/i,
+      /certified/i,
+      /leader in/i,
+      /\d+\s*★/i,
+      /rating/i,
+      /reviews/i,
+    ];
+    hasTrustSignalsAboveFold = trustPatternsArr.some(p => p.test(bodySlice));
   }
 
   // === CONTACT DETECTION (Batch C) ===

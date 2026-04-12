@@ -37,7 +37,7 @@ export function generateRecommendations(scan: ScanResult): RecommendationInput[]
     recs.push({ category: 'crawlability', severity: 'high', effort: 'easy', title: 'Add a robots.txt file',
       whyItMatters: 'Without robots.txt, AI crawlers have no guidance on what to index.',
       recommendedFix: 'Create a robots.txt at your site root with Allow rules for AI crawlers and a Sitemap reference.',
-      codeSnippet: null, affectedUrls: [] });
+      codeSnippet: null, affectedUrls: [], confidence: 'verified' });
   }
 
   if (scan.robotsTxt?.blocksAI) {
@@ -45,19 +45,19 @@ export function generateRecommendations(scan: ScanResult): RecommendationInput[]
       title: `AI crawlers are blocked: ${scan.robotsTxt.blockedAgents.join(', ')}`,
       whyItMatters: 'Blocked AI crawlers cannot read your site. AI search and assistants will not reference your content.',
       recommendedFix: 'Remove Disallow rules for AI crawlers you want to allow.',
-      codeSnippet: null, affectedUrls: [] });
+      codeSnippet: null, affectedUrls: [], confidence: 'verified' });
   }
 
   if (!scan.sitemap?.exists) {
     recs.push({ category: 'crawlability', severity: 'high', effort: 'easy', title: 'Add an XML sitemap',
       whyItMatters: 'A sitemap tells crawlers exactly which pages exist. Without one, they may miss key content.',
       recommendedFix: 'Generate a sitemap.xml listing your key pages and reference it in robots.txt.',
-      codeSnippet: null, affectedUrls: [] });
+      codeSnippet: null, affectedUrls: [], confidence: 'verified' });
   } else if (scan.sitemap.urlCount && scan.sitemap.urlCount < 5) {
     recs.push({ category: 'crawlability', severity: 'medium', effort: 'easy', title: 'Sitemap has very few URLs',
       whyItMatters: 'Your sitemap only lists a handful of pages. Ensure all important pages are included.',
       recommendedFix: 'Add pricing, product, docs, and blog pages to your sitemap.',
-      codeSnippet: null, affectedUrls: [scan.sitemap.url || ''] });
+      codeSnippet: null, affectedUrls: [scan.sitemap.url || ''], confidence: 'verified' });
   }
 
   // llms.txt check
@@ -66,7 +66,7 @@ export function generateRecommendations(scan: ScanResult): RecommendationInput[]
       title: 'No llms.txt file found',
       whyItMatters: 'llms.txt is an emerging standard that helps AI systems understand your site content and permissions. Adding one improves your visibility to ChatGPT, Claude, and Perplexity.',
       recommendedFix: 'Create an llms.txt file at your site root describing your site, key pages, and content for AI systems.',
-      codeSnippet: null, affectedUrls: [] });
+      codeSnippet: null, affectedUrls: [], confidence: 'verified' });
   }
 
   // P0: Noindex on key pages
@@ -75,7 +75,7 @@ export function generateRecommendations(scan: ScanResult): RecommendationInput[]
       title: 'Key pages have noindex tags — AI crawlers will ignore them',
       whyItMatters: 'Pages with noindex are completely invisible to AI systems. They cannot be cited, summarized, or recommended.',
       recommendedFix: 'Remove the noindex meta tag from any pages you want AI to discover.',
-      codeSnippet: null, affectedUrls: sw.noindexPages });
+      codeSnippet: null, affectedUrls: sw.noindexPages, confidence: 'verified' });
   }
 
   // P0: HTTPS
@@ -84,7 +84,7 @@ export function generateRecommendations(scan: ScanResult): RecommendationInput[]
       title: 'Site is not served over HTTPS',
       whyItMatters: 'AI systems deprioritize insecure sites. HTTPS is a baseline trust signal.',
       recommendedFix: 'Install an SSL certificate and redirect all HTTP traffic to HTTPS.',
-      codeSnippet: null, affectedUrls: [] });
+      codeSnippet: null, affectedUrls: [], confidence: 'verified' });
   }
 
   // P1: Nofollow on internal links
@@ -93,7 +93,7 @@ export function generateRecommendations(scan: ScanResult): RecommendationInput[]
       title: 'Internal links have nofollow attributes',
       whyItMatters: 'Nofollow on internal links tells crawlers not to follow those paths, potentially hiding key pages.',
       recommendedFix: 'Remove rel="nofollow" from internal links pointing to your own pages.',
-      codeSnippet: null, affectedUrls: sw.nofollowLinks.slice(0, 5) });
+      codeSnippet: null, affectedUrls: sw.nofollowLinks.slice(0, 5), confidence: 'verified' });
   }
 
   // P0: Nav links to key pages
@@ -102,7 +102,7 @@ export function generateRecommendations(scan: ScanResult): RecommendationInput[]
       title: `Navigation missing links to: ${sw.missingNavLinks.join(', ')}`,
       whyItMatters: 'AI crawlers use navigation to discover your most important pages. Missing nav links means they may never find them.',
       recommendedFix: `Add links to ${sw.missingNavLinks.join(', ')} in your main navigation.`,
-      codeSnippet: null, affectedUrls: [] });
+      codeSnippet: null, affectedUrls: [], confidence: 'verified' });
   }
 
   // Batch C: Internal link analysis
@@ -111,7 +111,7 @@ export function generateRecommendations(scan: ScanResult): RecommendationInput[]
       title: `Homepage does not link to key pages: ${sw.missingHomepageLinks.join(', ')}`,
       whyItMatters: 'AI crawlers follow links from the homepage to discover your content. Key pages that are not linked from the homepage may be harder for AI to find.',
       recommendedFix: `Add links to ${sw.missingHomepageLinks.join(', ')} from your homepage.`,
-      codeSnippet: null, affectedUrls: [] });
+      codeSnippet: null, affectedUrls: [], confidence: 'verified' });
   }
 
   // ========== MACHINE READABILITY ==========
@@ -122,7 +122,7 @@ export function generateRecommendations(scan: ScanResult): RecommendationInput[]
       title: 'Pages missing title tags',
       whyItMatters: 'Title tags are the primary way AI identifies what a page is about.',
       recommendedFix: 'Add unique, descriptive <title> tags (50-60 characters) to every page.',
-      codeSnippet: null, affectedUrls: pagesWithoutTitle.map((p) => p.url) });
+      codeSnippet: null, affectedUrls: pagesWithoutTitle.map((p) => p.url), confidence: 'verified' });
   }
 
   const pagesWithoutMeta = scan.pages.filter((p) => !p.metaDescription);
@@ -131,7 +131,7 @@ export function generateRecommendations(scan: ScanResult): RecommendationInput[]
       title: 'Pages missing meta descriptions',
       whyItMatters: 'Meta descriptions are used as summaries when AI references your content.',
       recommendedFix: 'Add meta descriptions (120-155 characters) describing each page.',
-      codeSnippet: null, affectedUrls: pagesWithoutMeta.map((p) => p.url) });
+      codeSnippet: null, affectedUrls: pagesWithoutMeta.map((p) => p.url), confidence: 'verified' });
   }
 
   // Batch B: Title quality
@@ -141,7 +141,7 @@ export function generateRecommendations(scan: ScanResult): RecommendationInput[]
       title: 'Page title is just the domain name',
       whyItMatters: 'AI systems use the title to understand what you do. A domain-only title gives AI no useful information about your business.',
       recommendedFix: 'Write a descriptive title like "BusinessName — What You Do for Whom".',
-      codeSnippet: null, affectedUrls: domainOnlyTitlePages.map(p => p.url) });
+      codeSnippet: null, affectedUrls: domainOnlyTitlePages.map(p => p.url), confidence: 'verified' });
   }
 
   // Batch B: Meta description quality
@@ -151,7 +151,7 @@ export function generateRecommendations(scan: ScanResult): RecommendationInput[]
       title: 'Meta description duplicates page title',
       whyItMatters: 'Your meta description is identical to your page title. AI systems get no additional context from a duplicate description.',
       recommendedFix: 'Write a unique meta description that expands on what the page offers.',
-      codeSnippet: null, affectedUrls: metaDupTitlePages.map(p => p.url) });
+      codeSnippet: null, affectedUrls: metaDupTitlePages.map(p => p.url), confidence: 'verified' });
   }
 
   // Batch B: Schema field validation
@@ -162,7 +162,7 @@ export function generateRecommendations(scan: ScanResult): RecommendationInput[]
       title: 'Schema markup is missing recommended fields',
       whyItMatters: `Your structured data is missing: ${hpSchemaMissing.join(', ')}. Complete schema helps AI systems better understand and recommend your business.`,
       recommendedFix: `Add the missing fields to your JSON-LD: ${hpSchemaMissing.join(', ')}.`,
-      codeSnippet: null, affectedUrls: homepageSchema ? [homepageSchema.url] : [] });
+      codeSnippet: null, affectedUrls: homepageSchema ? [homepageSchema.url] : [], confidence: 'verified' });
   }
 
   const pagesWithoutCanonical = scan.pages.filter((p) => !p.canonicalUrl);
@@ -171,7 +171,7 @@ export function generateRecommendations(scan: ScanResult): RecommendationInput[]
       title: 'Pages missing canonical tags',
       whyItMatters: 'Without canonical tags, AI may index duplicate versions of your pages.',
       recommendedFix: 'Add <link rel="canonical"> pointing to the preferred URL on each page.',
-      codeSnippet: null, affectedUrls: pagesWithoutCanonical.map((p) => p.url) });
+      codeSnippet: null, affectedUrls: pagesWithoutCanonical.map((p) => p.url), confidence: 'verified' });
   }
 
   const pagesWithoutSchema = scan.pages.filter((p) => !p.hasSchema);
@@ -180,7 +180,7 @@ export function generateRecommendations(scan: ScanResult): RecommendationInput[]
       title: 'Pages missing structured data (JSON-LD)',
       whyItMatters: 'Structured data tells AI exactly what each page represents in machine-readable format.',
       recommendedFix: 'Add JSON-LD: Organization on homepage, Product on product pages, Article on blog posts.',
-      codeSnippet: null, affectedUrls: pagesWithoutSchema.map((p) => p.url) });
+      codeSnippet: null, affectedUrls: pagesWithoutSchema.map((p) => p.url), confidence: 'verified' });
   }
 
   const pagesWithoutH1 = scan.pages.filter((p) => !p.h1Text);
@@ -189,7 +189,7 @@ export function generateRecommendations(scan: ScanResult): RecommendationInput[]
       title: 'Pages missing H1 headings',
       whyItMatters: 'The H1 is a strong signal for page topic identification.',
       recommendedFix: 'Add a single, clear H1 heading on every page.',
-      codeSnippet: null, affectedUrls: pagesWithoutH1.map((p) => p.url) });
+      codeSnippet: null, affectedUrls: pagesWithoutH1.map((p) => p.url), confidence: 'verified' });
   }
 
   const thinPages = scan.pages.filter((p) => p.wordCount !== null && p.wordCount < 100);
@@ -198,7 +198,7 @@ export function generateRecommendations(scan: ScanResult): RecommendationInput[]
       title: 'Pages with very thin content',
       whyItMatters: 'Pages with very little text are unlikely to be referenced by AI.',
       recommendedFix: 'Add meaningful content (at least 300 words on key pages).',
-      codeSnippet: null, affectedUrls: thinPages.map((p) => p.url) });
+      codeSnippet: null, affectedUrls: thinPages.map((p) => p.url), confidence: 'verified' });
   }
 
   // P0: Open Graph tags
@@ -208,7 +208,7 @@ export function generateRecommendations(scan: ScanResult): RecommendationInput[]
       title: 'Most pages missing Open Graph meta tags',
       whyItMatters: 'Open Graph tags control how your pages appear when shared and are used by AI systems for page summaries.',
       recommendedFix: 'Add og:title, og:description, and og:image meta tags to every page.',
-      codeSnippet: null, affectedUrls: pagesWithoutOG.slice(0, 5).map((p) => p.url) });
+      codeSnippet: null, affectedUrls: pagesWithoutOG.slice(0, 5).map((p) => p.url), confidence: 'verified' });
   }
 
   // P0: Image alt text
@@ -219,7 +219,7 @@ export function generateRecommendations(scan: ScanResult): RecommendationInput[]
       title: `${missingAlt} of ${totalImages} images missing alt text`,
       whyItMatters: 'AI crawlers cannot see images. Alt text is the only way they understand what an image shows.',
       recommendedFix: 'Add descriptive alt attributes to all meaningful images.',
-      codeSnippet: null, affectedUrls: scan.pages.filter(p => p.imagesWithoutAlt > 0).slice(0, 5).map(p => p.url) });
+      codeSnippet: null, affectedUrls: scan.pages.filter(p => p.imagesWithoutAlt > 0).slice(0, 5).map(p => p.url), confidence: 'verified' });
   }
 
   // P1: Heading hierarchy
@@ -229,7 +229,7 @@ export function generateRecommendations(scan: ScanResult): RecommendationInput[]
       title: 'Heading hierarchy issues found',
       whyItMatters: 'Logical heading order (H1→H2→H3) helps AI understand content structure and importance.',
       recommendedFix: 'Ensure headings follow a logical hierarchy without skipping levels.',
-      codeSnippet: null, affectedUrls: badHeadingPages.slice(0, 5).map((p) => p.url) });
+      codeSnippet: null, affectedUrls: badHeadingPages.slice(0, 5).map((p) => p.url), confidence: 'verified' });
   }
 
   // P1: Language attribute
@@ -239,7 +239,7 @@ export function generateRecommendations(scan: ScanResult): RecommendationInput[]
       title: 'HTML missing language attribute',
       whyItMatters: 'The lang attribute tells AI what language your content is in, improving comprehension.',
       recommendedFix: 'Add lang="en" (or appropriate language) to your <html> tag.',
-      codeSnippet: null, affectedUrls: noLang.slice(0, 3).map((p) => p.url) });
+      codeSnippet: null, affectedUrls: noLang.slice(0, 3).map((p) => p.url), confidence: 'verified' });
   }
 
   // P1: Breadcrumbs
@@ -249,7 +249,7 @@ export function generateRecommendations(scan: ScanResult): RecommendationInput[]
       title: 'Most pages lack breadcrumb navigation',
       whyItMatters: 'Breadcrumbs help AI understand your site hierarchy and page relationships.',
       recommendedFix: 'Add breadcrumb navigation with BreadcrumbList schema to inner pages.',
-      codeSnippet: null, affectedUrls: [] });
+      codeSnippet: null, affectedUrls: [], confidence: 'verified' });
   }
 
   // P1: FAQ schema on FAQ-like pages
@@ -259,7 +259,7 @@ export function generateRecommendations(scan: ScanResult): RecommendationInput[]
       title: 'FAQ pages missing FAQPage schema',
       whyItMatters: 'FAQ schema lets AI directly answer questions from your content.',
       recommendedFix: 'Add FAQPage JSON-LD structured data to your FAQ pages.',
-      codeSnippet: null, affectedUrls: faqPages.map(p => p.url) });
+      codeSnippet: null, affectedUrls: faqPages.map(p => p.url), confidence: 'verified' });
   }
 
   // P1: Pricing schema
@@ -269,7 +269,7 @@ export function generateRecommendations(scan: ScanResult): RecommendationInput[]
       title: 'Pricing page missing Offer/Price schema',
       whyItMatters: 'Pricing schema enables AI to answer "how much does it cost?" accurately.',
       recommendedFix: 'Add Offer or PriceSpecification schema to your pricing page.',
-      codeSnippet: null, affectedUrls: pricingPages.map(p => p.url) });
+      codeSnippet: null, affectedUrls: pricingPages.map(p => p.url), confidence: 'verified' });
   }
 
   // P1: Article dates
@@ -280,7 +280,7 @@ export function generateRecommendations(scan: ScanResult): RecommendationInput[]
       title: 'Blog posts missing publish dates',
       whyItMatters: 'AI systems use dates to assess content freshness. Undated content may be treated as stale.',
       recommendedFix: 'Add visible dates and article:published_time meta tags to blog posts.',
-      codeSnippet: null, affectedUrls: blogNoDates.slice(0, 5).map(p => p.url) });
+      codeSnippet: null, affectedUrls: blogNoDates.slice(0, 5).map(p => p.url), confidence: 'verified' });
   }
 
   // P1: Author info
@@ -290,7 +290,7 @@ export function generateRecommendations(scan: ScanResult): RecommendationInput[]
       title: 'Blog posts missing author information',
       whyItMatters: 'Author attribution is an E-E-A-T signal that helps AI trust your content.',
       recommendedFix: 'Add author names with meta tags or Person schema to blog posts.',
-      codeSnippet: null, affectedUrls: blogNoAuthor.slice(0, 5).map(p => p.url) });
+      codeSnippet: null, affectedUrls: blogNoAuthor.slice(0, 5).map(p => p.url), confidence: 'verified' });
   }
 
   // P1: Anchor text
@@ -300,7 +300,7 @@ export function generateRecommendations(scan: ScanResult): RecommendationInput[]
       title: 'Internal links use vague anchor text',
       whyItMatters: 'Descriptive link text helps AI understand what the linked page is about.',
       recommendedFix: 'Replace "click here" and "read more" with descriptive anchor text.',
-      codeSnippet: null, affectedUrls: badAnchors.slice(0, 5).map(p => p.url) });
+      codeSnippet: null, affectedUrls: badAnchors.slice(0, 5).map(p => p.url), confidence: 'verified' });
   }
 
   // P1: Duplicate content
@@ -318,7 +318,7 @@ export function generateRecommendations(scan: ScanResult): RecommendationInput[]
       title: 'Potential duplicate content detected',
       whyItMatters: 'Duplicate content confuses AI about which page is the authoritative version.',
       recommendedFix: 'Consolidate duplicate pages or use canonical tags to indicate the preferred version.',
-      codeSnippet: null, affectedUrls: dupes[0].slice(0, 5) });
+      codeSnippet: null, affectedUrls: dupes[0].slice(0, 5), confidence: 'verified' });
   }
 
   // ========== COMMERCIAL CLARITY ==========
@@ -330,7 +330,7 @@ export function generateRecommendations(scan: ScanResult): RecommendationInput[]
       title: 'No pricing page found',
       whyItMatters: 'Without a pricing page, AI cannot answer cost questions and may not recommend your product.',
       recommendedFix: 'Create a dedicated /pricing page with clear plan names, prices, and features.',
-      codeSnippet: null, affectedUrls: [] });
+      codeSnippet: null, affectedUrls: [], confidence: 'inferred' });
   }
 
   // P0: Pricing content clarity
@@ -339,7 +339,7 @@ export function generateRecommendations(scan: ScanResult): RecommendationInput[]
       title: 'Pricing page lacks clear pricing information',
       whyItMatters: 'AI needs actual prices in the HTML to answer "how much does it cost?" questions.',
       recommendedFix: 'Include plan names, dollar amounts, and billing frequency in plain text on the page.',
-      codeSnippet: null, affectedUrls: pricingPages.map(p => p.url) });
+      codeSnippet: null, affectedUrls: pricingPages.map(p => p.url), confidence: 'verified' });
   }
 
   if (!types.has('contact') && !types.has('demo')) {
@@ -347,7 +347,7 @@ export function generateRecommendations(scan: ScanResult): RecommendationInput[]
       title: 'No contact or demo page found',
       whyItMatters: 'AI cannot direct users to take action if there is no contact or demo page.',
       recommendedFix: 'Create a /contact page with a form or a /demo page for booking.',
-      codeSnippet: null, affectedUrls: [] });
+      codeSnippet: null, affectedUrls: [], confidence: 'inferred' });
   }
 
   if (!types.has('product')) {
@@ -355,7 +355,7 @@ export function generateRecommendations(scan: ScanResult): RecommendationInput[]
       title: 'No dedicated product/solution pages found',
       whyItMatters: 'Without product pages, AI has limited information about what you offer.',
       recommendedFix: 'Create product/feature pages explaining what you do and for whom.',
-      codeSnippet: null, affectedUrls: [] });
+      codeSnippet: null, affectedUrls: [], confidence: 'inferred' });
   }
 
   // P0: Homepage clarity
@@ -368,7 +368,7 @@ export function generateRecommendations(scan: ScanResult): RecommendationInput[]
         title: 'Homepage heading doesn\'t clearly state what you do',
         whyItMatters: 'The H1 is the first thing AI reads. A vague heading means AI can\'t determine your product\'s purpose.',
         recommendedFix: 'Rewrite your H1 to clearly state what your product does and who it\'s for.',
-        codeSnippet: null, affectedUrls: [homepage.url] });
+        codeSnippet: null, affectedUrls: [homepage.url], confidence: 'verified' });
     }
   }
 
@@ -378,7 +378,7 @@ export function generateRecommendations(scan: ScanResult): RecommendationInput[]
       title: 'Homepage missing clear call-to-action',
       whyItMatters: 'AI needs a clear CTA to understand the conversion path and recommend your product effectively.',
       recommendedFix: 'Add a prominent CTA button (e.g., "Start Free Trial", "Book a Demo") to your homepage.',
-      codeSnippet: null, affectedUrls: [homepage.url] });
+      codeSnippet: null, affectedUrls: [homepage.url], confidence: 'estimated' });
   }
 
   // P1: Comparison pages
@@ -387,7 +387,7 @@ export function generateRecommendations(scan: ScanResult): RecommendationInput[]
       title: 'No comparison or vs. pages found',
       whyItMatters: 'When users ask AI "X vs Y", comparison pages make you part of that conversation.',
       recommendedFix: 'Create comparison pages like /compare/competitor-name for your top alternatives.',
-      codeSnippet: null, affectedUrls: [] });
+      codeSnippet: null, affectedUrls: [], confidence: 'inferred' });
   }
 
   // P1: Use case pages
@@ -396,7 +396,7 @@ export function generateRecommendations(scan: ScanResult): RecommendationInput[]
       title: 'No use case or solution pages found',
       whyItMatters: 'Use case pages help AI recommend your product for specific problems and audiences.',
       recommendedFix: 'Create pages for each key use case: /use-cases/[audience-or-problem].',
-      codeSnippet: null, affectedUrls: [] });
+      codeSnippet: null, affectedUrls: [], confidence: 'inferred' });
   }
 
   // P1: Free trial visibility
@@ -405,7 +405,7 @@ export function generateRecommendations(scan: ScanResult): RecommendationInput[]
       title: 'No free trial or freemium option visible',
       whyItMatters: 'AI systems are more likely to recommend products that have a low-friction way to try them.',
       recommendedFix: 'Prominently mention your free tier, trial period, or demo option.',
-      codeSnippet: null, affectedUrls: [] });
+      codeSnippet: null, affectedUrls: [], confidence: 'estimated' });
   }
 
   // P1: Integrations page
@@ -414,7 +414,7 @@ export function generateRecommendations(scan: ScanResult): RecommendationInput[]
       title: 'No integrations or ecosystem page found',
       whyItMatters: 'AI uses integration data to recommend products that work with a user\'s existing tools.',
       recommendedFix: 'Create an /integrations page listing the tools and platforms you connect with.',
-      codeSnippet: null, affectedUrls: [] });
+      codeSnippet: null, affectedUrls: [], confidence: 'inferred' });
   }
 
   // ========== TRUST & SOURCE CLARITY ==========
@@ -425,7 +425,7 @@ export function generateRecommendations(scan: ScanResult): RecommendationInput[]
       title: 'Homepage missing Organization structured data',
       whyItMatters: 'Organization schema tells AI your company name, logo, and social profiles in a standardized format.',
       recommendedFix: 'Add Organization JSON-LD to your homepage with name, URL, logo, and sameAs links.',
-      codeSnippet: null, affectedUrls: [homepage.url] });
+      codeSnippet: null, affectedUrls: [homepage.url], confidence: 'verified' });
   }
 
   if (!types.has('blog') && !types.has('resource') && !types.has('docs')) {
@@ -433,7 +433,7 @@ export function generateRecommendations(scan: ScanResult): RecommendationInput[]
       title: 'No content/resource pages found',
       whyItMatters: 'Original content builds AI trust and gives them material to reference about your expertise.',
       recommendedFix: 'Create a blog or resource section with original, expert content about your domain.',
-      codeSnippet: null, affectedUrls: [] });
+      codeSnippet: null, affectedUrls: [], confidence: 'inferred' });
   }
 
   // About page
@@ -442,7 +442,7 @@ export function generateRecommendations(scan: ScanResult): RecommendationInput[]
       title: 'No about/company page found',
       whyItMatters: 'An about page helps AI verify your legitimacy and understand your company.',
       recommendedFix: 'Create an /about page with your company story, mission, and team.',
-      codeSnippet: null, affectedUrls: [] });
+      codeSnippet: null, affectedUrls: [], confidence: 'inferred' });
   }
 
   // P0: Privacy policy
@@ -451,7 +451,7 @@ export function generateRecommendations(scan: ScanResult): RecommendationInput[]
       title: 'No privacy policy found',
       whyItMatters: 'A privacy policy is a baseline trust signal. Its absence can indicate an unestablished business.',
       recommendedFix: 'Create a /privacy page with your privacy policy and link to it from your footer.',
-      codeSnippet: null, affectedUrls: [] });
+      codeSnippet: null, affectedUrls: [], confidence: 'verified' });
   }
 
   // P1: Terms of service
@@ -460,7 +460,7 @@ export function generateRecommendations(scan: ScanResult): RecommendationInput[]
       title: 'No terms of service found',
       whyItMatters: 'Terms of service indicate a legitimate business with defined operating rules.',
       recommendedFix: 'Create a /terms page with your terms of service.',
-      codeSnippet: null, affectedUrls: [] });
+      codeSnippet: null, affectedUrls: [], confidence: 'verified' });
   }
 
   // P0: Social links
@@ -469,7 +469,7 @@ export function generateRecommendations(scan: ScanResult): RecommendationInput[]
       title: 'No social media profiles linked',
       whyItMatters: 'Social links verify your brand identity and give AI additional sources of information about you.',
       recommendedFix: 'Add links to your LinkedIn, Twitter/X, and GitHub profiles in your footer or header.',
-      codeSnippet: null, affectedUrls: [] });
+      codeSnippet: null, affectedUrls: [], confidence: 'verified' });
   }
 
   // P0: Customer logos
@@ -478,7 +478,7 @@ export function generateRecommendations(scan: ScanResult): RecommendationInput[]
       title: 'No customer logos or social proof on homepage',
       whyItMatters: 'Customer logos signal market validation. AI uses these to assess product credibility.',
       recommendedFix: 'Add a "Trusted by" section with customer logos to your homepage.',
-      codeSnippet: null, affectedUrls: [] });
+      codeSnippet: null, affectedUrls: [], confidence: 'estimated' });
   }
 
   // P0: Review platform links
@@ -487,7 +487,7 @@ export function generateRecommendations(scan: ScanResult): RecommendationInput[]
       title: 'No links to review platforms (G2, Capterra, etc.)',
       whyItMatters: 'AI systems use third-party review data to assess and recommend products.',
       recommendedFix: 'Link to your profiles on G2, Capterra, TrustRadius, or other review platforms.',
-      codeSnippet: null, affectedUrls: [] });
+      codeSnippet: null, affectedUrls: [], confidence: 'estimated' });
   }
 
   // P1: Testimonials
@@ -496,7 +496,7 @@ export function generateRecommendations(scan: ScanResult): RecommendationInput[]
       title: 'No testimonials detected on the site',
       whyItMatters: 'Testimonials provide social proof that AI can cite when recommending your product.',
       recommendedFix: 'Add customer testimonials with real names and companies to key pages.',
-      codeSnippet: null, affectedUrls: [] });
+      codeSnippet: null, affectedUrls: [], confidence: 'estimated' });
   }
 
   // P1: Security page
@@ -505,7 +505,7 @@ export function generateRecommendations(scan: ScanResult): RecommendationInput[]
       title: 'No security or compliance page found',
       whyItMatters: 'For B2B products, security/compliance information is critical for AI to recommend you to enterprise buyers.',
       recommendedFix: 'Create a /security page detailing your compliance certifications (SOC2, GDPR, etc.).',
-      codeSnippet: null, affectedUrls: [] });
+      codeSnippet: null, affectedUrls: [], confidence: 'inferred' });
   }
 
   // P1: Team info
@@ -514,7 +514,7 @@ export function generateRecommendations(scan: ScanResult): RecommendationInput[]
       title: 'No team information found',
       whyItMatters: 'Team pages with real people build trust and help AI verify your company is legitimate.',
       recommendedFix: 'Add a team section with names, roles, and photos to your about page.',
-      codeSnippet: null, affectedUrls: [] });
+      codeSnippet: null, affectedUrls: [], confidence: 'estimated' });
   }
 
   // Performance
@@ -524,7 +524,7 @@ export function generateRecommendations(scan: ScanResult): RecommendationInput[]
       title: 'Some pages load slowly',
       whyItMatters: 'Slow pages may timeout for AI crawlers, resulting in incomplete indexing.',
       recommendedFix: 'Optimize images, minimize JavaScript, and enable caching to improve load times.',
-      codeSnippet: null, affectedUrls: slowPages.map((p) => p.url) });
+      codeSnippet: null, affectedUrls: slowPages.map((p) => p.url), confidence: 'verified' });
   }
 
   // P2: Viewport meta
@@ -534,7 +534,7 @@ export function generateRecommendations(scan: ScanResult): RecommendationInput[]
       title: 'Pages missing viewport meta tag',
       whyItMatters: 'Viewport meta indicates mobile responsiveness, which is a general quality signal.',
       recommendedFix: 'Add <meta name="viewport" content="width=device-width, initial-scale=1"> to all pages.',
-      codeSnippet: null, affectedUrls: noViewport.slice(0, 3).map(p => p.url) });
+      codeSnippet: null, affectedUrls: noViewport.slice(0, 3).map(p => p.url), confidence: 'verified' });
   }
 
   // Batch D: Homepage above-the-fold analysis
