@@ -488,7 +488,115 @@ export function generateRecommendations(scan: ScanResult): RecommendationInput[]
       codeSnippet: null, affectedUrls: noViewport.slice(0, 3).map(p => p.url) });
   }
 
-  return recs;
+  return verifyFindings(recs, scan);
+}
+
+// ============================================================
+// False-positive verification — cross-checks findings against
+// the pages that were actually scanned + keyPagesStatus
+// ============================================================
+function verifyFindings(
+  findings: RecommendationInput[],
+  scan: ScanResult
+): RecommendationInput[] {
+  const pageTitles = scan.pages.map(p => (p.title || '').toLowerCase());
+  const pageUrls = scan.pages.map(p => (p.url || '').toLowerCase());
+  const allText = [...pageTitles, ...pageUrls];
+
+  const matches = (keywords: string[]) =>
+    keywords.some(kw => allText.some(t => t.includes(kw)));
+
+  const CHECKS: { keywords: string[]; findingPatterns: string[] }[] = [
+    {
+      keywords: ['terms', 'conditions', 'legal', 'privacy', 'data processing'],
+      findingPatterns: ['terms of service', 'terms & conditions', 'no terms', 'missing terms'],
+    },
+    {
+      keywords: ['about', 'team', 'company', 'who we are'],
+      findingPatterns: ['no about', 'missing about', 'about page', 'company page'],
+    },
+    {
+      keywords: ['demo', 'trial', 'request-a-demo', 'view-a-demo', 'free-trial'],
+      findingPatterns: ['no demo', 'missing demo', 'demo page', 'trial page'],
+    },
+    {
+      keywords: ['testimonial', 'review', 'customer', 'quote', 'case study'],
+      findingPatterns: ['no testimonial', 'missing testimonial', 'no social proof', 'no reviews'],
+    },
+    {
+      keywords: ['vs', 'versus', 'compare', 'alternative', 'comparison'],
+      findingPatterns: ['no comparison', 'missing comparison', 'no versus', 'compare page'],
+    },
+    {
+      keywords: ['pricing', 'plans', 'cost', 'price'],
+      findingPatterns: ['no pricing', 'missing pricing', 'pricing page'],
+    },
+    {
+      keywords: ['blog', 'articles', 'resources', 'insights', 'news'],
+      findingPatterns: ['no blog', 'missing blog', 'no content', 'no articles'],
+    },
+    {
+      keywords: ['contact', 'contact-us', 'get-in-touch', 'reach-us'],
+      findingPatterns: ['no contact', 'missing contact', 'contact page'],
+    },
+    {
+      keywords: ['faq', 'faqs', 'frequently asked', 'help', 'support'],
+      findingPatterns: ['no faq', 'missing faq', 'no help'],
+    },
+  ];
+
+  // Step 4: Key pages conflict resolution — if keyPagesStatus says "found",
+  // remove any finding that flags that page type as missing
+  const foundPageTypes = scan.keyPagesStatus
+    .filter(p => p.found)
+    .map(p => p.type.toLowerCase());
+
+  // Step 5: Special handling for terms/privacy — if privacy exists but no
+  // explicit terms page, downgrade rather than remove
+  const hasPrivacyPage = matches(['privacy', 'data processing', 'gdpr']);
+  const hasExplicitTerms = matches(['terms', 'conditions', 'tos']);
+
+  return findings.reduce<RecommendationInput[]>((acc, finding) => {
+    const titleLower = (finding.title || '').toLowerCase();
+    const descLower = (finding.whyItMatters || '').toLowerCase();
+    const findingText = `${titleLower} ${descLower}`;
+
+    // Step 5: Terms/privacy special case — downgrade instead of remove
+    if (!hasExplicitTerms && hasPrivacyPage) {
+      const isTermsFinding = ['terms of service', 'no terms', 'missing terms']
+        .some(p => findingText.includes(p));
+      if (isTermsFinding) {
+        acc.push({
+          ...finding,
+          severity: 'low',
+          title: 'Consider adding a dedicated Terms of Service page',
+          whyItMatters: 'A privacy policy was found, but a separate Terms of Service page would further strengthen trust signals for AI systems.',
+          recommendedFix: 'Create a /terms page with your terms of service. This complements your existing privacy policy.',
+        });
+        return acc;
+      }
+    }
+
+    // Step 4: Key pages conflict — remove findings for pages keyPagesStatus says are found
+    const isConflictWithKeyPages = foundPageTypes.some(type =>
+      titleLower.includes(type) || descLower.includes(type)
+    );
+    if (isConflictWithKeyPages) return acc;
+
+    // Step 2: URL/title cross-check — remove false positives where
+    // the finding flags something as missing but pages with matching
+    // keywords exist in the scanned URLs or titles
+    for (const check of CHECKS) {
+      const isFalsePositive =
+        check.findingPatterns.some(p => findingText.includes(p)) &&
+        matches(check.keywords);
+
+      if (isFalsePositive) return acc;
+    }
+
+    acc.push(finding);
+    return acc;
+  }, []);
 }
 
 // ============================================================
