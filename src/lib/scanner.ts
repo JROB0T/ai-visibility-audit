@@ -91,9 +91,7 @@ export async function scanSite(inputUrl: string): Promise<ScanResult> {
     scannedUrls.add(link);
   }
 
-  urlsToScan.sort((a, b) => a.priority - b.priority);
-
-  // Sort blog URLs to prefer recent content
+  // Sort by priority, with blog posts sub-sorted to prefer recent content
   const recentFirst = (u: string) => {
     if (/\/(202[2-9]|203\d)\//.test(u)) return 0;
     if (/\/(201[5-9]|202[0-1])\//.test(u)) return 1;
@@ -101,8 +99,11 @@ export async function scanSite(inputUrl: string): Promise<ScanResult> {
     return 2;
   };
   urlsToScan.sort((a, b) => {
+    // Primary sort: by priority
+    if (a.priority !== b.priority) return a.priority - b.priority;
+    // Secondary sort: blog pages by recency
     if (a.type === 'blog' && b.type === 'blog') return recentFirst(a.url) - recentFirst(b.url);
-    return a.priority - b.priority;
+    return 0;
   });
 
   // Apply page type budget to prevent blog posts from consuming all slots
@@ -193,13 +194,11 @@ export async function scanSite(inputUrl: string): Promise<ScanResult> {
 
   const llmsTxt = await checkLlmsTxt(baseUrl).catch(() => null);
 
-  // Scanner summary (Batch D)
-  const pagesAttempted = pagesToScan.length + 1; // +1 for homepage
+  // Scanner summary (Batch D) — computed AFTER fallback probing so counts are accurate
   const pagesSucceeded = pageResults.length;
-  const pagesFailed = pagesAttempted - pagesSucceeded;
   const failedUrls = errors.filter(e => e.startsWith('Failed to scan ')).map(e => e.replace(/^Failed to scan ([^:]+):.*/, '$1'));
-  // Estimate check confidence breakdown: ~40 verified checks per page (HTML content),
-  // ~5 inferred (URL-pattern based), ~3 estimated (heuristic: logos, testimonials, CTA)
+  const pagesAttempted = pagesSucceeded + failedUrls.length;
+  const pagesFailed = failedUrls.length;
   const checksVerified = pagesSucceeded * 40;
   const checksInferred = pagesSucceeded * 5;
   const checksEstimated = pagesSucceeded * 3;
@@ -777,6 +776,9 @@ async function scanPage(url: string, pageType: PageType): Promise<PageScanResult
     hasValueProposition = heroText.length > 20 &&
       !/^welcome|^home$|^hello/.test(heroText.trim());
     const bodySlice = $('body').text().slice(0, 5000);
+    const metaContent = [title || '', metaDescription || ''].join(' ');
+    // Fallback for JS-rendered pages: if body text is very short, check meta instead
+    const textToCheck = bodySlice.length > 500 ? bodySlice : metaContent;
     const trustPatternsArr = [
       /trusted by/i,
       /as seen in/i,
@@ -791,8 +793,14 @@ async function scanPage(url: string, pageType: PageType): Promise<PageScanResult
       /\d+\s*★/i,
       /rating/i,
       /reviews/i,
+      /platform/i,
+      /solution/i,
+      /enterprise/i,
+      /free\s+trial/i,
+      /get\s+started/i,
+      /\d+\s*%/i,
     ];
-    hasTrustSignalsAboveFold = trustPatternsArr.some(p => p.test(bodySlice));
+    hasTrustSignalsAboveFold = trustPatternsArr.some(p => p.test(textToCheck));
   }
 
   // === CONTACT DETECTION (Batch C) ===
