@@ -830,16 +830,23 @@ async function scanPage(url: string, pageType: PageType): Promise<PageScanResult
     const t = $(el).text().trim().toLowerCase();
     if (t && t.length < 100) allButtonText.push(t);
   });
-  const hasDemoCTA = allButtonText.some(t => /book\s*a?\s*demo|request\s*a?\s*demo|schedule\s*a?\s*demo|get\s*a?\s*demo|see\s*a?\s*demo/.test(t));
-  const hasContactCTA = allButtonText.some(t => /contact us|get in touch|talk to sales|talk to us|reach out|connect with/.test(t));
+  const allLinkHrefs: string[] = [];
+  $('a[href]').each((_, el) => {
+    const href = $(el).attr('href')?.toLowerCase() || '';
+    allLinkHrefs.push(href);
+  });
+  const hasDemoLink = allLinkHrefs.some(h => /\/demo|book-a-demo|request-demo|schedule-demo|get-demo/.test(h));
+  const hasContactLink = allLinkHrefs.some(h => /\/contact|get-in-touch|talk-to-us/.test(h));
+  const hasDemoCTA = allButtonText.some(t => /book\s*a?\s*demo|request\s*a?\s*demo|schedule\s*a?\s*demo|get\s*a?\s*demo|see\s*a?\s*demo/.test(t)) || hasDemoLink;
+  const hasContactCTA = allButtonText.some(t => /contact us|get in touch|talk to sales|talk to us|reach out|connect with/.test(t)) || hasContactLink;
 
   // === HOMEPAGE DEEP CONTENT EVIDENCE (Fix 1) ===
   let homeEvidence: import('@/lib/types').HomeEvidence | undefined;
   if (pageType === 'homepage') {
     const bodyTextLower = bodyText.toLowerCase();
     homeEvidence = {
-      hasBookDemoButton: allButtonText.some(t => /book\s*a?\s*demo|schedule\s*a?\s*demo|request\s*a?\s*demo|get\s*a?\s*demo|see\s*a?\s*demo/.test(t)),
-      hasRequestDemoButton: allButtonText.some(t => /request|get started|contact us|talk to us|get in touch|reach out|connect with/.test(t)),
+      hasBookDemoButton: allButtonText.some(t => /book\s*a?\s*demo|schedule\s*a?\s*demo|request\s*a?\s*demo|get\s*a?\s*demo|see\s*a?\s*demo/.test(t)) || hasDemoLink,
+      hasRequestDemoButton: allButtonText.some(t => /request|get started|contact us|talk to us|get in touch|reach out|connect with/.test(t)) || hasContactLink,
       hasContactForm: $('form').length > 0 || $('[data-form], [class*="form"], [id*="form"]').length > 0,
       hasContactEmail: /[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/.test(bodyText),
       hasPricingSection: /pricing|per month|per year|\$\d+\/mo|free plan|paid plan|starter plan|pro plan|enterprise plan/.test(bodyTextLower),
@@ -1109,6 +1116,8 @@ function buildKeyPagesStatus(pages: PageScanResult[]): KeyPageStatus[] {
     { type: 'integrations', label: 'Integrations' },
   ];
   const homepage = pages.find(p => p.pageType === 'homepage');
+  const allNavLinks = pages.flatMap((p: PageScanResult) => p.navLinks || []).map((l: string) => l.toLowerCase());
+  console.log('[keyPages debug] allNavLinks:', allNavLinks.slice(0, 15));
   return keyTypes.map(kt => {
     const found = pages.find(p => p.pageType === kt.type);
     if (found) return { type: kt.type, label: kt.label, found: true, url: found.url };
@@ -1123,10 +1132,10 @@ function buildKeyPagesStatus(pages: PageScanResult[]): KeyPageStatus[] {
 
     // Fallback: check homeEvidence and CTA detection across all pages
     const ev = homepage?.homeEvidence;
-    if (kt.type === 'demo' && (ev?.hasBookDemoButton || ev?.hasRequestDemoButton || pages.some(p => p.hasDemoCTA))) {
+    if (kt.type === 'demo' && (ev?.hasBookDemoButton || ev?.hasRequestDemoButton || pages.some(p => p.hasDemoCTA) || allNavLinks.some((l: string) => /demo|book-a-demo|request-demo/.test(l)))) {
       return { type: kt.type, label: kt.label, found: true, url: homepage?.url || null, note: 'Demo CTA found on site (modal/anchor link)' };
     }
-    if (kt.type === 'contact' && (ev?.hasContactForm || ev?.hasContactEmail || homepage?.hasPhoneNumber || pages.some(p => p.hasContactCTA))) {
+    if (kt.type === 'contact' && (ev?.hasContactForm || ev?.hasContactEmail || homepage?.hasPhoneNumber || pages.some(p => p.hasContactCTA) || allNavLinks.some((l: string) => /contact|get-in-touch|talk-to/.test(l)))) {
       return { type: kt.type, label: kt.label, found: true, url: homepage?.url || null, note: 'Contact info found on homepage' };
     }
     if (kt.type === 'integrations' && ev?.hasIntegrationsSection) {
