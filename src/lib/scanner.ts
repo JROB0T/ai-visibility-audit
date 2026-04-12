@@ -1117,7 +1117,6 @@ function buildKeyPagesStatus(pages: PageScanResult[]): KeyPageStatus[] {
   ];
   const homepage = pages.find(p => p.pageType === 'homepage');
   const allNavLinks = pages.flatMap((p: PageScanResult) => p.navLinks || []).map((l: string) => l.toLowerCase());
-  console.log('[keyPages debug] allNavLinks:', allNavLinks.slice(0, 15));
   return keyTypes.map(kt => {
     const found = pages.find(p => p.pageType === kt.type);
     if (found) return { type: kt.type, label: kt.label, found: true, url: found.url };
