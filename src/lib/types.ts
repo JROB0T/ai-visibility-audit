@@ -74,15 +74,42 @@ export interface AuditRecommendation {
 }
 
 // Scanner internal types
+export interface LlmsTxtResult {
+  exists: boolean;
+  hasFullVersion: boolean;
+  content?: string | null;
+}
+
+export interface ScannerSummary {
+  pagesAttempted: number;
+  pagesSucceeded: number;
+  pagesFailed: number;
+  failedUrls: string[];
+  checksVerified: number;
+  checksInferred: number;
+  confidencePercent: number;
+}
+
+export interface NapConsistency {
+  nameInSchema?: string | null;
+  phoneInSchema?: string | null;
+  phoneInContent?: boolean;
+  consistent: boolean;
+  issues: string[];
+}
+
 export interface ScanResult {
   robotsTxt: RobotsTxtResult | null;
   sitemap: SitemapResult | null;
+  llmsTxt?: LlmsTxtResult | null;
   pages: PageScanResult[];
   errors: string[];
   crawlerStatuses: CrawlerStatus[];
   keyPagesStatus: KeyPageStatus[];
   siteWideChecks: SiteWideChecks;
   detectedVertical: string;
+  scannerSummary?: ScannerSummary;
+  napConsistency?: NapConsistency;
 }
 
 export interface SiteWideChecks {
@@ -105,6 +132,9 @@ export interface SiteWideChecks {
   reviewPlatformLinks: string[];
   navigationLinksToKeyPages: boolean;
   missingNavLinks: string[];
+  // Internal link analysis (Batch C)
+  homepageLinksToKeyPages?: boolean;
+  missingHomepageLinks?: string[];
 }
 
 export interface CrawlerStatus {
@@ -210,6 +240,26 @@ export interface PageScanResult {
   usesSemanticLists: boolean;
   hasViewportMeta: boolean;
   hasAddressInfo: boolean;
+
+  // Footer extraction
+  footerLinks?: string[];
+  footerText?: string | null;
+
+  // Quality checks (Batch B)
+  schemaMissingFields?: string[];
+  metaDescriptionLength?: number | null;
+  metaDescriptionDuplicatesTitle?: boolean;
+  titleLength?: number | null;
+  titleIsDomainOnly?: boolean;
+
+  // Contact detection (Batch C)
+  hasPhoneNumber?: boolean;
+  hasEmailAddress?: boolean;
+  hasPhysicalAddress?: boolean;
+
+  // Above-the-fold analysis (Batch D)
+  hasValueProposition?: boolean;
+  hasTrustSignalsAboveFold?: boolean;
 }
 
 export interface ScoreResult {
@@ -237,6 +287,7 @@ export interface RecommendationInput {
   recommendedFix: string;
   codeSnippet: string | null;
   affectedUrls: string[];
+  confidence?: 'verified' | 'inferred' | 'estimated';
 }
 
 // ============================================================

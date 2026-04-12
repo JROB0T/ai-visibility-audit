@@ -60,6 +60,15 @@ export function generateRecommendations(scan: ScanResult): RecommendationInput[]
       codeSnippet: null, affectedUrls: [scan.sitemap.url || ''] });
   }
 
+  // llms.txt check
+  if (!scan.llmsTxt?.exists) {
+    recs.push({ category: 'crawlability', severity: 'medium', effort: 'easy',
+      title: 'No llms.txt file found',
+      whyItMatters: 'llms.txt is an emerging standard that helps AI systems understand your site content and permissions. Adding one improves your visibility to ChatGPT, Claude, and Perplexity.',
+      recommendedFix: 'Create an llms.txt file at your site root describing your site, key pages, and content for AI systems.',
+      codeSnippet: null, affectedUrls: [] });
+  }
+
   // P0: Noindex on key pages
   if (sw?.hasNoindexOnKeyPages) {
     recs.push({ category: 'crawlability', severity: 'high', effort: 'easy',
@@ -96,6 +105,15 @@ export function generateRecommendations(scan: ScanResult): RecommendationInput[]
       codeSnippet: null, affectedUrls: [] });
   }
 
+  // Batch C: Internal link analysis
+  if (sw && sw.missingHomepageLinks && sw.missingHomepageLinks.length > 0) {
+    recs.push({ category: 'crawlability', severity: 'medium', effort: 'easy',
+      title: `Homepage does not link to key pages: ${sw.missingHomepageLinks.join(', ')}`,
+      whyItMatters: 'AI crawlers follow links from the homepage to discover your content. Key pages that are not linked from the homepage may be harder for AI to find.',
+      recommendedFix: `Add links to ${sw.missingHomepageLinks.join(', ')} from your homepage.`,
+      codeSnippet: null, affectedUrls: [] });
+  }
+
   // ========== MACHINE READABILITY ==========
 
   const pagesWithoutTitle = scan.pages.filter((p) => !p.title);
@@ -114,6 +132,37 @@ export function generateRecommendations(scan: ScanResult): RecommendationInput[]
       whyItMatters: 'Meta descriptions are used as summaries when AI references your content.',
       recommendedFix: 'Add meta descriptions (120-155 characters) describing each page.',
       codeSnippet: null, affectedUrls: pagesWithoutMeta.map((p) => p.url) });
+  }
+
+  // Batch B: Title quality
+  const domainOnlyTitlePages = scan.pages.filter(p => p.titleIsDomainOnly);
+  if (domainOnlyTitlePages.length > 0) {
+    recs.push({ category: 'machine_readability', severity: 'high', effort: 'easy',
+      title: 'Page title is just the domain name',
+      whyItMatters: 'AI systems use the title to understand what you do. A domain-only title gives AI no useful information about your business.',
+      recommendedFix: 'Write a descriptive title like "BusinessName — What You Do for Whom".',
+      codeSnippet: null, affectedUrls: domainOnlyTitlePages.map(p => p.url) });
+  }
+
+  // Batch B: Meta description quality
+  const metaDupTitlePages = scan.pages.filter(p => p.metaDescriptionDuplicatesTitle);
+  if (metaDupTitlePages.length > 0) {
+    recs.push({ category: 'machine_readability', severity: 'medium', effort: 'easy',
+      title: 'Meta description duplicates page title',
+      whyItMatters: 'Your meta description is identical to your page title. AI systems get no additional context from a duplicate description.',
+      recommendedFix: 'Write a unique meta description that expands on what the page offers.',
+      codeSnippet: null, affectedUrls: metaDupTitlePages.map(p => p.url) });
+  }
+
+  // Batch B: Schema field validation
+  const homepageSchema = scan.pages.find(p => p.pageType === 'homepage');
+  const hpSchemaMissing = homepageSchema?.schemaMissingFields || [];
+  if (hpSchemaMissing.length > 0) {
+    recs.push({ category: 'machine_readability', severity: 'medium', effort: 'easy',
+      title: 'Schema markup is missing recommended fields',
+      whyItMatters: `Your structured data is missing: ${hpSchemaMissing.join(', ')}. Complete schema helps AI systems better understand and recommend your business.`,
+      recommendedFix: `Add the missing fields to your JSON-LD: ${hpSchemaMissing.join(', ')}.`,
+      codeSnippet: null, affectedUrls: homepageSchema ? [homepageSchema.url] : [] });
   }
 
   const pagesWithoutCanonical = scan.pages.filter((p) => !p.canonicalUrl);
@@ -488,6 +537,32 @@ export function generateRecommendations(scan: ScanResult): RecommendationInput[]
       codeSnippet: null, affectedUrls: noViewport.slice(0, 3).map(p => p.url) });
   }
 
+  // Batch D: Homepage above-the-fold analysis
+  const homepageForFold = scan.pages.find(p => p.pageType === 'homepage');
+  if (homepageForFold && homepageForFold.hasValueProposition === false) {
+    recs.push({ category: 'commercial_clarity', severity: 'high', effort: 'medium',
+      title: 'Homepage lacks a clear value proposition',
+      whyItMatters: 'Your homepage heading does not clearly describe what your business does. AI systems use the H1 to understand and describe your product.',
+      recommendedFix: 'Rewrite your homepage H1 to be specific and action-oriented: "[Product] helps [audience] [achieve goal]".',
+      codeSnippet: null, affectedUrls: [homepageForFold.url], confidence: 'estimated' });
+  }
+  if (homepageForFold && homepageForFold.hasTrustSignalsAboveFold === false) {
+    recs.push({ category: 'trust_clarity', severity: 'medium', effort: 'medium',
+      title: 'No trust signals detected on homepage',
+      whyItMatters: 'AI systems look for social proof when evaluating businesses. Adding customer counts, logos, testimonials, or certifications helps AI recommend you.',
+      recommendedFix: 'Add a "Trusted by" section, customer counts, ratings, or certifications to your homepage.',
+      codeSnippet: null, affectedUrls: [homepageForFold.url], confidence: 'estimated' });
+  }
+
+  // Batch D: NAP consistency (local verticals only)
+  if (scan.napConsistency && !scan.napConsistency.consistent) {
+    recs.push({ category: 'trust_clarity', severity: 'medium', effort: 'easy',
+      title: 'Business contact information may be incomplete',
+      whyItMatters: `Issues found: ${scan.napConsistency.issues.join('; ')}. AI systems cross-check visible contact information — inconsistency or absence reduces trust scores.`,
+      recommendedFix: 'Ensure your phone number, address, and business name are visible on your homepage and match your schema markup.',
+      codeSnippet: null, affectedUrls: [], confidence: 'inferred' });
+  }
+
   return verifyFindings(recs, scan);
 }
 
@@ -592,6 +667,19 @@ function verifyFindings(
         matches(check.keywords);
 
       if (isFalsePositive) return acc;
+    }
+
+    // Batch D: Assign confidence if not already set
+    if (!finding.confidence) {
+      const INFERRED_PATTERNS = ['no pricing', 'no contact', 'no demo', 'no dedicated product', 'no about', 'no comparison', 'no use case', 'no content/resource', 'no security', 'no integrations', 'no blog'];
+      const ESTIMATED_PATTERNS = ['customer logos', 'testimonial', 'social proof', 'call-to-action', 'free trial', 'team information', 'value proposition', 'trust signals'];
+      if (INFERRED_PATTERNS.some(p => titleLower.includes(p))) {
+        finding = { ...finding, confidence: 'inferred' };
+      } else if (ESTIMATED_PATTERNS.some(p => titleLower.includes(p))) {
+        finding = { ...finding, confidence: 'estimated' };
+      } else {
+        finding = { ...finding, confidence: 'verified' };
+      }
     }
 
     acc.push(finding);
