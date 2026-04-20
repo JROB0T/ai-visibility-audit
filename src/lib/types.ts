@@ -396,3 +396,181 @@ export interface BotActivityData {
   mostActiveCrawler: string | null;
   dataAsOf: string;
 }
+
+// ============================================================
+// AI Discovery Prompt Testing module
+// ============================================================
+
+export type DiscoveryCluster =
+  | 'core'
+  | 'problem'
+  | 'comparison'
+  | 'long_tail'
+  | 'brand'
+  | 'adjacent';
+
+export type DiscoveryVisibilityStatus =
+  | 'strong_presence'
+  | 'partial_presence'
+  | 'indirect_presence'
+  | 'absent'
+  | 'competitor_dominant'
+  | 'directory_dominant'
+  | 'unclear';
+
+export type DiscoveryPositionType =
+  | 'directly_recommended'
+  | 'listed_among_options'
+  | 'cited_as_source'
+  | 'mentioned_without_preference'
+  | 'implied_only'
+  | 'not_present';
+
+export type DiscoveryBusinessModel =
+  | 'local_service'
+  | 'ecommerce'
+  | 'professional_services'
+  | 'hybrid'
+  | 'other';
+
+export type DiscoveryOwnerType = 'developer' | 'marketer' | 'business_owner';
+
+export type DiscoveryPriority = 'high' | 'medium' | 'low';
+
+export interface DiscoveryClusterWeights {
+  core: number;
+  problem: number;
+  comparison: number;
+  long_tail: number;
+  brand: number;
+  adjacent: number;
+}
+
+export interface DiscoveryProfile {
+  id: string;
+  site_id: string;
+  business_name: string | null;
+  domain: string | null;
+  primary_category: string | null;
+  service_area: string | null;
+  description: string | null;
+  core_services: string[];
+  secondary_services: string[];
+  target_customers: string[];
+  business_model: DiscoveryBusinessModel | null;
+  priority_service_lines: string[];
+  high_margin_services: string[];
+  branded_terms: string[];
+  cluster_weights: DiscoveryClusterWeights;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DiscoveryPrompt {
+  id: string;
+  site_id: string;
+  prompt_text: string;
+  cluster: DiscoveryCluster;
+  priority: DiscoveryPriority;
+  service_line_tag: string | null;
+  importance_tag: string | null;
+  active: boolean;
+  last_tested_at: string | null;
+  notes: string | null;
+  source: 'generated' | 'custom' | 'edited';
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DiscoveryCompetitor {
+  id: string;
+  site_id: string;
+  name: string;
+  domain: string | null;
+  location: string | null;
+  category: string | null;
+  active: boolean;
+  source: 'manual' | 'inferred' | 'growth_strategy';
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DiscoveryResult {
+  id: string;
+  site_id: string;
+  prompt_id: string | null;
+  run_id: string;
+  prompt_text: string;
+  prompt_cluster: DiscoveryCluster | null;
+  test_date: string;
+  test_surface: string;
+  business_mentioned: boolean;
+  business_cited: boolean;
+  business_domain_detected: boolean;
+  business_page_detected: string | null;
+  business_position_type: DiscoveryPositionType | null;
+  competitor_mentioned: boolean;
+  competitor_names_detected: string[];
+  competitor_domains_detected: string[];
+  directories_detected: string[];
+  marketplaces_detected: string[];
+  result_type_summary: string | null;
+  visibility_status: DiscoveryVisibilityStatus | null;
+  prompt_score: number | null;
+  confidence_score: number | null;
+  normalized_response_summary: string | null;
+  raw_response_excerpt: string | null;
+  recommendation_tags: string[];
+  reviewed: boolean;
+  suppressed: boolean;
+  internal_notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DiscoveryInsight {
+  id: string;
+  site_id: string;
+  run_id: string | null;
+  category: 'wins' | 'gaps' | 'competitor_advantages' | 'content_issues' | 'opportunities';
+  title: string;
+  description: string | null;
+  severity: DiscoveryPriority;
+  linked_cluster: DiscoveryCluster | null;
+  linked_competitor_id: string | null;
+  created_at: string;
+}
+
+export interface DiscoveryRecommendation {
+  id: string;
+  site_id: string;
+  run_id: string | null;
+  title: string;
+  description: string | null;
+  why_it_matters: string | null;
+  category: string | null;
+  priority: DiscoveryPriority | null;
+  owner_type: DiscoveryOwnerType | null;
+  impact_estimate: DiscoveryPriority | null;
+  difficulty_estimate: DiscoveryPriority | null;
+  suggested_timeline: string | null;
+  linked_prompt_clusters: DiscoveryCluster[];
+  linked_competitor_ids: string[];
+  edited_by_admin: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DiscoveryScoreSnapshot {
+  id: string;
+  site_id: string;
+  run_id: string;
+  overall_score: number | null;
+  cluster_scores: Partial<Record<DiscoveryCluster, number>>;
+  prompt_count: number;
+  strong_count: number;
+  partial_count: number;
+  absent_count: number;
+  competitor_dominant_count: number;
+  snapshot_date: string;
+}
