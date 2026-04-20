@@ -16,6 +16,7 @@ import {
   normalizeDomain,
   DEFAULT_DISCOVERY_CLUSTER_WEIGHTS,
 } from '@/lib/discovery';
+import { ensureDiscoveryProfileAndPrompts, BootstrapError } from '@/lib/discoveryBootstrap';
 import {
   countsForSnapshot,
   overallDiscoveryScore,
@@ -372,14 +373,77 @@ export async function runDiscoveryTests(input: RunDiscoveryTestsInput): Promise<
     throw new Error('ANTHROPIC_API_KEY not configured');
   }
 
-  // 1. Load profile
-  const { data: profile, error: profileErr } = await admin
+  // 1. Load profile (auto-bootstrap if missing)
+  let { data: profile } = await admin
     .from('discovery_profiles')
     .select('*')
     .eq('site_id', siteId)
     .maybeSingle();
-  if (profileErr || !profile) {
-    throw new Error('Discovery profile not found for site — seed it via generate-prompts first');
+
+  // 2. Load active prompts
+  async function loadActivePrompts(): Promise<DiscoveryPrompt[]> {
+    let q = admin.from('discovery_prompts').select('*').eq('site_id', siteId).eq('active', true);
+    if (promptIds && promptIds.length > 0) {
+      q = q.in('id', promptIds);
+    }
+    const { data, error } = await q;
+    if (error) {
+      throw new Error(`Failed to load prompts: ${error.message}`);
+    }
+    return (data || []) as DiscoveryPrompt[];
+  }
+
+  let allPrompts = await loadActivePrompts();
+
+  // Determine if we need to bootstrap. When promptIds is supplied, allPrompts could be empty
+  // because the filter matched nothing — check the unfiltered total instead.
+  let shouldBootstrap = !profile;
+  if (!shouldBootstrap) {
+    if (promptIds && promptIds.length > 0) {
+      const { count } = await admin
+        .from('discovery_prompts')
+        .select('id', { count: 'exact', head: true })
+        .eq('site_id', siteId)
+        .eq('active', true);
+      shouldBootstrap = (count || 0) === 0;
+    } else {
+      shouldBootstrap = allPrompts.length === 0;
+    }
+  }
+
+  if (shouldBootstrap) {
+    console.log(`[discoveryRunner] auto-bootstrap starting for site=${siteId}`);
+    try {
+      const result = await ensureDiscoveryProfileAndPrompts({ siteId });
+      console.log(
+        `[discoveryRunner] auto-bootstrap complete for site=${siteId}`,
+        `generated=${result.generated} promptCount=${result.prompts.length}`,
+      );
+    } catch (err) {
+      if (err instanceof BootstrapError) {
+        if (err.code === 'no_audit') {
+          throw new Error('Run an AI visibility audit first — discovery needs an existing audit to personalize prompts.');
+        }
+        if (err.code === 'missing_api_key' || err.code === 'claude_failed' || err.code === 'claude_parse_failed' || err.code === 'no_prompts_generated') {
+          throw new Error('Could not generate your discovery prompt library. Please try again in a moment.');
+        }
+        throw new Error('Could not prepare your discovery run. Please try again in a moment.');
+      }
+      throw err;
+    }
+
+    // Reload profile + prompts after bootstrap
+    const reloaded = await admin
+      .from('discovery_profiles')
+      .select('*')
+      .eq('site_id', siteId)
+      .maybeSingle();
+    profile = reloaded.data;
+    allPrompts = await loadActivePrompts();
+  }
+
+  if (!profile) {
+    throw new Error('Could not prepare your discovery profile. Please try again in a moment.');
   }
 
   const businessName: string = String(profile.business_name || '').trim();
@@ -388,21 +452,6 @@ export async function runDiscoveryTests(input: RunDiscoveryTestsInput): Promise<
     ? (profile.branded_terms as unknown[]).map(t => String(t || '').trim()).filter(t => t.length > 0)
     : [];
   const businessNames: string[] = Array.from(new Set([businessName, ...brandedTerms].filter(n => n.length > 0)));
-
-  // 2. Load active prompts (filtered)
-  let promptQuery = admin
-    .from('discovery_prompts')
-    .select('*')
-    .eq('site_id', siteId)
-    .eq('active', true);
-  if (promptIds && promptIds.length > 0) {
-    promptQuery = promptQuery.in('id', promptIds);
-  }
-  const { data: promptRows, error: promptErr } = await promptQuery;
-  if (promptErr) {
-    throw new Error(`Failed to load prompts: ${promptErr.message}`);
-  }
-  const allPrompts = (promptRows || []) as DiscoveryPrompt[];
 
   // Cost guardrail: sort by priority then created_at
   const sortedPrompts = allPrompts

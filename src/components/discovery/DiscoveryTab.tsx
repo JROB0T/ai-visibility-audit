@@ -19,6 +19,20 @@ interface DiscoveryTabProps {
   isAdmin: boolean;
 }
 
+/**
+ * Map known backend error phrases to friendly copy. Unknown errors pass through
+ * verbatim so we can still debug — but the Ticket 5.1 auto-bootstrap should make
+ * this a rare path.
+ */
+function friendlyRunError(raw: string | undefined | null): string {
+  const msg = (raw || '').toLowerCase();
+  if (!msg) return 'Run failed. Please try again.';
+  if (msg.includes('profile not found') || msg.includes('no active prompts') || msg.includes('seed it via generate-prompts')) {
+    return 'Something went wrong preparing your discovery run. Please try again in a moment.';
+  }
+  return raw || 'Run failed. Please try again.';
+}
+
 const SUB_TABS: { id: SubTab; label: string; icon: typeof Sparkles }[] = [
   { id: 'overview', label: 'Overview', icon: Target },
   { id: 'prompts', label: 'Prompts', icon: ListChecks },
@@ -81,7 +95,7 @@ export default function DiscoveryTab({ siteId, isPaid, isAdmin }: DiscoveryTabPr
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({ error: 'Run failed' }));
-        setError(data.error || 'Run failed');
+        setError(friendlyRunError(data.error));
         return;
       }
       await loadAll();
