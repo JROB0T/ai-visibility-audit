@@ -9,6 +9,10 @@ import type {
 } from '@/lib/types';
 import DiscoveryOverview from './DiscoveryOverview';
 import DiscoveryPrompts from './DiscoveryPrompts';
+import DiscoveryResults from './DiscoveryResults';
+import DiscoveryCompetitors from './DiscoveryCompetitors';
+import DiscoveryRecommendations from './DiscoveryRecommendations';
+import DiscoveryTrends from './DiscoveryTrends';
 
 type SubTab = 'overview' | 'prompts' | 'results' | 'competitors' | 'recommendations' | 'trends';
 
@@ -244,27 +248,46 @@ export default function DiscoveryTab({ siteId, isPaid, isAdmin }: DiscoveryTabPr
         />
       )}
 
-      {!loading && activeSub === 'results' && <ComingSoon label="Results" />}
-      {!loading && activeSub === 'competitors' && <ComingSoon label="Competitors" />}
-      {!loading && activeSub === 'recommendations' && <ComingSoon label="Recommendations" />}
-      {!loading && activeSub === 'trends' && <ComingSoon label="Trends" />}
-    </div>
-  );
-}
+      {!loading && activeSub === 'results' && (
+        <DiscoveryResults
+          siteId={siteId}
+          latestRunId={latestRunId}
+          tier={tier}
+          isPaid={isPaid}
+          isAdmin={isAdmin}
+          onRefresh={loadAll}
+        />
+      )}
 
-// ============================================================
-// ComingSoon placeholder
-// ============================================================
-function ComingSoon({ label }: { label: string }): React.ReactElement {
-  return (
-    <div
-      className="rounded-xl border p-10 text-center"
-      style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}
-    >
-      <h3 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>{label}</h3>
-      <p className="mt-2 text-sm" style={{ color: 'var(--text-tertiary)' }}>
-        Coming in the next update.
-      </p>
+      {!loading && activeSub === 'competitors' && (
+        <DiscoveryCompetitors
+          siteId={siteId}
+          tier={tier}
+          isPaid={isPaid}
+          isAdmin={isAdmin}
+          onRefresh={loadAll}
+        />
+      )}
+
+      {!loading && activeSub === 'recommendations' && (
+        <DiscoveryRecommendations
+          siteId={siteId}
+          latestRunId={latestRunId}
+          tier={tier}
+          isPaid={isPaid}
+          isAdmin={isAdmin}
+          onRefresh={loadAll}
+        />
+      )}
+
+      {!loading && activeSub === 'trends' && (
+        <DiscoveryTrends
+          siteId={siteId}
+          tier={tier}
+          isPaid={isPaid}
+          isAdmin={isAdmin}
+        />
+      )}
     </div>
   );
 }
