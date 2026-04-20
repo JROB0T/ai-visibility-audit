@@ -27,6 +27,7 @@ import type {
   DiscoveryPrompt,
   DiscoveryResult,
   DiscoveryScoreSnapshot,
+  DiscoveryTier,
   DiscoveryVisibilityStatus,
 } from '@/lib/types';
 
@@ -42,6 +43,8 @@ export type RunDiscoveryTestsInput = {
   promptIds?: string[];
   runLabel?: string;
   triggeredBy: 'user' | 'cron' | 'admin';
+  tier?: DiscoveryTier;
+  teaserPromptCount?: number;
 };
 
 export type RunDiscoveryTestsResult = {
@@ -156,7 +159,7 @@ async function callClaudeForPrompt(apiKey: string, promptText: string): Promise<
         max_tokens: 1500,
         temperature: 0,
         system: SYSTEM_PROMPT,
-        tools: [{ type: WEB_SEARCH_TOOL_TYPE, name: 'web_search' }],
+        tools: [{ type: WEB_SEARCH_TOOL_TYPE, name: 'web_search', max_uses: 1 }],
         messages: [{ role: 'user', content: promptText }],
       }),
     });
@@ -360,6 +363,8 @@ function scoreFromStatus(status: DiscoveryVisibilityStatus, position: DiscoveryP
 
 export async function runDiscoveryTests(input: RunDiscoveryTestsInput): Promise<RunDiscoveryTestsResult> {
   const { siteId, promptIds, runLabel, triggeredBy } = input;
+  const tier: DiscoveryTier = input.tier ?? 'full';
+  const teaserPromptCount = Math.max(1, input.teaserPromptCount ?? 5);
   const runId = newRunId();
   const admin = getAdminClient();
   const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -399,16 +404,47 @@ export async function runDiscoveryTests(input: RunDiscoveryTestsInput): Promise<
   }
   const allPrompts = (promptRows || []) as DiscoveryPrompt[];
 
-  // Cost guardrail: sort by priority then created_at, cap at MAX_PROMPTS_PER_RUN
-  const prompts = allPrompts
+  // Cost guardrail: sort by priority then created_at
+  const sortedPrompts = allPrompts
     .slice()
     .sort((a, b) => {
       const pa = PRIORITY_ORDER[a.priority] ?? 3;
       const pb = PRIORITY_ORDER[b.priority] ?? 3;
       if (pa !== pb) return pa - pb;
       return (a.created_at || '').localeCompare(b.created_at || '');
-    })
-    .slice(0, MAX_PROMPTS_PER_RUN);
+    });
+
+  let prompts: DiscoveryPrompt[];
+  if (tier === 'teaser') {
+    // Teaser: pick a representative subset that covers as many clusters as possible,
+    // then fill remaining slots by priority order. Try to ensure >=3 distinct clusters.
+    const picked: DiscoveryPrompt[] = [];
+    const seenClusters = new Set<DiscoveryCluster>();
+    // Pass 1: one prompt per cluster in priority order
+    for (const p of sortedPrompts) {
+      if (picked.length >= teaserPromptCount) break;
+      if (!seenClusters.has(p.cluster)) {
+        picked.push(p);
+        seenClusters.add(p.cluster);
+      }
+    }
+    // Pass 2: fill any remaining slots with next-best by priority
+    if (picked.length < teaserPromptCount) {
+      const pickedIds = new Set(picked.map(p => p.id));
+      for (const p of sortedPrompts) {
+        if (picked.length >= teaserPromptCount) break;
+        if (!pickedIds.has(p.id)) picked.push(p);
+      }
+    }
+    prompts = picked;
+  } else {
+    prompts = sortedPrompts.slice(0, MAX_PROMPTS_PER_RUN);
+  }
+
+  console.log(
+    `[discoveryRunner] tier=${tier} selected=${prompts.length}`,
+    `clusters=${Array.from(new Set(prompts.map(p => p.cluster))).join(',')}`,
+  );
 
   // 3. Load active competitors
   const { data: competitorRows } = await admin
@@ -437,6 +473,8 @@ export async function runDiscoveryTests(input: RunDiscoveryTestsInput): Promise<
   );
 
   // 5. Detect + score + build insert rows
+  // Tier tagging: teaser runs get 'tier:teaser' stamped into internal_notes for downstream filtering.
+  const tierNote: string | null = tier === 'teaser' ? 'tier:teaser' : null;
   const resultInsertRows: Record<string, unknown>[] = [];
   for (const { prompt, outcome } of outcomes) {
     if (!outcome) {
@@ -464,6 +502,7 @@ export async function runDiscoveryTests(input: RunDiscoveryTestsInput): Promise<
         confidence_score: 0.2,
         normalized_response_summary: null,
         raw_response_excerpt: null,
+        internal_notes: tierNote,
         recommendation_tags: [],
       });
       continue;
@@ -578,6 +617,7 @@ export async function runDiscoveryTests(input: RunDiscoveryTestsInput): Promise<
       confidence_score: confidence,
       normalized_response_summary: normalizedSummary,
       raw_response_excerpt: rawExcerpt,
+      internal_notes: tierNote,
       recommendation_tags: [],
     });
   }
@@ -635,7 +675,7 @@ export async function runDiscoveryTests(input: RunDiscoveryTestsInput): Promise<
   }
 
   console.log(
-    `[discoveryRunner] site=${siteId} runId=${runId} triggeredBy=${triggeredBy}${runLabel ? ` label=${runLabel}` : ''}`,
+    `[discoveryRunner] site=${siteId} runId=${runId} tier=${tier} triggeredBy=${triggeredBy}${runLabel ? ` label=${runLabel}` : ''}`,
     `prompts=${prompts.length} results=${insertedResults.length} errors=${errors.length} overall=${overall}`,
   );
 

@@ -90,12 +90,12 @@ export function isAdminEmail(email: string | null | undefined): boolean {
 // ============================================================
 
 export const clusterDistributionTargets: Record<DiscoveryCluster, { min: number; max: number }> = {
-  core: { min: 5, max: 8 },
-  problem: { min: 4, max: 6 },
-  comparison: { min: 4, max: 6 },
-  long_tail: { min: 4, max: 8 },
-  brand: { min: 2, max: 4 },
-  adjacent: { min: 2, max: 4 },
+  core: { min: 5, max: 7 },
+  problem: { min: 3, max: 5 },
+  comparison: { min: 3, max: 5 },
+  long_tail: { min: 3, max: 5 },
+  brand: { min: 2, max: 3 },
+  adjacent: { min: 2, max: 3 },
 };
 
 // ============================================================

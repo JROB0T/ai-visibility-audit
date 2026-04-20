@@ -437,6 +437,8 @@ export type DiscoveryOwnerType = 'developer' | 'marketer' | 'business_owner';
 
 export type DiscoveryPriority = 'high' | 'medium' | 'low';
 
+export type DiscoveryTier = 'teaser' | 'full';
+
 export interface DiscoveryClusterWeights {
   core: number;
   problem: number;

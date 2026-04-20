@@ -202,7 +202,7 @@ Business:
 - Description: ${description || h1 || 'not specified'}
 - Core services: ${services.length > 0 ? services.join(', ') : 'unknown'}
 
-Generate 20-40 prompts across six clusters with this distribution:
+Generate roughly 18-28 prompts total across six clusters with this distribution:
 ${distLines}
 
 Requirements:
