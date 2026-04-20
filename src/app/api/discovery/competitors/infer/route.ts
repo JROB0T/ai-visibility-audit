@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { createServerSupabase } from '@/lib/supabase/server';
-import { isAdminAccount } from '@/lib/entitlements';
+import { requireFullDiscoveryAccess } from '@/lib/discoveryAccess';
 import { inferCompetitors } from '@/lib/competitorInference';
 
 export const maxDuration = 60;
@@ -23,28 +22,20 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: 'siteId is required' }, { status: 400 });
   }
 
-  // Auth + ownership
-  const supabase = await createServerSupabase();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
-  }
-  const isAdmin = isAdminAccount(user.email);
-
-  // Load the site (needed for domain + ownership check)
-  const { data: site, error: siteErr } = await supabase
-    .from('sites')
-    .select('id, user_id, domain, vertical')
-    .eq('id', siteId)
-    .maybeSingle();
-  if (siteErr || !site) {
-    return NextResponse.json({ error: 'Site not found' }, { status: 404 });
-  }
-  if (!isAdmin && site.user_id !== user.id) {
-    return NextResponse.json({ error: 'Not authorized for this site' }, { status: 403 });
-  }
+  const auth = await requireFullDiscoveryAccess(request, siteId);
+  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
   const admin = getAdminClient();
+
+  // Load site details needed for inference (domain + vertical)
+  const { data: site } = await admin
+    .from('sites')
+    .select('domain, vertical')
+    .eq('id', siteId)
+    .maybeSingle();
+  if (!site) {
+    return NextResponse.json({ error: 'Site not found' }, { status: 404 });
+  }
 
   // Pull most recent completed audit to get h1/metaDescription/pageTypes
   const { data: recentAudit } = await admin

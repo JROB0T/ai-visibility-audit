@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import { createServerSupabase } from '@/lib/supabase/server';
-import { isAdminAccount } from '@/lib/entitlements';
+import { requireDiscoveryAccess } from '@/lib/discoveryAccess';
 import { runDiscoveryTests } from '@/lib/discoveryRunner';
 import {
   detectInsightSignals,
@@ -56,13 +55,13 @@ async function runPostRunHook(
 
   // Insights
   let signals = detectInsightSignals(ctx);
-  signals = await polishInsightsWithClaude(signals, profile, { timeoutMs: 8000 });
+  signals = await polishInsightsWithClaude(signals, profile, { timeoutMs: 12000 });
   const insertedInsights = await persistInsights(admin, siteId, runId, signals, competitors);
 
   // Recommendations (re-detect signals to keep signal_keys fresh; cheap)
   const freshSignals = detectInsightSignals(ctx);
   let drafts = draftRecommendations(freshSignals, ctx);
-  drafts = await polishRecommendationsWithClaude(drafts, profile, { timeoutMs: 8000 });
+  drafts = await polishRecommendationsWithClaude(drafts, profile, { timeoutMs: 12000 });
   const insertedRecs = await persistRecommendations(admin, siteId, runId, drafts, competitors);
 
   return {
@@ -83,40 +82,20 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: 'siteId is required' }, { status: 400 });
   }
 
-  // Auth
-  const supabase = await createServerSupabase();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
-  const isAdmin = isAdminAccount(user.email);
+  // Auth + ownership (teaser is always allowed; full gate below)
+  const auth = await requireDiscoveryAccess(request, siteId);
+  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
-  const { data: site, error: siteErr } = await supabase
-    .from('sites')
-    .select('id, user_id')
-    .eq('id', siteId)
-    .maybeSingle();
-  if (siteErr || !site) return NextResponse.json({ error: 'Site not found' }, { status: 404 });
-  if (!isAdmin && site.user_id !== user.id) {
-    return NextResponse.json({ error: 'Not authorized for this site' }, { status: 403 });
-  }
-
-  // Entitlement gate — teaser is free for all logged-in users; full requires can_view_core
-  if (!isAdmin && tier === 'full') {
-    const { data: entitlement } = await supabase
-      .from('entitlements')
-      .select('can_view_core')
-      .eq('user_id', user.id)
-      .eq('site_id', siteId)
-      .single();
-    if (!entitlement?.can_view_core) {
-      return NextResponse.json({ error: 'Full discovery test requires a paid plan — try a teaser instead' }, { status: 403 });
-    }
+  // Entitlement gate — teaser is free for all logged-in users; full requires paid
+  if (tier === 'full' && !auth.isAdmin && !auth.isPaid) {
+    return NextResponse.json({ error: 'Full discovery requires a paid plan' }, { status: 403 });
   }
 
   try {
     const run = await runDiscoveryTests({
       siteId,
       promptIds,
-      triggeredBy: isAdmin ? 'admin' : 'user',
+      triggeredBy: auth.isAdmin ? 'admin' : 'user',
       tier,
     });
 

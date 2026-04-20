@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import { createServerSupabase } from '@/lib/supabase/server';
-import { isAdminAccount } from '@/lib/entitlements';
+import { requireFullDiscoveryAccess } from '@/lib/discoveryAccess';
 import { detectInsightSignals } from '@/lib/discoveryInsights';
 import {
   draftRecommendations,
@@ -36,27 +35,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: 'siteId is required' }, { status: 400 });
   }
 
-  const supabase = await createServerSupabase();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
-  const isAdmin = isAdminAccount(user.email);
-
-  const { data: site } = await supabase.from('sites').select('id, user_id').eq('id', siteId).maybeSingle();
-  if (!site) return NextResponse.json({ error: 'Site not found' }, { status: 404 });
-  if (!isAdmin && site.user_id !== user.id) {
-    return NextResponse.json({ error: 'Not authorized for this site' }, { status: 403 });
-  }
-  if (!isAdmin) {
-    const { data: entitlement } = await supabase
-      .from('entitlements')
-      .select('can_view_core')
-      .eq('user_id', user.id)
-      .eq('site_id', siteId)
-      .single();
-    if (!entitlement?.can_view_core) {
-      return NextResponse.json({ error: 'Premium feature — purchase required' }, { status: 403 });
-    }
-  }
+  const auth = await requireFullDiscoveryAccess(request, siteId);
+  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
   const admin = getAdminClient();
 

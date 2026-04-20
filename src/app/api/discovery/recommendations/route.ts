@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import { createServerSupabase } from '@/lib/supabase/server';
-import { isAdminAccount } from '@/lib/entitlements';
+import { requireDiscoveryAccess, requireFullDiscoveryAccess } from '@/lib/discoveryAccess';
 import type {
   DiscoveryOwnerType,
   DiscoveryPriority,
@@ -22,26 +21,11 @@ function getAdminClient(): SupabaseClient {
   );
 }
 
-async function authorizeSiteAccess(siteId: string): Promise<
-  | { ok: true; userId: string; isAdmin: boolean }
-  | { ok: false; response: NextResponse }
-> {
-  const supabase = await createServerSupabase();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { ok: false, response: NextResponse.json({ error: 'Authentication required' }, { status: 401 }) };
-  const isAdmin = isAdminAccount(user.email);
-  if (isAdmin) return { ok: true, userId: user.id, isAdmin: true };
-  const { data: site } = await supabase.from('sites').select('id, user_id').eq('id', siteId).maybeSingle();
-  if (!site) return { ok: false, response: NextResponse.json({ error: 'Site not found' }, { status: 404 }) };
-  if (site.user_id !== user.id) return { ok: false, response: NextResponse.json({ error: 'Not authorized for this site' }, { status: 403 }) };
-  return { ok: true, userId: user.id, isAdmin: false };
-}
-
 export async function GET(request: NextRequest): Promise<NextResponse> {
   const siteId = request.nextUrl.searchParams.get('siteId');
   if (!siteId) return NextResponse.json({ error: 'siteId query param required' }, { status: 400 });
-  const auth = await authorizeSiteAccess(siteId);
-  if (!auth.ok) return auth.response;
+  const auth = await requireDiscoveryAccess(request, siteId);
+  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
   const admin = getAdminClient();
   let runId = request.nextUrl.searchParams.get('runId');
@@ -99,8 +83,8 @@ export async function PATCH(request: NextRequest): Promise<NextResponse> {
     .eq('id', id)
     .maybeSingle();
   if (!existing) return NextResponse.json({ error: 'Recommendation not found' }, { status: 404 });
-  const auth = await authorizeSiteAccess(existing.site_id);
-  if (!auth.ok) return auth.response;
+  const auth = await requireFullDiscoveryAccess(request, existing.site_id);
+  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
   const updates: Record<string, unknown> = { edited_by_admin: true };
   if (typeof body.title === 'string') updates.title = body.title.trim();

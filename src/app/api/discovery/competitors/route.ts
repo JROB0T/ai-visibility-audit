@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { createServerSupabase } from '@/lib/supabase/server';
-import { isAdminAccount } from '@/lib/entitlements';
+import { requireDiscoveryAccess } from '@/lib/discoveryAccess';
 
 export const maxDuration = 30;
 
@@ -14,43 +13,13 @@ function getAdminClient() {
   );
 }
 
-/**
- * Verify the caller is authenticated and either an admin or the owner of the site.
- * Returns { ok: true, userId, isAdmin } on success, or an error response on failure.
- */
-async function authorizeSiteAccess(siteId: string): Promise<
-  | { ok: true; userId: string; isAdmin: boolean }
-  | { ok: false; response: NextResponse }
-> {
-  const supabase = await createServerSupabase();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    return { ok: false, response: NextResponse.json({ error: 'Authentication required' }, { status: 401 }) };
-  }
-  const isAdmin = isAdminAccount(user.email);
-  if (isAdmin) return { ok: true, userId: user.id, isAdmin: true };
-
-  const { data: site, error: siteErr } = await supabase
-    .from('sites')
-    .select('id, user_id')
-    .eq('id', siteId)
-    .maybeSingle();
-  if (siteErr || !site) {
-    return { ok: false, response: NextResponse.json({ error: 'Site not found' }, { status: 404 }) };
-  }
-  if (site.user_id !== user.id) {
-    return { ok: false, response: NextResponse.json({ error: 'Not authorized for this site' }, { status: 403 }) };
-  }
-  return { ok: true, userId: user.id, isAdmin: false };
-}
-
 export async function GET(request: NextRequest): Promise<NextResponse> {
   const siteId = request.nextUrl.searchParams.get('siteId');
   if (!siteId) {
     return NextResponse.json({ error: 'siteId query param required' }, { status: 400 });
   }
-  const auth = await authorizeSiteAccess(siteId);
-  if (!auth.ok) return auth.response;
+  const auth = await requireDiscoveryAccess(request, siteId);
+  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
   const admin = getAdminClient();
   const { data, error } = await admin
@@ -73,8 +42,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   if (!siteId || !name) {
     return NextResponse.json({ error: 'siteId and name are required' }, { status: 400 });
   }
-  const auth = await authorizeSiteAccess(siteId);
-  if (!auth.ok) return auth.response;
+  const auth = await requireDiscoveryAccess(request, siteId);
+  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
   const admin = getAdminClient();
 
@@ -128,8 +97,8 @@ export async function PATCH(request: NextRequest): Promise<NextResponse> {
   if (findErr || !existing) {
     return NextResponse.json({ error: 'Competitor not found' }, { status: 404 });
   }
-  const auth = await authorizeSiteAccess(existing.site_id);
-  if (!auth.ok) return auth.response;
+  const auth = await requireDiscoveryAccess(request, existing.site_id);
+  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
   const updates: Record<string, unknown> = {};
   if (typeof body.name === 'string') updates.name = body.name.trim();
@@ -166,8 +135,8 @@ export async function DELETE(request: NextRequest): Promise<NextResponse> {
   if (findErr || !existing) {
     return NextResponse.json({ error: 'Competitor not found' }, { status: 404 });
   }
-  const auth = await authorizeSiteAccess(existing.site_id);
-  if (!auth.ok) return auth.response;
+  const auth = await requireDiscoveryAccess(request, existing.site_id);
+  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
   const { error } = await admin
     .from('discovery_competitors')
