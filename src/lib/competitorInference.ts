@@ -4,6 +4,8 @@
 //   - /api/discovery/competitors/infer (new)
 // ============================================================
 
+import { normalizeDomain } from '@/lib/discovery';
+
 export interface CompetitorEstimate {
   domain: string;
   overall: number;
@@ -36,14 +38,6 @@ const VERTICAL_HINTS: Record<string, string> = {
   professional_services: 'This is a PROFESSIONAL SERVICES firm. Competitors must be other firms in the same industry.',
   local_service: 'This is a LOCAL SERVICE business. Competitors must be other local service providers in the same trade.',
 };
-
-function normalizeDomain(raw: string): string {
-  return String(raw || '')
-    .replace(/^https?:\/\//, '')
-    .replace(/^www\./, '')
-    .replace(/\/.*$/, '')
-    .toLowerCase();
-}
 
 /**
  * Calls Claude Haiku to identify likely competitors and estimate their AI visibility.

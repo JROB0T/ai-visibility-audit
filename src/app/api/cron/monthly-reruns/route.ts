@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { scanSite } from '@/lib/scanner';
 import { calculateScores, generateRecommendations, enrichWithCodeSnippets } from '@/lib/scoring';
+import { runDiscoveryTests } from '@/lib/discoveryRunner';
 
 function getAdminSupabase() {
   return createClient(
@@ -202,6 +203,37 @@ export async function GET(request: NextRequest) {
 
       console.log(`Monthly rerun completed for ${site.domain}: score ${scores.overall}/100`);
       succeeded++;
+
+      // Discovery rerun — only if profile exists AND site has at least one active prompt.
+      // Wrapped in its own try/catch so a discovery failure doesn't affect the audit result.
+      try {
+        const { data: profile } = await supabase
+          .from('discovery_profiles')
+          .select('id')
+          .eq('site_id', site.id)
+          .maybeSingle();
+        if (profile) {
+          const { count: activePromptCount } = await supabase
+            .from('discovery_prompts')
+            .select('id', { count: 'exact', head: true })
+            .eq('site_id', site.id)
+            .eq('active', true);
+          if ((activePromptCount || 0) > 0) {
+            console.log(`[cron] Running discovery tests for ${site.domain}`);
+            const discoveryRun = await runDiscoveryTests({
+              siteId: site.id,
+              triggeredBy: 'cron',
+              runLabel: 'monthly_auto',
+            });
+            console.log(
+              `[cron] Discovery complete for ${site.domain}: runId=${discoveryRun.runId}`,
+              `overall=${discoveryRun.snapshot.overall_score} errors=${discoveryRun.errors.length}`,
+            );
+          }
+        }
+      } catch (discoveryErr) {
+        console.error(`[cron] Discovery rerun failed for ${site.domain}:`, discoveryErr instanceof Error ? discoveryErr.message : discoveryErr);
+      }
     } catch (error) {
       console.error('[cron] Error during rerun:', error);
       console.error(`Unexpected error processing ${site.domain}:`, error);

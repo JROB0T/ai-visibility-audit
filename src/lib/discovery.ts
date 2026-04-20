@@ -110,3 +110,56 @@ export async function fetchDiscoveryPrompts(siteId: string): Promise<DiscoveryPr
   const data = await res.json();
   return (data.prompts || []) as DiscoveryPrompt[];
 }
+
+// ============================================================
+// Domain helpers (used by runner + competitor inference)
+// ============================================================
+
+/**
+ * Normalize a URL or domain string to just the bare lowercased hostname.
+ * Strips protocol, 'www.', any path, and trailing slash.
+ */
+export function normalizeDomain(input: string | null | undefined): string {
+  if (!input) return '';
+  return String(input)
+    .trim()
+    .replace(/^https?:\/\//i, '')
+    .replace(/^www\./i, '')
+    .replace(/\/.*$/, '')
+    .replace(/\/$/, '')
+    .toLowerCase();
+}
+
+/**
+ * Common directory/aggregator domains. AI answers that lean heavily on these
+ * are a sign that the business itself is invisible in AI discovery.
+ */
+export const DIRECTORY_DOMAINS: readonly string[] = [
+  'yelp.com',
+  'yellowpages.com',
+  'angi.com',
+  'angieslist.com',
+  'thumbtack.com',
+  'bbb.org',
+  'tripadvisor.com',
+  'houzz.com',
+  'bark.com',
+  'homeadvisor.com',
+  'trustpilot.com',
+  'g2.com',
+  'capterra.com',
+];
+
+/**
+ * Common marketplace domains. Similar signal as directories.
+ */
+export const MARKETPLACE_DOMAINS: readonly string[] = [
+  'amazon.com',
+  'ebay.com',
+  'etsy.com',
+  'walmart.com',
+  'target.com',
+  'wayfair.com',
+  'homedepot.com',
+  'lowes.com',
+];
