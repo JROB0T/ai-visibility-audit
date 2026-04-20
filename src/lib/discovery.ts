@@ -5,8 +5,10 @@
 import type {
   DiscoveryCluster,
   DiscoveryClusterWeights,
+  DiscoveryPrompt,
   DiscoveryVisibilityStatus,
 } from '@/lib/types';
+import { ADMIN_EMAILS } from '@/lib/entitlements';
 
 export const DEFAULT_DISCOVERY_CLUSTER_WEIGHTS: DiscoveryClusterWeights = {
   core: 0.30,
@@ -70,4 +72,41 @@ export function visibilityStatusColor(status: DiscoveryVisibilityStatus): string
     case 'unclear':
       return 'text-slate-400';
   }
+}
+
+// ============================================================
+// Admin / auth helpers
+// ============================================================
+
+export const adminEmails: string[] = ADMIN_EMAILS;
+
+export function isAdminEmail(email: string | null | undefined): boolean {
+  if (!email) return false;
+  return adminEmails.includes(email.toLowerCase());
+}
+
+// ============================================================
+// Prompt distribution targets (used by generation + validation)
+// ============================================================
+
+export const clusterDistributionTargets: Record<DiscoveryCluster, { min: number; max: number }> = {
+  core: { min: 5, max: 8 },
+  problem: { min: 4, max: 6 },
+  comparison: { min: 4, max: 6 },
+  long_tail: { min: 4, max: 8 },
+  brand: { min: 2, max: 4 },
+  adjacent: { min: 2, max: 4 },
+};
+
+// ============================================================
+// Client-side fetch helper
+// ============================================================
+
+export async function fetchDiscoveryPrompts(siteId: string): Promise<DiscoveryPrompt[]> {
+  const res = await fetch(`/api/discovery/prompts?siteId=${encodeURIComponent(siteId)}`);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch discovery prompts: ${res.status}`);
+  }
+  const data = await res.json();
+  return (data.prompts || []) as DiscoveryPrompt[];
 }

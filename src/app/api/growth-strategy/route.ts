@@ -1,18 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabase } from '@/lib/supabase/server';
 import { isAdminAccount } from '@/lib/entitlements';
+import { inferCompetitors, type CompetitorEstimate } from '@/lib/competitorInference';
 
 export const maxDuration = 60;
-
-interface CompetitorEstimate {
-  domain: string;
-  overall: number;
-  crawl: number;
-  read: number;
-  commercial: number;
-  trust: number;
-  rationale: string;
-}
 
 export async function POST(request: NextRequest) {
   try {
@@ -45,85 +36,14 @@ export async function POST(request: NextRequest) {
     const name = domain.replace(/\.(com|io|co|org|net)$/, '').replace(/^www\./, '');
 
     // Step 1: Identify competitors + estimate their AI visibility via AI
-    let competitorEstimates: CompetitorEstimate[] = [];
-    if (apiKey) {
-      try {
-        const verticalHints: Record<string, string> = {
-          restaurant: 'This is a RESTAURANT/food service business. Competitors must be other restaurants, cafes, or food businesses — NOT retail stores or tech companies.',
-          saas: 'This is a SOFTWARE/SaaS company. Competitors must be other software companies in the same category.',
-          ecommerce: 'This is an E-COMMERCE/retail business. Competitors must be other online retailers in the same product category.',
-          healthcare: 'This is a HEALTHCARE business. Competitors must be other healthcare providers or clinics.',
-          law_firm: 'This is a LAW FIRM. Competitors must be other law firms or legal service providers.',
-          professional_services: 'This is a PROFESSIONAL SERVICES firm. Competitors must be other firms in the same industry.',
-          local_service: 'This is a LOCAL SERVICE business. Competitors must be other local service providers in the same trade.',
-        };
-        const verticalHint = verticalHints[businessType] || 'Pick competitors in the same industry as this business.';
-
-        const compPrompt = `Based on this website info, identify exactly 2 likely direct competitors. For each competitor, estimate their AI visibility scores based on your knowledge of their web presence.
-
-Business type: ${businessType}
-Domain: ${domain}
-Homepage heading: "${h1 || 'unknown'}"
-Meta description: "${metaDescription || 'unknown'}"
-Page types found: ${(pageTypes || []).join(', ')}
-
-${verticalHint}
-
-Return ONLY a JSON array of 2 objects, each with these fields:
-- "domain": the competitor's domain name
-- "overall": estimated AI visibility score 0-100
-- "crawl": estimated crawlability score 0-100
-- "read": estimated machine readability score 0-100
-- "commercial": estimated commercial clarity score 0-100
-- "trust": estimated trust score 0-100
-- "rationale": one sentence explaining why you picked this competitor and how you estimated their scores
-
-Rules:
-- Competitors MUST be in the same business category (${businessType})
-- Pick real businesses that are actual competitors, not tangentially related companies
-- A restaurant's competitors are other restaurants, not retail stores
-- Base scores on what you know about their website structure, content quality, and AI readiness
-- No markdown, no backticks, just the JSON array`;
-
-        console.log('Growth strategy: requesting competitor estimates for', domain);
-        const compRes = await fetch('https://api.anthropic.com/v1/messages', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
-          body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 500, messages: [{ role: 'user', content: compPrompt }] }),
-        });
-
-        if (!compRes.ok) {
-          const errorBody = await compRes.text();
-          console.error('Competitor API failed:', { status: compRes.status, body: errorBody });
-        } else {
-          const compData = await compRes.json();
-          const compText = compData.content?.[0]?.text || '';
-          console.log('Competitor API raw response:', compText);
-          try {
-            const cleaned = compText.replace(/```json|```/g, '').trim();
-            const parsed = JSON.parse(cleaned);
-            if (Array.isArray(parsed)) {
-              competitorEstimates = parsed.slice(0, 2).map((c: Record<string, unknown>) => ({
-                domain: String(c.domain || '').replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/.*$/, ''),
-                overall: Number(c.overall) || 0,
-                crawl: Number(c.crawl) || 0,
-                read: Number(c.read) || 0,
-                commercial: Number(c.commercial) || 0,
-                trust: Number(c.trust) || 0,
-                rationale: String(c.rationale || ''),
-              }));
-              console.log('Parsed competitor estimates:', competitorEstimates.map(c => c.domain));
-            } else {
-              console.error('Competitor response not an array:', typeof parsed);
-            }
-          } catch (parseErr) {
-            console.error('Failed to parse competitor response:', { text: compText.substring(0, 300), error: parseErr instanceof Error ? parseErr.message : parseErr });
-          }
-        }
-      } catch (fetchErr) {
-        console.error('Competitor fetch error:', fetchErr instanceof Error ? fetchErr.message : fetchErr);
-      }
-    }
+    const competitorEstimates: CompetitorEstimate[] = await inferCompetitors({
+      domain,
+      businessType,
+      h1,
+      metaDescription,
+      pageTypes,
+      count: 2,
+    });
 
     // Step 2: Generate marketing strategy via AI
     let marketingStrategy = null;
