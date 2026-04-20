@@ -5,7 +5,9 @@ import { useParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import ScoreRing, { ScoreBar, scoreToGrade, getScoreColor } from '@/components/ScoreRing';
 import SeverityBadge, { EffortBadge } from '@/components/SeverityBadge';
-import { Lock, ArrowRight, ArrowLeft, CheckCircle, XCircle, ExternalLink, FileText, AlertTriangle, RefreshCw, ChevronDown, ChevronRight, Filter, Shield, Code, Eye, Bot, Copy, Check, Globe, Minus, LayoutGrid, Wrench, Zap, MonitorSmartphone, X, Download, Target, Users, CalendarCheck } from 'lucide-react';
+import { Lock, ArrowRight, ArrowLeft, CheckCircle, XCircle, ExternalLink, FileText, AlertTriangle, RefreshCw, ChevronDown, ChevronRight, Filter, Shield, Code, Eye, Bot, Copy, Check, Globe, Minus, LayoutGrid, Wrench, Zap, MonitorSmartphone, X, Download, Target, Users, CalendarCheck, Sparkles } from 'lucide-react';
+import { isAdminAccount } from '@/lib/entitlements';
+import DiscoveryTab from '@/components/discovery/DiscoveryTab';
 import { compareAudits, classifyFinding, generateMonthlyActions } from '@/lib/deltas';
 import { getExpectedPages, getVerticalConfig } from '@/lib/verticals';
 
@@ -69,7 +71,7 @@ interface AuditData {
 
 type ViewMode = 'priority' | 'page' | 'category';
 type SeverityFilter = 'all' | 'high' | 'medium' | 'low';
-type ReportTab = 'overview' | 'fix-plan' | 'ai-perception' | 'pages';
+type ReportTab = 'overview' | 'fix-plan' | 'ai-perception' | 'pages' | 'ai-discovery';
 
 // FREE_RECOMMENDATION_LIMIT removed — gating now handled at tab level
 
@@ -469,6 +471,7 @@ export default function AuditResultPage() {
   const [error, setError] = useState('');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [hasPaid, setHasPaid] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('category');
   const [severityFilter, setSeverityFilter] = useState<SeverityFilter>('all');
@@ -815,6 +818,7 @@ export default function AuditResultPage() {
         const supabase = createClient();
         const { data: { user } } = await supabase.auth.getUser();
         setIsAuthenticated(!!user);
+        setIsAdmin(isAdminAccount(user?.email));
         const res = await fetch(`/api/audit/${params.id}`);
         if (!res.ok) { setError('Audit not found'); return; }
         const auditData = await res.json();
@@ -1096,6 +1100,7 @@ export default function AuditResultPage() {
             { id: 'fix-plan' as ReportTab, label: 'Fix Plan', icon: Wrench, locked: !hasPaid },
             { id: 'ai-perception' as ReportTab, label: 'AI Perception', icon: Eye, locked: !hasPaid },
             { id: 'pages' as ReportTab, label: 'Pages', icon: MonitorSmartphone, locked: !hasPaid },
+            { id: 'ai-discovery' as ReportTab, label: 'AI Discovery', icon: Sparkles, locked: false },
           ]).map(tab => (
             <button key={tab.id} onClick={() => switchTab(tab.id)}
               className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-md whitespace-nowrap transition-colors"
@@ -2054,6 +2059,16 @@ export default function AuditResultPage() {
       {/* CTA banner — always visible for unauthenticated users at bottom of landing state */}
       {!isAuthenticated && ctaBanner}
       </>
+      )}
+
+      {/* ===== AI DISCOVERY TAB ===== */}
+      {isAuthenticated && activeTab === 'ai-discovery' && audit?.site_id && (
+        <DiscoveryTab
+          auditId={audit.id}
+          siteId={audit.site_id}
+          isPaid={hasPaid}
+          isAdmin={isAdmin}
+        />
       )}
     </div>
   );
