@@ -300,6 +300,22 @@ interface FullReportAddOns {
   perception?: PerceptionQuestion[] | null;
   growth?: GrowthData | null;
   generatedFixes?: GeneratedFix[] | null;
+  // Everything else from the audit payload we haven't already rendered.
+  findings?: AuditData['findings'] | null;
+  pagePreviews?: AuditData['pagePreviews'] | null;
+  previousAudit?: AuditData['previousAudit'] | null;
+  hasEntitlement?: boolean | null;
+  hasMonitoring?: boolean | null;
+  totalRecommendationCount?: number | null;
+  // Extra fields stored on the audit row (home_evidence, llms_txt,
+  // scanner_summary, napConsistency). Typed loosely because they're
+  // jsonb columns.
+  auditExtras?: Record<string, unknown> | null;
+  // Full discovery-side data we fetched alongside the report.
+  discoveryPromptsFull?: Record<string, unknown>[] | null;
+  discoveryResultsFull?: Record<string, unknown>[] | null;
+  discoveryCompetitorsFull?: Record<string, unknown>[] | null;
+  discoveryTrendsFull?: Record<string, unknown>[] | null;
 }
 
 function escapeHtml(s: string): string {
@@ -353,9 +369,26 @@ th{background:#f8fafc;font-weight:600;color:#64748b}
 
 <div style="text-align:center;margin-bottom:32px">
 <div style="font-size:13px;color:#6366F1;font-weight:600;letter-spacing:1px;text-transform:uppercase">AI Visibility Audit Report</div>
-<h1 style="border:none;margin-top:8px;padding:0;font-size:28px">${domain}</h1>
-<p class="meta">Report generated ${date} · ${pages.length} pages scanned</p>
+<h1 style="border:none;margin-top:8px;padding:0;font-size:28px">${escapeHtml(domain)}</h1>
+<p class="meta">Report generated ${escapeHtml(date)} · ${pages.length} pages scanned</p>
 </div>
+
+<h2>Audit Metadata</h2>
+<table>
+<tr><td>Audit ID</td><td>${escapeHtml(audit.id)}</td></tr>
+<tr><td>Site ID</td><td>${escapeHtml(audit.site_id)}</td></tr>
+<tr><td>Domain</td><td>${escapeHtml(audit.site?.domain || '—')}</td></tr>
+<tr><td>Site URL</td><td>${escapeHtml(audit.site?.url || '—')}</td></tr>
+<tr><td>Vertical</td><td>${escapeHtml(audit.site?.vertical || '—')}</td></tr>
+<tr><td>Status</td><td>${escapeHtml(audit.status)}</td></tr>
+<tr><td>Created</td><td>${escapeHtml(audit.created_at)}</td></tr>
+<tr><td>Completed</td><td>${escapeHtml(audit.completed_at || '—')}</td></tr>
+<tr><td>Pages scanned</td><td>${audit.pages_scanned}</td></tr>
+<tr><td>Run type</td><td>${escapeHtml((audit as unknown as { run_type?: string }).run_type || '—')}</td></tr>
+<tr><td>Run scope</td><td>${escapeHtml((audit as unknown as { run_scope?: string }).run_scope || '—')}</td></tr>
+<tr><td>Previous audit ID</td><td>${escapeHtml((audit as unknown as { previous_audit_id?: string }).previous_audit_id || '—')}</td></tr>
+<tr><td>Summary</td><td>${escapeHtml(audit.summary || '—')}</td></tr>
+</table>
 
 <h2>Executive Summary</h2>
 <div class="score-box">
@@ -374,29 +407,75 @@ th{background:#f8fafc;font-weight:600;color:#64748b}
 
 <h2>Key Pages Status</h2>
 <table>
-<tr><th>Page Type</th><th>Status</th></tr>
-${keyPagesStatus?.map(kp => `<tr><td>${kp.label}</td><td><span class="badge badge-${kp.found ? 'found' : 'missing'}">${kp.found ? 'Found' : 'Missing'}</span></td></tr>`).join('\n') || ''}
+<tr><th>Page Type</th><th>Status</th><th>URL found</th><th>Note</th></tr>
+${keyPagesStatus?.map(kp => `<tr><td>${escapeHtml(kp.label)}</td><td><span class="badge badge-${kp.found ? 'found' : 'missing'}">${kp.found ? 'Found' : 'Missing'}</span></td><td>${escapeHtml(kp.url || '—')}</td><td>${escapeHtml((kp as unknown as { note?: string }).note || '—')}</td></tr>`).join('\n') || ''}
 </table>
-${missing.length > 0 ? `<p><strong>Missing pages:</strong> ${missing.map(m => m.label).join(', ')}. These gaps mean AI cannot answer common questions about your product's pricing, contact information, or key features.</p>` : '<p>All key page types were found.</p>'}
+${missing.length > 0 ? `<p><strong>Missing pages:</strong> ${missing.map(m => escapeHtml(m.label)).join(', ')}. These gaps mean AI cannot answer common questions about your product's pricing, contact information, or key features.</p>` : '<p>All key page types were found.</p>'}
 
-<h2>AI Crawler Access</h2>
-${blocked.length > 0 ? `<p><strong>${blocked.length} AI system(s) are blocked:</strong> ${blocked.map(b => b.displayName + ' (' + b.operator + ')').join(', ')}. These systems cannot access your site content at all.</p>` : '<p>No AI crawlers are blocked. All major AI systems can access your site.</p>'}
+<h2>AI Crawler Access — Full Detail</h2>
+${blocked.length > 0 ? `<p><strong>${blocked.length} AI system(s) are blocked:</strong> ${blocked.map(b => escapeHtml(b.displayName) + ' (' + escapeHtml(b.operator) + ')').join(', ')}. These systems cannot access your site content at all.</p>` : '<p>No AI crawlers are blocked. All major AI systems can access your site.</p>'}
+<table>
+<tr><th>Crawler</th><th>Operator</th><th>Status</th><th>Visibility purpose</th><th>Readiness</th><th>Detail</th></tr>
+${(crawlerStatuses || []).map(c => `<tr><td>${escapeHtml(c.displayName)}</td><td>${escapeHtml(c.operator)}</td><td>${escapeHtml(c.status)}</td><td>${escapeHtml(c.visibilityLabel)}</td><td>${c.readinessScore}/100</td><td>${escapeHtml(c.statusDetail)}</td></tr>`).join('\n')}
+</table>
+${(crawlerStatuses || []).some(c => (c.barriers && c.barriers.length > 0) || (c.recommendations && c.recommendations.length > 0)) ? `<h3>Per-crawler barriers &amp; recommendations</h3>${(crawlerStatuses || []).map(c => (c.barriers.length + c.recommendations.length > 0) ? `<div class="rec-card">
+<div class="rec-title">${escapeHtml(c.displayName)} — ${escapeHtml(c.operator)}</div>
+<div class="meta">${escapeHtml(c.description)}</div>
+${c.barriers.length > 0 ? `<div class="rec-fix"><strong>Barriers:</strong><ul>${c.barriers.map(b => `<li>${escapeHtml(b)}</li>`).join('')}</ul></div>` : ''}
+${c.recommendations.length > 0 ? `<div class="rec-fix"><strong>Recommendations:</strong><ul>${c.recommendations.map(r => `<li>${escapeHtml(r)}</li>`).join('')}</ul></div>` : ''}
+<div class="meta" style="font-size:10px;">Basis: ${escapeHtml(c.statusBasis)} · Confidence: ${escapeHtml(c.confidenceLevel)}</div>
+</div>` : '').join('\n')}` : ''}
 
 <h2>Findings & Recommendations</h2>
 <h3>High Priority (${highRecs.length})</h3>
-${highRecs.map(r => `<div class="rec-card"><div class="rec-title"><span class="badge badge-high">HIGH</span> ${r.title}</div><div class="rec-fix"><strong>Why:</strong> ${r.why_it_matters}</div><div class="rec-fix"><strong>Fix:</strong> ${r.recommended_fix}</div></div>`).join('\n') || '<p>No high-priority issues found.</p>'}
+${highRecs.map(r => `<div class="rec-card">
+<div class="rec-title"><span class="badge badge-high">HIGH</span> ${escapeHtml(r.title)}</div>
+<div class="meta">Category: ${escapeHtml(r.category || '—')} · Effort: ${escapeHtml(r.effort || '—')} · Priority order: ${r.priority_order ?? '—'}</div>
+<div class="rec-fix"><strong>Why this matters:</strong> ${escapeHtml(r.why_it_matters || '')}</div>
+<div class="rec-fix"><strong>Recommended fix:</strong> ${escapeHtml(r.recommended_fix || '')}</div>
+${r.code_snippet ? `<pre style="background:#0f172a;color:#e2e8f0;padding:10px;border-radius:6px;overflow-x:auto;font-size:11px;white-space:pre-wrap;word-break:break-word;">${escapeHtml(r.code_snippet)}</pre>` : ''}
+<div class="meta" style="font-size:10px;">Recommendation ID: ${escapeHtml(r.id)}</div>
+</div>`).join('\n') || '<p>No high-priority issues found.</p>'}
 
 <h3>Medium Priority (${medRecs.length})</h3>
-${medRecs.map(r => `<div class="rec-card"><div class="rec-title"><span class="badge badge-medium">MEDIUM</span> ${r.title}</div><div class="rec-fix"><strong>Why:</strong> ${r.why_it_matters}</div><div class="rec-fix"><strong>Fix:</strong> ${r.recommended_fix}</div></div>`).join('\n') || '<p>No medium-priority issues found.</p>'}
+${medRecs.map(r => `<div class="rec-card">
+<div class="rec-title"><span class="badge badge-medium">MEDIUM</span> ${escapeHtml(r.title)}</div>
+<div class="meta">Category: ${escapeHtml(r.category || '—')} · Effort: ${escapeHtml(r.effort || '—')} · Priority order: ${r.priority_order ?? '—'}</div>
+<div class="rec-fix"><strong>Why this matters:</strong> ${escapeHtml(r.why_it_matters || '')}</div>
+<div class="rec-fix"><strong>Recommended fix:</strong> ${escapeHtml(r.recommended_fix || '')}</div>
+${r.code_snippet ? `<pre style="background:#0f172a;color:#e2e8f0;padding:10px;border-radius:6px;overflow-x:auto;font-size:11px;white-space:pre-wrap;word-break:break-word;">${escapeHtml(r.code_snippet)}</pre>` : ''}
+<div class="meta" style="font-size:10px;">Recommendation ID: ${escapeHtml(r.id)}</div>
+</div>`).join('\n') || '<p>No medium-priority issues found.</p>'}
 
 <h3>Low Priority (${lowRecs.length})</h3>
-${lowRecs.map(r => `<div class="rec-card"><div class="rec-title"><span class="badge badge-low">LOW</span> ${r.title}</div><div class="rec-fix"><strong>Fix:</strong> ${r.recommended_fix}</div></div>`).join('\n') || '<p>No low-priority issues found.</p>'}
+${lowRecs.map(r => `<div class="rec-card">
+<div class="rec-title"><span class="badge badge-low">LOW</span> ${escapeHtml(r.title)}</div>
+<div class="meta">Category: ${escapeHtml(r.category || '—')} · Effort: ${escapeHtml(r.effort || '—')} · Priority order: ${r.priority_order ?? '—'}</div>
+${r.why_it_matters ? `<div class="rec-fix"><strong>Why this matters:</strong> ${escapeHtml(r.why_it_matters)}</div>` : ''}
+<div class="rec-fix"><strong>Recommended fix:</strong> ${escapeHtml(r.recommended_fix || '')}</div>
+${r.code_snippet ? `<pre style="background:#0f172a;color:#e2e8f0;padding:10px;border-radius:6px;overflow-x:auto;font-size:11px;white-space:pre-wrap;word-break:break-word;">${escapeHtml(r.code_snippet)}</pre>` : ''}
+<div class="meta" style="font-size:10px;">Recommendation ID: ${escapeHtml(r.id)}</div>
+</div>`).join('\n') || '<p>No low-priority issues found.</p>'}
 
-<h2>Pages Analyzed</h2>
+<h2>Pages Analyzed — Summary</h2>
 <table>
-<tr><th>Page</th><th>Type</th><th>Schema</th><th>Issues</th></tr>
-${pages.map(p => { let path = p.url; try { path = new URL(p.url).pathname; } catch {} return `<tr><td>${p.title || path}</td><td>${p.page_type}</td><td>${p.has_schema ? '✓' : '—'}</td><td>${p.issues.length}</td></tr>`; }).join('\n')}
+<tr><th>Page</th><th>Type</th><th>Status</th><th>Schema</th><th>Word count</th><th>Load</th><th>Issues</th></tr>
+${pages.map(p => { let path = p.url; try { path = new URL(p.url).pathname; } catch {} return `<tr><td>${escapeHtml(p.title || path)}</td><td>${escapeHtml(p.page_type)}</td><td>${p.status_code ?? '—'}</td><td>${p.has_schema ? '✓' : '—'}</td><td>${p.word_count ?? '—'}</td><td>${p.load_time_ms ? (p.load_time_ms / 1000).toFixed(1) + 's' : '—'}</td><td>${p.issues.length}</td></tr>`; }).join('\n')}
 </table>
+
+<h2>Pages Analyzed — Full Detail</h2>
+<p class="meta">Every field the scanner captured for each page. This is the raw input behind every recommendation above.</p>
+${pages.map(p => `<div class="rec-card">
+<div class="rec-title">${escapeHtml(p.url)}</div>
+<div class="meta" style="margin-top:4px;">Type: ${escapeHtml(p.page_type)} · Status: ${p.status_code ?? '—'} · Load: ${p.load_time_ms ? (p.load_time_ms / 1000).toFixed(2) + 's' : '—'} · Word count: ${p.word_count ?? '—'}</div>
+<div class="meta"><strong>Title:</strong> ${escapeHtml(p.title || '(none)')}</div>
+<div class="meta"><strong>H1:</strong> ${escapeHtml(p.h1_text || '(none)')}</div>
+<div class="meta"><strong>Meta description:</strong> ${escapeHtml(p.meta_description || '(none)')}</div>
+<div class="meta"><strong>Canonical URL:</strong> ${escapeHtml(p.canonical_url || '(none)')}</div>
+<div class="meta"><strong>Has schema:</strong> ${p.has_schema ? 'yes' : 'no'}${p.schema_types.length > 0 ? ` (${p.schema_types.map(escapeHtml).join(', ')})` : ''}</div>
+${p.issues.length > 0 ? `<div class="rec-fix"><strong>Issues found (${p.issues.length}):</strong><ul>${p.issues.map(i => `<li>${escapeHtml(i)}</li>`).join('')}</ul></div>` : '<div class="meta">No issues found on this page.</div>'}
+<div class="meta" style="font-size:10px;margin-top:6px;">Page ID: ${escapeHtml(p.id)}</div>
+</div>`).join('\n')}
 
 <h2>Next Steps</h2>
 <ol>
@@ -606,6 +685,201 @@ ${recBlocks ? `<h2>Discovery Recommendations</h2>${recBlocks}` : ''}
 ${trendBlock}`);
   }
 
+  // ---------- Findings (raw, separate from recommendations) ----------
+  if (addOns.findings && addOns.findings.length > 0) {
+    const bySev: Record<string, AuditData['findings']> = { high: [], medium: [], low: [] };
+    for (const f of addOns.findings) {
+      const s = (f.severity || 'low').toLowerCase();
+      (bySev[s] || bySev.low).push(f);
+    }
+    const renderGroup = (label: string, color: string, rows: AuditData['findings']): string => rows.length === 0 ? '' : `<h3>${escapeHtml(label)} (${rows.length})</h3>
+${rows.map(f => `<div class="rec-card">
+<div class="rec-title"><span class="badge" style="background:${color}20;color:${color};">${escapeHtml(f.severity.toUpperCase())}</span> ${escapeHtml(f.title)}</div>
+<div class="meta" style="margin-top:4px;">Category: ${escapeHtml(f.category || '—')} · Finding ID: ${escapeHtml(f.id)}</div>
+${f.description ? `<div class="rec-fix">${escapeHtml(f.description)}</div>` : ''}
+${(f.affected_urls && f.affected_urls.length > 0) ? `<div class="meta"><strong>Affected URLs (${f.affected_urls.length}):</strong><ul>${f.affected_urls.map(u => `<li>${escapeHtml(u)}</li>`).join('')}</ul></div>` : ''}
+</div>`).join('\n')}`;
+    parts.push(`<h2>All Findings (raw)</h2>
+<p class="meta">Every finding recorded for this scan, grouped by severity. This is the audit log backing the recommendations above.</p>
+${renderGroup('High severity', '#EF4444', bySev.high || [])}
+${renderGroup('Medium severity', '#F59E0B', bySev.medium || [])}
+${renderGroup('Low severity', '#10B981', bySev.low || [])}`);
+  }
+
+  // ---------- Page Previews (raw HTML preview per page) ----------
+  if (addOns.pagePreviews && addOns.pagePreviews.length > 0) {
+    const rows = addOns.pagePreviews.map(p => `<div class="rec-card">
+<div class="rec-title">${escapeHtml(p.url)}</div>
+<div class="meta">Title: ${escapeHtml(p.title)}</div>
+<div class="meta">H1: ${escapeHtml(p.h1)}</div>
+<div class="meta">Meta description: ${escapeHtml(p.metaDescription)}</div>
+<div class="meta">Schema types: ${(p.schemaTypes || []).map(escapeHtml).join(', ') || '(none)'}</div>
+<div class="meta">Word count: ${p.wordCount ?? '—'} · Has schema: ${p.hasSchema ? 'yes' : 'no'}</div>
+</div>`).join('\n');
+    parts.push(`<h2>Page Previews</h2>
+<p class="meta">What the scanner saw on each page — the exact content downstream AI recommendations were derived from.</p>
+${rows}`);
+  }
+
+  // ---------- Previous Audit Delta ----------
+  if (addOns.previousAudit) {
+    const prev = addOns.previousAudit;
+    parts.push(`<h2>Previous Audit Comparison</h2>
+<p class="meta">The prior completed audit for this site. Useful for tracking month-over-month change.</p>
+<table>
+<tr><th>Metric</th><th>Previous</th></tr>
+<tr><td>Audit ID</td><td>${escapeHtml(prev.id)}</td></tr>
+<tr><td>Overall score</td><td>${prev.overall_score ?? '—'}/100</td></tr>
+<tr><td>Crawlability</td><td>${prev.crawlability_score ?? '—'}/100</td></tr>
+<tr><td>Machine readability</td><td>${prev.machine_readability_score ?? '—'}/100</td></tr>
+<tr><td>Commercial clarity</td><td>${prev.commercial_clarity_score ?? '—'}/100</td></tr>
+<tr><td>Trust clarity</td><td>${prev.trust_clarity_score ?? '—'}/100</td></tr>
+<tr><td>Findings count</td><td>${prev.findings.length}</td></tr>
+<tr><td>Pages scanned</td><td>${prev.pages.length}</td></tr>
+</table>
+${prev.findings.length > 0 ? `<h3>Previous findings (${prev.findings.length})</h3><ul>${prev.findings.map(f => `<li><strong>${escapeHtml(f.severity.toUpperCase())}</strong> · ${escapeHtml(f.title)}${f.description ? ` — ${escapeHtml(f.description)}` : ''}</li>`).join('')}</ul>` : ''}
+${prev.pages.length > 0 ? `<h3>Previous pages (${prev.pages.length})</h3><ul>${prev.pages.map(p => `<li>${escapeHtml(p.url)}</li>`).join('')}</ul>` : ''}`);
+  }
+
+  // ---------- Audit row extras: home_evidence, llms_txt, scanner_summary, etc. ----------
+  if (addOns.auditExtras && Object.keys(addOns.auditExtras).length > 0) {
+    const renderValue = (v: unknown): string => {
+      if (v === null || v === undefined) return '<em>null</em>';
+      if (typeof v === 'object') return `<pre style="background:#f8fafc;padding:10px;border-radius:6px;overflow-x:auto;font-size:11px;white-space:pre-wrap;word-break:break-word;">${escapeHtml(JSON.stringify(v, null, 2))}</pre>`;
+      return escapeHtml(String(v));
+    };
+    const kvRows = Object.entries(addOns.auditExtras)
+      .map(([k, v]) => `<tr><td style="vertical-align:top;width:220px;"><strong>${escapeHtml(k)}</strong></td><td>${renderValue(v)}</td></tr>`)
+      .join('');
+    parts.push(`<h2>Scanner Diagnostics</h2>
+<p class="meta">Raw scanner output stored with the audit row — home-evidence flags, llms.txt result, NAP consistency, scanner summary, and any other jsonb columns attached.</p>
+<table>${kvRows}</table>`);
+  }
+
+  // ---------- AI Discovery — FULL prompt library ----------
+  if (addOns.discoveryPromptsFull && addOns.discoveryPromptsFull.length > 0) {
+    const rows = addOns.discoveryPromptsFull.map(pUnknown => {
+      const p = pUnknown as Record<string, unknown>;
+      return `<tr>
+<td>${escapeHtml(String(p.prompt_text || ''))}</td>
+<td>${escapeHtml(String(p.cluster || ''))}</td>
+<td>${escapeHtml(String(p.priority || ''))}</td>
+<td>${escapeHtml(String(p.source || ''))}</td>
+<td>${p.active ? 'yes' : 'no'}</td>
+<td>${escapeHtml(String(p.service_line_tag || '—'))}</td>
+<td>${escapeHtml(String(p.last_tested_at || '—'))}</td>
+</tr>`;
+    }).join('');
+    parts.push(`<h2>AI Discovery — Full Prompt Library</h2>
+<p class="meta">Every prompt in the discovery library for this site (${addOns.discoveryPromptsFull.length} total). Includes generated, custom, edited, active, and inactive prompts.</p>
+<table>
+<tr><th>Prompt</th><th>Cluster</th><th>Priority</th><th>Source</th><th>Active</th><th>Service line</th><th>Last tested</th></tr>
+${rows}
+</table>`);
+  }
+
+  // ---------- AI Discovery — FULL per-prompt results ----------
+  if (addOns.discoveryResultsFull && addOns.discoveryResultsFull.length > 0) {
+    const rows = addOns.discoveryResultsFull.map(rUnknown => {
+      const r = rUnknown as Record<string, unknown>;
+      const competitorNames = Array.isArray(r.competitor_names_detected) ? (r.competitor_names_detected as string[]) : [];
+      const directories = Array.isArray(r.directories_detected) ? (r.directories_detected as string[]) : [];
+      const confidence = typeof r.confidence_score === 'number' ? r.confidence_score : null;
+      return `<div class="rec-card">
+<div class="rec-title">${escapeHtml(String(r.prompt_text || ''))}</div>
+<div class="meta">Cluster: ${escapeHtml(String(r.prompt_cluster || '—'))} · Score: ${r.prompt_score ?? '—'} · Status: ${escapeHtml(String(r.visibility_status || '—'))} · Position: ${escapeHtml(String(r.business_position_type || '—'))}</div>
+<div class="meta">Business mentioned: ${r.business_mentioned ? 'yes' : 'no'} · Cited: ${r.business_cited ? 'yes' : 'no'} · Domain detected: ${r.business_domain_detected ? 'yes' : 'no'}${confidence !== null ? ` · Confidence: ${Math.round(confidence * 100)}%` : ''}</div>
+${r.result_type_summary ? `<div class="meta">Answer type: ${escapeHtml(String(r.result_type_summary))}</div>` : ''}
+${competitorNames.length > 0 ? `<div class="meta"><strong>Competitors detected:</strong> ${competitorNames.map(escapeHtml).join(', ')}</div>` : ''}
+${directories.length > 0 ? `<div class="meta"><strong>Directories cited:</strong> ${directories.map(escapeHtml).join(', ')}</div>` : ''}
+${r.normalized_response_summary ? `<div class="rec-fix"><strong>Answer summary:</strong> ${escapeHtml(String(r.normalized_response_summary))}</div>` : ''}
+${r.raw_response_excerpt ? `<div class="rec-fix" style="font-size:11px;color:#64748b;"><strong>Raw excerpt:</strong> ${escapeHtml(String(r.raw_response_excerpt))}</div>` : ''}
+<div class="meta" style="font-size:10px;margin-top:6px;">Result ID: ${escapeHtml(String(r.id || ''))} · Run ID: ${escapeHtml(String(r.run_id || ''))} · Tested: ${escapeHtml(String(r.test_date || '—'))}${r.suppressed ? ' · SUPPRESSED' : ''}${r.reviewed ? ' · REVIEWED' : ''}${r.internal_notes ? ` · Notes: ${escapeHtml(String(r.internal_notes))}` : ''}</div>
+</div>`;
+    }).join('\n');
+    parts.push(`<h2>AI Discovery — Every Test Result</h2>
+<p class="meta">Full per-prompt result for the most recent run. Every response summary, competitor detection, directory citation, and confidence score.</p>
+${rows}`);
+  }
+
+  // ---------- AI Discovery — FULL competitor list ----------
+  if (addOns.discoveryCompetitorsFull && addOns.discoveryCompetitorsFull.length > 0) {
+    const rows = addOns.discoveryCompetitorsFull.map(cUnknown => {
+      const c = cUnknown as Record<string, unknown>;
+      return `<tr>
+<td>${escapeHtml(String(c.name || ''))}</td>
+<td>${escapeHtml(String(c.domain || '—'))}</td>
+<td>${escapeHtml(String(c.location || '—'))}</td>
+<td>${escapeHtml(String(c.category || '—'))}</td>
+<td>${escapeHtml(String(c.source || ''))}</td>
+<td>${c.active ? 'yes' : 'no'}</td>
+<td>${escapeHtml(String(c.created_at || '—'))}</td>
+</tr>`;
+    }).join('');
+    parts.push(`<h2>AI Discovery — Full Competitor List</h2>
+<p class="meta">All competitors tracked for this site (${addOns.discoveryCompetitorsFull.length} total), including manual, inferred, and auto-detected.</p>
+<table>
+<tr><th>Name</th><th>Domain</th><th>Location</th><th>Category</th><th>Source</th><th>Active</th><th>Added</th></tr>
+${rows}
+</table>`);
+  }
+
+  // ---------- AI Discovery — FULL trend history ----------
+  if (addOns.discoveryTrendsFull && addOns.discoveryTrendsFull.length > 0) {
+    const rows = addOns.discoveryTrendsFull.map(sUnknown => {
+      const s = sUnknown as Record<string, unknown>;
+      const clusterScores = (s.cluster_scores || {}) as Record<string, number | null>;
+      return `<tr>
+<td>${escapeHtml(String(s.snapshot_date || ''))}</td>
+<td>${s.overall_score ?? '—'}</td>
+<td>${s.prompt_count ?? 0}</td>
+<td>${s.strong_count ?? 0}</td>
+<td>${s.partial_count ?? 0}</td>
+<td>${s.absent_count ?? 0}</td>
+<td>${s.competitor_dominant_count ?? 0}</td>
+<td>${Object.entries(clusterScores).map(([k, v]) => `${escapeHtml(k)}:${v ?? '—'}`).join(' · ')}</td>
+<td>${escapeHtml(String(s.run_id || ''))}</td>
+</tr>`;
+    }).join('');
+    parts.push(`<h2>AI Discovery — Trend History</h2>
+<p class="meta">Every snapshot we've recorded (oldest first). Shows how this site's AI discovery has moved over time.</p>
+<table>
+<tr><th>Date</th><th>Overall</th><th>Prompts</th><th>Strong</th><th>Partial</th><th>Absent</th><th>Competitor-dom.</th><th>Cluster scores</th><th>Run ID</th></tr>
+${rows}
+</table>`);
+  }
+
+  // ---------- Plan + Entitlement ----------
+  if (addOns.hasEntitlement !== undefined || addOns.hasMonitoring !== undefined || addOns.totalRecommendationCount !== undefined) {
+    parts.push(`<h2>Plan & Entitlement</h2>
+<table>
+<tr><td>Paid core access</td><td>${addOns.hasEntitlement ? 'yes' : 'no'}</td></tr>
+<tr><td>Monthly monitoring</td><td>${addOns.hasMonitoring ? 'yes' : 'no'}</td></tr>
+<tr><td>Total recommendation count (unfiltered)</td><td>${addOns.totalRecommendationCount ?? '—'}</td></tr>
+</table>`);
+  }
+
+  // ---------- Raw data appendix (safety net for formal report writers) ----------
+  parts.push(`<h2>Complete Raw Data Appendix</h2>
+<p class="meta">Every field we've fetched, dumped verbatim as JSON. Use this as a safety net when writing a formal report — if a field was on the scan, it's here.</p>
+<pre style="background:#0f172a;color:#e2e8f0;padding:14px;border-radius:6px;overflow-x:auto;font-size:11px;white-space:pre-wrap;word-break:break-word;">${escapeHtml(JSON.stringify({
+    discovery: addOns.discovery ?? null,
+    perception: addOns.perception ?? null,
+    growth: addOns.growth ?? null,
+    generatedFixes: addOns.generatedFixes ?? null,
+    findings: addOns.findings ?? null,
+    pagePreviews: addOns.pagePreviews ?? null,
+    previousAudit: addOns.previousAudit ?? null,
+    auditExtras: addOns.auditExtras ?? null,
+    discoveryPromptsFull: addOns.discoveryPromptsFull ?? null,
+    discoveryResultsFull: addOns.discoveryResultsFull ?? null,
+    discoveryCompetitorsFull: addOns.discoveryCompetitorsFull ?? null,
+    discoveryTrendsFull: addOns.discoveryTrendsFull ?? null,
+    hasEntitlement: addOns.hasEntitlement ?? null,
+    hasMonitoring: addOns.hasMonitoring ?? null,
+    totalRecommendationCount: addOns.totalRecommendationCount ?? null,
+  }, null, 2))}</pre>`);
+
   return parts.join('\n');
 }
 
@@ -668,19 +942,52 @@ export default function AuditResultPage() {
     if (!data || exportLoading) return;
     setExportLoading(true);
     try {
-      // Best-effort fetch of the AI Discovery export payload. Skipped silently
-      // when there's no run or the caller isn't entitled — the core report
-      // still exports with the other sections.
+      // Fetch every discovery data source in parallel. All best-effort —
+      // any individual failure (403 free tier, 404 no run, network) is
+      // swallowed. The report still exports whatever we got.
       let discovery: DiscoveryExportPayload | null = null;
+      let discoveryPromptsFull: Record<string, unknown>[] | null = null;
+      let discoveryResultsFull: Record<string, unknown>[] | null = null;
+      let discoveryCompetitorsFull: Record<string, unknown>[] | null = null;
+      let discoveryTrendsFull: Record<string, unknown>[] | null = null;
+
       const siteId = data.audit.site_id || data.audit.site?.id;
       if (siteId) {
-        try {
-          const res = await fetch(`/api/discovery/export-report?siteId=${encodeURIComponent(siteId)}`);
-          if (res.ok) {
-            discovery = await res.json();
-          }
-        } catch {
-          // Silent — discovery section is optional
+        const sid = encodeURIComponent(siteId);
+        const safe = async (url: string): Promise<Record<string, unknown> | null> => {
+          try {
+            const res = await fetch(url);
+            if (!res.ok) return null;
+            return await res.json();
+          } catch { return null; }
+        };
+        const [
+          exportJson,
+          promptsJson,
+          resultsJson,
+          competitorsJson,
+          trendsJson,
+        ] = await Promise.all([
+          safe(`/api/discovery/export-report?siteId=${sid}`),
+          safe(`/api/discovery/prompts?siteId=${sid}`),
+          safe(`/api/discovery/results?siteId=${sid}&includesSuppressed=true`),
+          safe(`/api/discovery/competitors?siteId=${sid}`),
+          safe(`/api/discovery/trends?siteId=${sid}&limit=24`),
+        ]);
+        if (exportJson) discovery = exportJson as unknown as DiscoveryExportPayload;
+        if (promptsJson && Array.isArray(promptsJson.prompts)) discoveryPromptsFull = promptsJson.prompts as Record<string, unknown>[];
+        if (resultsJson && Array.isArray(resultsJson.results)) discoveryResultsFull = resultsJson.results as Record<string, unknown>[];
+        if (competitorsJson && Array.isArray(competitorsJson.competitors)) discoveryCompetitorsFull = competitorsJson.competitors as Record<string, unknown>[];
+        if (trendsJson && Array.isArray(trendsJson.snapshots)) discoveryTrendsFull = trendsJson.snapshots as Record<string, unknown>[];
+      }
+
+      // Extract every jsonb column we stored on the audit row so the
+      // Scanner Diagnostics section has something to render.
+      const auditRaw = data.audit as unknown as Record<string, unknown>;
+      const auditExtras: Record<string, unknown> = {};
+      for (const k of ['home_evidence', 'llms_txt', 'scanner_summary', 'napConsistency', 'nap_consistency', 'perception_data', 'growth_data']) {
+        if (k in auditRaw && auditRaw[k] !== undefined && auditRaw[k] !== null) {
+          auditExtras[k] = auditRaw[k];
         }
       }
 
@@ -695,6 +1002,17 @@ export default function AuditResultPage() {
           perception: perceptionQuestions,
           growth: growthData,
           generatedFixes,
+          findings: data.findings,
+          pagePreviews: data.pagePreviews,
+          previousAudit: data.previousAudit,
+          hasEntitlement: data.hasEntitlement ?? null,
+          hasMonitoring: data.hasMonitoring ?? null,
+          totalRecommendationCount: data.totalRecommendationCount ?? null,
+          auditExtras: Object.keys(auditExtras).length > 0 ? auditExtras : null,
+          discoveryPromptsFull,
+          discoveryResultsFull,
+          discoveryCompetitorsFull,
+          discoveryTrendsFull,
         },
       );
       const blob = new Blob([html], { type: 'text/html' });
@@ -1579,11 +1897,16 @@ export default function AuditResultPage() {
           <div className="flex-1 min-w-[240px]">
             <h3 className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>Export complete report</h3>
             <p className="mt-1 text-sm" style={{ color: 'var(--text-secondary)' }}>
-              Download everything we&rsquo;ve scanned and analyzed for this business — overview, fix plan, AI perception, pages, and AI discovery (prompts, results, competitors, insights, recommendations, trends) — in one HTML file.
+              Download everything we&rsquo;ve scanned and analyzed for this business — overview, all recommendations, findings, pages (full detail), AI perception, growth strategy, generated fix snippets, and every AI Discovery subtab (prompts, results, competitors, insights, recommendations, trends). Every field, with a raw-JSON appendix at the end as a safety net.
             </p>
+            {hasPaid && (
+              <p className="mt-2 text-xs" style={{ color: 'var(--text-tertiary)' }}>
+                Tip: visit the Fix Plan and AI Perception tabs at least once before exporting — those sections load on demand, so the export only includes them if they&rsquo;ve been generated.
+              </p>
+            )}
             {!hasPaid && (
               <p className="mt-2 text-xs" style={{ color: 'var(--text-tertiary)' }}>
-                Free preview includes the overview and key pages. Paid sections (fix plan, AI perception, AI discovery) export only when unlocked.
+                Free preview includes the overview, key pages, and any AI Discovery data you&rsquo;ve run. Paid sections (fix plan, AI perception, growth strategy) only export once unlocked.
               </p>
             )}
           </div>
