@@ -277,7 +277,41 @@ function getKeyPageDetail(type: string, domain: string): { title: string; whyItM
 // ============================================================
 // Export consultant report as HTML
 // ============================================================
-function generateConsultantReport(audit: AuditData['audit'], pages: AuditData['pages'], recommendations: AuditData['recommendations'], crawlerStatuses: CrawlerStatus[], keyPagesStatus: KeyPageStatus[]): string {
+// Optional add-ons for the full-report export. All are nullable — the report
+// only renders a section when data is provided.
+interface DiscoveryExportPayload {
+  meta?: { business_name?: string; domain?: string; primary_category?: string | null; service_area?: string | null; snapshot_date?: string; prompt_count?: number; tier?: string };
+  scores?: { overall_score?: number; overall_grade?: string; cluster_scores?: Record<string, number | null>; counts?: { prompt_count?: number; strong_count?: number; partial_count?: number; absent_count?: number; competitor_dominant_count?: number } };
+  prompts_tested?: Array<{ prompt_text: string; cluster: string; priority?: string; score?: number; visibility_status?: string; business_position_type?: string | null }>;
+  competitors?: Array<{ name: string; domain?: string | null; times_appeared?: number; times_beat_us?: number }>;
+  insights?: Array<{ category: string; title: string; description?: string; severity?: string; linked_cluster?: string | null }>;
+  recommendations?: Array<{ title: string; description?: string; why_it_matters?: string; category?: string; priority?: string; owner_type?: string; suggested_timeline?: string }>;
+  trend?: { available?: boolean; snapshots_count?: number; overall_change_from_first?: number | null; overall_change_from_previous?: number | null };
+}
+
+type PerceptionQuestion = { question: string; intent: string; what_ai_needs: string; status: 'pass' | 'partial' | 'fail'; assessment: string; fix: string; codeSnippet: string | null };
+
+type GrowthData = { competitors: Array<{ domain: string; overall: number; rationale?: string }>; yourScores: { overall: number }; marketingStrategy: { queries: string[]; pages_to_create: Array<{ title: string; why: string }>; content_to_optimize: Array<{ page: string; action: string }>; schema_actions: Array<{ action: string; impact: string }>; trust_actions: Array<{ action: string; impact: string }> } };
+
+type GeneratedFix = { key: string; implementation: string; explanation: string };
+
+interface FullReportAddOns {
+  discovery?: DiscoveryExportPayload | null;
+  perception?: PerceptionQuestion[] | null;
+  growth?: GrowthData | null;
+  generatedFixes?: GeneratedFix[] | null;
+}
+
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function generateConsultantReport(audit: AuditData['audit'], pages: AuditData['pages'], recommendations: AuditData['recommendations'], crawlerStatuses: CrawlerStatus[], keyPagesStatus: KeyPageStatus[], addOns?: FullReportAddOns): string {
   const domain = audit.site?.domain || 'unknown';
   const date = new Date(audit.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
   const score = audit.overall_score ?? 0;
@@ -424,11 +458,155 @@ ${pages.map(p => { let path = p.url; try { path = new URL(p.url).pathname; } cat
 
 </div>
 
+${renderAddOnsHtml(addOns)}
+
 <div class="footer">
 <p>AI Visibility Audit — aivisibilityaudit.com</p>
 <p>This report was generated automatically. Recommendations are based on automated scanning and should be reviewed by your development team before implementation.</p>
 </div>
 </body></html>`;
+}
+
+/**
+ * Render optional full-report sections: AI Perception, Growth Strategy,
+ * Generated Fixes, AI Discovery. Each block is skipped when data is missing.
+ */
+function renderAddOnsHtml(addOns?: FullReportAddOns): string {
+  if (!addOns) return '';
+  const parts: string[] = [];
+
+  // ---------- AI Perception ----------
+  if (addOns.perception && addOns.perception.length > 0) {
+    const passCount = addOns.perception.filter(q => q.status === 'pass').length;
+    const rows = addOns.perception.map(q => {
+      const statusColor = q.status === 'pass' ? '#10B981' : q.status === 'partial' ? '#F59E0B' : '#EF4444';
+      return `<div class="rec-card"><div class="rec-title"><span class="badge" style="background:${statusColor}20;color:${statusColor};">${escapeHtml(q.status.toUpperCase())}</span> ${escapeHtml(q.question)}</div>
+<div style="font-size:12px;color:#64748b;margin:4px 0;"><strong>What AI needs:</strong> ${escapeHtml(q.what_ai_needs)}</div>
+<div class="rec-fix"><strong>Assessment:</strong> ${escapeHtml(q.assessment)}</div>
+<div class="rec-fix"><strong>Fix:</strong> ${escapeHtml(q.fix)}</div></div>`;
+    }).join('\n');
+    parts.push(`<h2>AI Perception</h2>
+<p class="meta">How AI tools perceive this business across ${addOns.perception.length} core buyer questions. ${passCount} passing, ${addOns.perception.length - passCount} need attention.</p>
+${rows}`);
+  }
+
+  // ---------- Growth Strategy (competitors + marketing plan) ----------
+  if (addOns.growth) {
+    const g = addOns.growth;
+    const compTable = g.competitors.length > 0
+      ? `<table><tr><th>Competitor</th><th>AI Score</th><th>Why they're a competitor</th></tr>${g.competitors.map(c => `<tr><td>${escapeHtml(c.domain)}</td><td>${c.overall}/100</td><td>${escapeHtml(c.rationale || '')}</td></tr>`).join('')}</table>`
+      : '<p class="meta">No competitors identified.</p>';
+    const queries = (g.marketingStrategy?.queries || []).map(q => `<li>${escapeHtml(q)}</li>`).join('');
+    const pagesToCreate = (g.marketingStrategy?.pages_to_create || []).map(p => `<li><strong>${escapeHtml(p.title)}</strong> — ${escapeHtml(p.why)}</li>`).join('');
+    const contentOptimize = (g.marketingStrategy?.content_to_optimize || []).map(p => `<li><strong>${escapeHtml(p.page)}</strong> — ${escapeHtml(p.action)}</li>`).join('');
+    const schemaActions = (g.marketingStrategy?.schema_actions || []).map(p => `<li><strong>${escapeHtml(p.action)}</strong> — ${escapeHtml(p.impact)}</li>`).join('');
+    const trustActions = (g.marketingStrategy?.trust_actions || []).map(p => `<li><strong>${escapeHtml(p.action)}</strong> — ${escapeHtml(p.impact)}</li>`).join('');
+    parts.push(`<h2>Growth Strategy</h2>
+<h3>Competitor Landscape</h3>
+${compTable}
+${queries ? `<h3>Buyer Queries Worth Winning</h3><ul>${queries}</ul>` : ''}
+${pagesToCreate ? `<h3>Pages to Create</h3><ul>${pagesToCreate}</ul>` : ''}
+${contentOptimize ? `<h3>Content to Optimize</h3><ul>${contentOptimize}</ul>` : ''}
+${schemaActions ? `<h3>Schema / Structured Data Actions</h3><ul>${schemaActions}</ul>` : ''}
+${trustActions ? `<h3>Trust-Building Actions</h3><ul>${trustActions}</ul>` : ''}`);
+  }
+
+  // ---------- Generated Fixes (code snippets) ----------
+  if (addOns.generatedFixes && addOns.generatedFixes.length > 0) {
+    const fixBlocks = addOns.generatedFixes.map(f => `<div class="rec-card">
+<div class="rec-title">${escapeHtml(f.key)}</div>
+<div class="rec-fix">${escapeHtml(f.explanation)}</div>
+<pre style="background:#0f172a;color:#e2e8f0;padding:14px;border-radius:6px;overflow-x:auto;font-size:12px;white-space:pre-wrap;word-break:break-word;">${escapeHtml(f.implementation)}</pre>
+</div>`).join('\n');
+    parts.push(`<h2>Ready-to-Paste Fixes</h2>
+<p class="meta">AI-generated code snippets tailored to this site. Review with your developer before deploying.</p>
+${fixBlocks}`);
+  }
+
+  // ---------- AI Discovery ----------
+  if (addOns.discovery) {
+    const d = addOns.discovery;
+    const meta = d.meta || {};
+    const scores = d.scores || {};
+    const counts = scores.counts || {};
+    const clusterScores = scores.cluster_scores || {};
+    const clusterOrder = ['core', 'problem', 'comparison', 'long_tail', 'brand', 'adjacent'];
+    const clusterLabels: Record<string, string> = {
+      core: 'Core Purchase Intent',
+      problem: 'Problem-Based',
+      comparison: 'Comparison / Best-Of',
+      long_tail: 'Service Detail / Long-Tail',
+      brand: 'Brand & Category',
+      adjacent: 'Adjacent Opportunity',
+    };
+    const clusterRows = clusterOrder.map(c => {
+      const v = clusterScores[c];
+      return `<tr><td>${escapeHtml(clusterLabels[c])}</td><td>${typeof v === 'number' ? `${v}/100` : '—'}</td></tr>`;
+    }).join('');
+    const topPrompts = (d.prompts_tested || [])
+      .slice()
+      .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
+      .slice(0, 10)
+      .map(p => `<tr><td>${escapeHtml(p.prompt_text)}</td><td>${escapeHtml(p.cluster)}</td><td>${p.score ?? '—'}</td><td>${escapeHtml(p.visibility_status || '—')}</td></tr>`)
+      .join('');
+    const missedPrompts = (d.prompts_tested || [])
+      .filter(p => p.visibility_status === 'absent' || p.visibility_status === 'competitor_dominant' || p.visibility_status === 'directory_dominant')
+      .slice(0, 10)
+      .map(p => `<tr><td>${escapeHtml(p.prompt_text)}</td><td>${escapeHtml(p.cluster)}</td><td>${escapeHtml(p.visibility_status || '—')}</td></tr>`)
+      .join('');
+    const competitorTable = (d.competitors || []).length > 0
+      ? `<table><tr><th>Competitor</th><th>Domain</th><th>Times seen</th><th>Times beat us</th></tr>${(d.competitors || []).map(c => `<tr><td>${escapeHtml(c.name)}</td><td>${escapeHtml(c.domain || '—')}</td><td>${c.times_appeared ?? 0}</td><td>${c.times_beat_us ?? 0}</td></tr>`).join('')}</table>`
+      : '<p class="meta">No competitors tracked for this run.</p>';
+    const insightBlocks = (d.insights || []).map(i => {
+      const sevColor = i.severity === 'high' ? '#EF4444' : i.severity === 'medium' ? '#F59E0B' : '#10B981';
+      return `<div class="rec-card"><div class="rec-title"><span class="badge" style="background:${sevColor}20;color:${sevColor};">${escapeHtml((i.severity || 'medium').toUpperCase())}</span> ${escapeHtml(i.title)}</div><div class="rec-fix">${escapeHtml(i.description || '')}</div></div>`;
+    }).join('\n');
+    const recBlocks = (d.recommendations || []).map(r => {
+      const prioColor = r.priority === 'high' ? '#EF4444' : r.priority === 'medium' ? '#F59E0B' : '#10B981';
+      return `<div class="rec-card"><div class="rec-title"><span class="badge" style="background:${prioColor}20;color:${prioColor};">${escapeHtml((r.priority || 'medium').toUpperCase())}</span> ${escapeHtml(r.title)}</div>
+${r.description ? `<div class="rec-fix">${escapeHtml(r.description)}</div>` : ''}
+${r.why_it_matters ? `<div class="rec-fix"><strong>Why it matters:</strong> ${escapeHtml(r.why_it_matters)}</div>` : ''}
+<div class="meta" style="margin-top:6px;">Owner: ${escapeHtml(r.owner_type || '—')} · Timeline: ${escapeHtml(r.suggested_timeline || '—')} · Category: ${escapeHtml(r.category || '—')}</div>
+</div>`;
+    }).join('\n');
+    const trendBlock = d.trend && d.trend.available && d.trend.snapshots_count && d.trend.snapshots_count >= 2
+      ? `<h3>Movement</h3><p class="meta">${d.trend.snapshots_count} snapshots tracked${typeof d.trend.overall_change_from_first === 'number' ? ` · Change since first run: ${d.trend.overall_change_from_first >= 0 ? '+' : ''}${d.trend.overall_change_from_first}` : ''}${typeof d.trend.overall_change_from_previous === 'number' ? ` · Change since last run: ${d.trend.overall_change_from_previous >= 0 ? '+' : ''}${d.trend.overall_change_from_previous}` : ''}</p>`
+      : '<p class="meta">Trend data will appear after you run the tests a second time.</p>';
+
+    parts.push(`<h1>AI Discovery Report</h1>
+<p class="meta">${meta.business_name ? escapeHtml(meta.business_name) + ' · ' : ''}${meta.primary_category ? escapeHtml(meta.primary_category) + ' · ' : ''}${meta.service_area ? escapeHtml(meta.service_area) : ''}${meta.snapshot_date ? ` · Run date: ${new Date(meta.snapshot_date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}` : ''}</p>
+
+<div class="score-box">
+<div class="score-num">${typeof scores.overall_score === 'number' ? scores.overall_score : '—'}/100</div>
+<div style="margin-top:8px;font-size:18px;font-weight:600;">${escapeHtml(scores.overall_grade || '')}</div>
+<div class="meta">AI Discovery Score · ${counts.prompt_count ?? 0} prompts tested</div>
+</div>
+
+<h2>Visibility Distribution</h2>
+<table>
+<tr><th>Strong</th><th>Partial</th><th>Absent</th><th>Competitor-dominant</th></tr>
+<tr><td>${counts.strong_count ?? 0}</td><td>${counts.partial_count ?? 0}</td><td>${counts.absent_count ?? 0}</td><td>${counts.competitor_dominant_count ?? 0}</td></tr>
+</table>
+
+<h2>Score by Question Type</h2>
+<table><tr><th>Cluster</th><th>Score</th></tr>${clusterRows}</table>
+
+${topPrompts ? `<h2>Top-Performing Prompts</h2><table><tr><th>Prompt</th><th>Cluster</th><th>Score</th><th>Status</th></tr>${topPrompts}</table>` : ''}
+
+${missedPrompts ? `<h2>Prompts We're Missing</h2><table><tr><th>Prompt</th><th>Cluster</th><th>Status</th></tr>${missedPrompts}</table>` : ''}
+
+<h2>Competitors Detected</h2>
+${competitorTable}
+
+${insightBlocks ? `<h2>Insights</h2>${insightBlocks}` : ''}
+
+${recBlocks ? `<h2>Discovery Recommendations</h2>${recBlocks}` : ''}
+
+<h2>Trend</h2>
+${trendBlock}`);
+  }
+
+  return parts.join('\n');
 }
 
 // ============================================================
@@ -484,16 +662,51 @@ export default function AuditResultPage() {
   const [monitoringLoading, setMonitoringLoading] = useState(false);
   const [hasMonitoring, setHasMonitoring] = useState(false);
 
-  function handleExportReport() {
-    if (!data) return;
-    const html = generateConsultantReport(data.audit, data.pages, data.recommendations, data.crawlerStatuses || [], data.keyPagesStatus || []);
-    const blob = new Blob([html], { type: 'text/html' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `ai-visibility-report-${data.audit.site?.domain}-${new Date(data.audit.created_at).toISOString().split('T')[0]}.html`;
-    a.click();
-    URL.revokeObjectURL(url);
+  const [exportLoading, setExportLoading] = useState(false);
+
+  async function handleExportReport() {
+    if (!data || exportLoading) return;
+    setExportLoading(true);
+    try {
+      // Best-effort fetch of the AI Discovery export payload. Skipped silently
+      // when there's no run or the caller isn't entitled — the core report
+      // still exports with the other sections.
+      let discovery: DiscoveryExportPayload | null = null;
+      const siteId = data.audit.site_id || data.audit.site?.id;
+      if (siteId) {
+        try {
+          const res = await fetch(`/api/discovery/export-report?siteId=${encodeURIComponent(siteId)}`);
+          if (res.ok) {
+            discovery = await res.json();
+          }
+        } catch {
+          // Silent — discovery section is optional
+        }
+      }
+
+      const html = generateConsultantReport(
+        data.audit,
+        data.pages,
+        data.recommendations,
+        data.crawlerStatuses || [],
+        data.keyPagesStatus || [],
+        {
+          discovery,
+          perception: perceptionQuestions,
+          growth: growthData,
+          generatedFixes,
+        },
+      );
+      const blob = new Blob([html], { type: 'text/html' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `ai-visibility-full-report-${data.audit.site?.domain}-${new Date(data.audit.created_at).toISOString().split('T')[0]}.html`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } finally {
+      setExportLoading(false);
+    }
   }
 
   async function handleCheckout(priceType: 'initial_scan' | 'rescan' | 'monthly') {
@@ -1355,6 +1568,35 @@ export default function AuditResultPage() {
             })()}
           </div>
         </>
+      )}
+
+      {/* EXPORT FULL REPORT — bottom of Overview */}
+      {isAuthenticated && (
+        <div
+          className="mb-6 rounded-xl border p-6 flex items-center justify-between gap-4 flex-wrap"
+          style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}
+        >
+          <div className="flex-1 min-w-[240px]">
+            <h3 className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>Export complete report</h3>
+            <p className="mt-1 text-sm" style={{ color: 'var(--text-secondary)' }}>
+              Download everything we&rsquo;ve scanned and analyzed for this business — overview, fix plan, AI perception, pages, and AI discovery (prompts, results, competitors, insights, recommendations, trends) — in one HTML file.
+            </p>
+            {!hasPaid && (
+              <p className="mt-2 text-xs" style={{ color: 'var(--text-tertiary)' }}>
+                Free preview includes the overview and key pages. Paid sections (fix plan, AI perception, AI discovery) export only when unlocked.
+              </p>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={handleExportReport}
+            disabled={exportLoading}
+            className="btn-primary px-5 py-2.5 text-sm font-medium inline-flex items-center gap-2 whitespace-nowrap"
+          >
+            <Download className="w-4 h-4" />
+            {exportLoading ? 'Preparing…' : 'Export full report'}
+          </button>
+        </div>
       )}
 
       {ctaBanner}
