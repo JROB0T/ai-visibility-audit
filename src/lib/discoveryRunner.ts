@@ -74,6 +74,8 @@ interface PerPromptOutcome {
   answer: string;
   analysis: ClaudeAnalysis | null;
   parseFailed: boolean;
+  turn: 1 | 2;
+  searchUsed: boolean;
 }
 
 // ============================================================
@@ -211,29 +213,84 @@ Tool-use rules:
 - For directories_cited / marketplaces_cited, only include domains that are actually referenced in your answer AND that clearly belong to those categories.`;
 }
 
+// Helper: walk a content-block array and extract { text, analysisInput, searchUsed }.
+interface ExtractResult {
+  text: string;
+  analysisInput: Record<string, unknown> | null;
+  searchUsed: boolean;
+}
+function extractFromContent(content: unknown): ExtractResult {
+  const textBlocks: string[] = [];
+  let analysisInput: Record<string, unknown> | null = null;
+  let searchUsed = false;
+  if (Array.isArray(content)) {
+    for (const block of content as Record<string, unknown>[]) {
+      if (block?.type === 'text' && typeof block.text === 'string') {
+        textBlocks.push(block.text);
+      } else if (block?.type === 'tool_use' && block.name === 'record_analysis' && block.input && typeof block.input === 'object') {
+        analysisInput = block.input as Record<string, unknown>;
+      } else if (block?.type === 'server_tool_use' && block.name === 'web_search') {
+        searchUsed = true;
+      } else if (block?.type === 'web_search_tool_result') {
+        searchUsed = true;
+      }
+    }
+  }
+  return { text: textBlocks.join('\n').trim(), analysisInput, searchUsed };
+}
+
+function parseAnalysisInput(toolInput: Record<string, unknown>): ClaudeAnalysis | null {
+  const answerType = typeof toolInput.answer_type === 'string' && VALID_ANSWER_TYPES.includes(toolInput.answer_type as AnswerType)
+    ? (toolInput.answer_type as AnswerType)
+    : null;
+  const position = typeof toolInput.target_business_position === 'string' && VALID_POSITION_TYPES.includes(toolInput.target_business_position as DiscoveryPositionType)
+    ? (toolInput.target_business_position as DiscoveryPositionType)
+    : null;
+  if (!answerType || !position) return null;
+  return {
+    businesses_mentioned: Array.isArray(toolInput.businesses_mentioned)
+      ? (toolInput.businesses_mentioned as unknown[]).map(s => String(s || '').trim()).filter(s => s.length > 0)
+      : [],
+    domains_cited: Array.isArray(toolInput.domains_cited)
+      ? (toolInput.domains_cited as unknown[]).map(s => normalizeDomain(String(s))).filter(s => s.length > 0)
+      : [],
+    directories_cited: Array.isArray(toolInput.directories_cited)
+      ? (toolInput.directories_cited as unknown[]).map(s => normalizeDomain(String(s))).filter(s => s.length > 0)
+      : [],
+    marketplaces_cited: Array.isArray(toolInput.marketplaces_cited)
+      ? (toolInput.marketplaces_cited as unknown[]).map(s => normalizeDomain(String(s))).filter(s => s.length > 0)
+      : [],
+    answer_type: answerType,
+    target_business_appeared: toolInput.target_business_appeared === true,
+    target_business_position: position,
+  };
+}
+
 async function callClaudeForPrompt(
   apiKey: string,
+  promptId: string,
   promptText: string,
   targetName: string,
   targetDomain: string,
 ): Promise<PerPromptOutcome> {
+  const system = buildSystemPrompt(targetName, targetDomain);
+
+  // ---------- Turn 1 ----------
+  let turn1Response: Record<string, unknown>;
   try {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-      },
+      headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
       body: JSON.stringify({
         model: CLAUDE_MODEL,
-        max_tokens: 1500,
+        max_tokens: 1800,
         temperature: 0,
-        system: buildSystemPrompt(targetName, targetDomain),
+        system,
         tools: [
-          { type: WEB_SEARCH_TOOL_TYPE, name: 'web_search', max_uses: 1 },
+          { type: WEB_SEARCH_TOOL_TYPE, name: 'web_search', max_uses: 2 },
           RECORD_ANALYSIS_TOOL,
         ],
+        tool_choice: { type: 'auto' },
         messages: [{ role: 'user', content: promptText }],
       }),
     });
@@ -241,63 +298,67 @@ async function callClaudeForPrompt(
       const body = await res.text();
       throw new Error(`Claude API error ${res.status}: ${body.slice(0, 200)}`);
     }
-    const data = await res.json();
-
-    // Walk content blocks: text blocks build the natural answer, and the
-    // record_analysis tool_use block carries the structured analysis.
-    const textBlocks: string[] = [];
-    let toolInput: Record<string, unknown> | null = null;
-    if (Array.isArray(data.content)) {
-      for (const block of data.content) {
-        if (block?.type === 'text' && typeof block.text === 'string') {
-          textBlocks.push(block.text);
-        } else if (block?.type === 'tool_use' && block.name === 'record_analysis' && block.input && typeof block.input === 'object') {
-          toolInput = block.input as Record<string, unknown>;
-        }
-      }
-    }
-    const answer = textBlocks.join('\n').trim();
-
-    let analysis: ClaudeAnalysis | null = null;
-    let parseFailed = false;
-
-    if (toolInput) {
-      const answerType = typeof toolInput.answer_type === 'string' && VALID_ANSWER_TYPES.includes(toolInput.answer_type as AnswerType)
-        ? (toolInput.answer_type as AnswerType)
-        : null;
-      const position = typeof toolInput.target_business_position === 'string' && VALID_POSITION_TYPES.includes(toolInput.target_business_position as DiscoveryPositionType)
-        ? (toolInput.target_business_position as DiscoveryPositionType)
-        : null;
-      if (!answerType || !position) {
-        parseFailed = true;
-      } else {
-        analysis = {
-          businesses_mentioned: Array.isArray(toolInput.businesses_mentioned)
-            ? (toolInput.businesses_mentioned as unknown[]).map(s => String(s || '').trim()).filter(s => s.length > 0)
-            : [],
-          domains_cited: Array.isArray(toolInput.domains_cited)
-            ? (toolInput.domains_cited as unknown[]).map(s => normalizeDomain(String(s))).filter(s => s.length > 0)
-            : [],
-          directories_cited: Array.isArray(toolInput.directories_cited)
-            ? (toolInput.directories_cited as unknown[]).map(s => normalizeDomain(String(s))).filter(s => s.length > 0)
-            : [],
-          marketplaces_cited: Array.isArray(toolInput.marketplaces_cited)
-            ? (toolInput.marketplaces_cited as unknown[]).map(s => normalizeDomain(String(s))).filter(s => s.length > 0)
-            : [],
-          answer_type: answerType,
-          target_business_appeared: toolInput.target_business_appeared === true,
-          target_business_position: position,
-        };
-      }
-    } else {
-      parseFailed = true;
-      console.warn('[discoveryRunner] no record_analysis tool_use block found for prompt');
-    }
-
-    return { answer, analysis, parseFailed };
+    turn1Response = await res.json();
   } catch (err) {
     throw err instanceof Error ? err : new Error(String(err));
   }
+
+  const turn1 = extractFromContent(turn1Response.content);
+
+  if (turn1.analysisInput) {
+    const analysis = parseAnalysisInput(turn1.analysisInput);
+    const parseFailed = analysis === null;
+    if (parseFailed) {
+      console.warn(`[Discovery] prompt=${promptId.slice(0, 8)} turn=1 invalid enums in record_analysis`);
+    }
+    return { answer: turn1.text, analysis, parseFailed, turn: 1, searchUsed: turn1.searchUsed };
+  }
+
+  // ---------- Turn 2 (force record_analysis) ----------
+  // Turn 1 didn't emit record_analysis. Append assistant response + a nudge,
+  // and force tool_choice.record_analysis so Claude has no option but to call it.
+  const turn1Content = Array.isArray(turn1Response.content) ? turn1Response.content : [];
+  let turn2Response: Record<string, unknown>;
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+      body: JSON.stringify({
+        model: CLAUDE_MODEL,
+        max_tokens: 800,
+        temperature: 0,
+        system,
+        tools: [RECORD_ANALYSIS_TOOL],
+        tool_choice: { type: 'tool', name: 'record_analysis' },
+        messages: [
+          { role: 'user', content: promptText },
+          { role: 'assistant', content: turn1Content },
+          { role: 'user', content: 'Please call the record_analysis tool now with your structured analysis of the answer you just gave, whether or not the target business appeared. If you did not mention the target, set target_business_appeared=false and target_business_position="not_present".' },
+        ],
+      }),
+    });
+    if (!res.ok) {
+      const body = await res.text();
+      console.warn(`[Discovery] prompt=${promptId.slice(0, 8)} turn=2 API error: ${res.status} ${body.slice(0, 150)}`);
+      return { answer: turn1.text, analysis: null, parseFailed: true, turn: 2, searchUsed: turn1.searchUsed };
+    }
+    turn2Response = await res.json();
+  } catch (err) {
+    console.warn(`[Discovery] prompt=${promptId.slice(0, 8)} turn=2 fetch error: ${err instanceof Error ? err.message : err}`);
+    return { answer: turn1.text, analysis: null, parseFailed: true, turn: 2, searchUsed: turn1.searchUsed };
+  }
+
+  const turn2 = extractFromContent(turn2Response.content);
+  const analysis = turn2.analysisInput ? parseAnalysisInput(turn2.analysisInput) : null;
+  const parseFailed = analysis === null;
+
+  return {
+    answer: turn1.text,
+    analysis,
+    parseFailed,
+    turn: 2,
+    searchUsed: turn1.searchUsed,
+  };
 }
 
 // ============================================================
@@ -414,17 +475,15 @@ function resultTypeLabel(answerType: ClaudeAnalysis['answer_type']): string {
 function computeConfidence(args: {
   parseFailed: boolean;
   answerLen: number;
-  toolAppeared: boolean | null;
-  domainDetected: boolean;
+  turn: 1 | 2;
+  searchUsed: boolean;
 }): number {
-  const { parseFailed, answerLen, toolAppeared, domainDetected } = args;
-  // No tool_use block at all — rare with the new structured-output path.
+  const { parseFailed, answerLen, turn, searchUsed } = args;
   if (parseFailed) return 0.3;
-  // Tool-reported appearance matches our independent domain detection
-  // AND the answer was substantive.
-  const consistent = toolAppeared === null || toolAppeared === domainDetected || !domainDetected;
-  if (answerLen > 200 && consistent) return 0.9;
-  return 0.7;
+  if (turn === 1 && searchUsed && answerLen > 200) return 0.9;
+  if (turn === 2 && searchUsed) return 0.75;
+  // tool fired but Claude answered from training data or gave a short clarifier
+  return 0.5;
 }
 
 function scoreFromStatus(status: DiscoveryVisibilityStatus, position: DiscoveryPositionType | null): number {
@@ -596,7 +655,7 @@ export async function runDiscoveryTests(input: RunDiscoveryTestsInput): Promise<
     CONCURRENCY,
     async (prompt) => {
       try {
-        const outcome = await callClaudeForPrompt(apiKey, prompt.prompt_text, businessName, businessDomain);
+        const outcome = await callClaudeForPrompt(apiKey, prompt.id, prompt.prompt_text, businessName, businessDomain);
         return { prompt, outcome };
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
@@ -743,9 +802,13 @@ export async function runDiscoveryTests(input: RunDiscoveryTestsInput): Promise<
     const confidence = computeConfidence({
       parseFailed,
       answerLen: answer.length,
-      toolAppeared: analysis ? analysis.target_business_appeared : null,
-      domainDetected: businessDomainDetected,
+      turn: outcome.turn,
+      searchUsed: outcome.searchUsed,
     });
+    console.log(
+      `[Discovery] prompt=${prompt.id.slice(0, 8)} turn=${outcome.turn} search_used=${outcome.searchUsed}`,
+      `tool_use=${!parseFailed} conf=${confidence.toFixed(2)}`,
+    );
     if (analysis) toolUseSuccessCount++;
     confidenceSum += confidence;
     confidenceCount++;

@@ -458,6 +458,10 @@ export interface DiscoveryProfile {
   domain: string | null;
   primary_category: string | null;
   service_area: string | null;
+  // Ticket 7.6 — short anchors used by the prompt generator so local-intent
+  // prompts get concrete geography instead of "near me".
+  service_area_city: string | null;
+  service_area_region: string | null;
   description: string | null;
   core_services: string[];
   secondary_services: string[];
