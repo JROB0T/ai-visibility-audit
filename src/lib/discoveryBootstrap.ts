@@ -527,10 +527,13 @@ You MUST call record_prompts exactly once with the full array. Do not respond in
     if (!toolInput) {
       throw new BootstrapError('claude_parse_failed', 'Prompt generation did not emit record_prompts');
     }
-    const arr = Array.isArray((toolInput as GeneratedPromptsResponse).prompts) ? (toolInput as GeneratedPromptsResponse).prompts : [];
+    // Bridge through unknown before narrowing to a typed shape — direct
+    // Record<string, unknown> → GeneratedPromptsResponse fails TS strict.
+    const toolInputShape = (toolInput as unknown) as GeneratedPromptsResponse;
+    const arr: unknown[] = Array.isArray(toolInputShape?.prompts) ? toolInputShape.prompts : [];
     const normalized: GeneratedPrompt[] = [];
     for (const raw of arr) {
-      const r = raw as unknown as Record<string, unknown>;
+      const r = raw as Record<string, unknown>;
       const promptText = typeof r.prompt_text === 'string' ? r.prompt_text.trim() : '';
       const cluster = String(r.cluster || '') as DiscoveryCluster;
       if (!promptText || !VALID_CLUSTERS.includes(cluster)) continue;
