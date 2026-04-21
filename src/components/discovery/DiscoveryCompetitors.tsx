@@ -245,6 +245,9 @@ export default function DiscoveryCompetitors(props: CompetitorsProps): React.Rea
           <p className="mt-1 text-sm" style={{ color: 'var(--text-secondary)' }}>
             {activeCount} active competitor{activeCount === 1 ? '' : 's'}. We&rsquo;ll look for these in every AI answer.
           </p>
+          <p className="mt-1 text-xs" style={{ color: 'var(--text-tertiary)' }}>
+            Competitors are auto-detected from your most recent discovery run. Add your own below to track them explicitly.
+          </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <button
@@ -262,9 +265,10 @@ export default function DiscoveryCompetitors(props: CompetitorsProps): React.Rea
             onClick={inferCompetitors}
             disabled={inferBusy}
             className="btn-secondary px-3 py-2 text-sm font-medium inline-flex items-center gap-1.5"
+            title="Competitors are auto-detected on every discovery run. Use this to force a refresh from your latest run without re-running discovery."
           >
             <Wand2 className={`w-4 h-4 ${inferBusy ? 'animate-pulse' : ''}`} />
-            {inferBusy ? 'Detecting…' : 'Auto-detect competitors'}
+            {inferBusy ? 'Refreshing…' : 'Refresh from latest run'}
           </button>
         </div>
       </div>
@@ -338,8 +342,17 @@ export default function DiscoveryCompetitors(props: CompetitorsProps): React.Rea
           style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}
         >
           <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-            No competitors yet. Add them manually or use Auto-detect to pull from your recent audits.
+            No competitors yet. They&rsquo;re auto-populated from your latest discovery run — if nothing has appeared, try pulling a refresh manually.
           </p>
+          <button
+            type="button"
+            onClick={inferCompetitors}
+            disabled={inferBusy}
+            className="mt-4 btn-secondary px-4 py-2 text-sm font-medium inline-flex items-center gap-1.5"
+          >
+            <Wand2 className={`w-4 h-4 ${inferBusy ? 'animate-pulse' : ''}`} />
+            {inferBusy ? 'Refreshing…' : 'Populate from latest run'}
+          </button>
         </div>
       ) : (
         <div className="space-y-2">

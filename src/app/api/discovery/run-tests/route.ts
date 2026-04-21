@@ -6,12 +6,15 @@ import {
   detectInsightSignals,
   persistInsights,
   polishInsightsWithClaude,
+  type InsightSignal,
 } from '@/lib/discoveryInsights';
 import {
   draftRecommendations,
   persistRecommendations,
   polishRecommendationsWithClaude,
+  type RecommendationDraft,
 } from '@/lib/discoveryRecommendations';
+import { autoPopulateCompetitorsForRun } from '@/lib/discoveryCompetitorAutoPopulate';
 import type {
   DiscoveryCompetitor,
   DiscoveryProfile,
@@ -28,46 +31,168 @@ function getAdminClient(): SupabaseClient {
   );
 }
 
-interface PostRunArtifacts {
-  insightsCount: number;
-  recommendationsCount: number;
+export interface PostRunStatus {
+  insights: 'ok' | 'drafts_only' | 'failed';
+  recommendations: 'ok' | 'drafts_only' | 'failed';
+  competitors: 'ok' | 'skipped' | 'failed';
 }
 
-async function runPostRunHook(
+export interface PostRunOutcome {
+  insightsCount: number;
+  recommendationsCount: number;
+  competitorsInserted: number;
+  competitorsTotal: number;
+  status: PostRunStatus;
+}
+
+/**
+ * Multi-phase post-run hook. Each phase is an INDEPENDENT try/catch — a
+ * failure in one phase never prevents later phases. Every phase logs a
+ * single structured line with outcome + duration.
+ *
+ * Phases:
+ *   A. detect + persist DRAFT insights (unpolished)
+ *   B. polish insights with Claude
+ *   C. re-persist polished insights (overwrites A for this run_id)
+ *   D. draft + persist DRAFT recommendations (unpolished)
+ *   E. polish recommendations with Claude
+ *   F. re-persist polished recommendations
+ *   G. auto-populate discovery_competitors for this run
+ */
+export async function runPostRunHook(
   siteId: string,
   runId: string,
   tier: DiscoveryTier,
   results: DiscoveryResult[],
-): Promise<PostRunArtifacts> {
+): Promise<PostRunOutcome> {
   const admin = getAdminClient();
+  const logTag = `site=${siteId.slice(0, 8)} run=${runId.slice(0, 8)}`;
 
-  const [{ data: compRows }, { data: profileRow }] = await Promise.all([
-    admin.from('discovery_competitors').select('*').eq('site_id', siteId).eq('active', true),
-    admin.from('discovery_profiles').select('*').eq('site_id', siteId).maybeSingle(),
-  ]);
-  const competitors = (compRows || []) as DiscoveryCompetitor[];
-  const profile = profileRow as DiscoveryProfile | null;
+  const outcome: PostRunOutcome = {
+    insightsCount: 0,
+    recommendationsCount: 0,
+    competitorsInserted: 0,
+    competitorsTotal: 0,
+    status: { insights: 'failed', recommendations: 'failed', competitors: 'skipped' },
+  };
+
+  // Load profile + competitors (shared context for insights + recs)
+  let profile: DiscoveryProfile | null = null;
+  let competitors: DiscoveryCompetitor[] = [];
+  try {
+    const [{ data: compRows }, { data: profileRow }] = await Promise.all([
+      admin.from('discovery_competitors').select('*').eq('site_id', siteId).eq('active', true),
+      admin.from('discovery_profiles').select('*').eq('site_id', siteId).maybeSingle(),
+    ]);
+    competitors = (compRows || []) as DiscoveryCompetitor[];
+    profile = profileRow as DiscoveryProfile | null;
+  } catch (err) {
+    console.error(`[PostRun] phase=loadContext ${logTag} status=failed error=${err instanceof Error ? err.message : err}`);
+  }
   if (!profile) {
-    throw new Error('Discovery profile missing — cannot derive insights/recommendations');
+    console.error(`[PostRun] phase=loadContext ${logTag} status=failed reason=profile_missing — skipping all post-run phases`);
+    return outcome;
   }
 
   const ctx = { results, competitors, profile, tier };
 
-  // Insights
-  let signals = detectInsightSignals(ctx);
-  signals = await polishInsightsWithClaude(signals, profile, { timeoutMs: 12000 });
-  const insertedInsights = await persistInsights(admin, siteId, runId, signals, competitors);
+  // --- Phase A: persist DRAFT insights ---
+  let rawSignals: InsightSignal[] = [];
+  {
+    const t0 = Date.now();
+    try {
+      rawSignals = detectInsightSignals(ctx);
+      await persistInsights(admin, siteId, runId, rawSignals, competitors);
+      outcome.insightsCount = rawSignals.length;
+      outcome.status.insights = 'drafts_only';
+      console.log(`[PostRun] phase=insights.persistDrafts ${logTag} status=ok count=${rawSignals.length} duration_ms=${Date.now() - t0}`);
+    } catch (err) {
+      console.error(`[PostRun] phase=insights.persistDrafts ${logTag} status=failed duration_ms=${Date.now() - t0} error=${err instanceof Error ? err.message : err}`);
+    }
+  }
 
-  // Recommendations (re-detect signals to keep signal_keys fresh; cheap)
-  const freshSignals = detectInsightSignals(ctx);
-  let drafts = draftRecommendations(freshSignals, ctx);
-  drafts = await polishRecommendationsWithClaude(drafts, profile, { timeoutMs: 12000 });
-  const insertedRecs = await persistRecommendations(admin, siteId, runId, drafts, competitors);
+  // --- Phase B + C: polish + re-persist polished insights ---
+  if (rawSignals.length > 0) {
+    const t0 = Date.now();
+    try {
+      const before = rawSignals;
+      const polished = await polishInsightsWithClaude(rawSignals, profile, { timeoutMs: 12000 });
+      const polishedOk = polished !== before;
+      if (polishedOk) {
+        try {
+          await persistInsights(admin, siteId, runId, polished, competitors);
+          outcome.insightsCount = polished.length;
+          outcome.status.insights = 'ok';
+          console.log(`[PostRun] phase=insights.polish ${logTag} status=success count=${polished.length} duration_ms=${Date.now() - t0}`);
+        } catch (persistErr) {
+          console.error(`[PostRun] phase=insights.repersistPolished ${logTag} status=failed duration_ms=${Date.now() - t0} error=${persistErr instanceof Error ? persistErr.message : persistErr}`);
+          // drafts already persisted — leave status=drafts_only
+        }
+      } else {
+        console.log(`[PostRun] phase=insights.polish ${logTag} status=fallback duration_ms=${Date.now() - t0}`);
+      }
+    } catch (err) {
+      console.error(`[PostRun] phase=insights.polish ${logTag} status=failed duration_ms=${Date.now() - t0} error=${err instanceof Error ? err.message : err}`);
+    }
+  }
 
-  return {
-    insightsCount: insertedInsights.length,
-    recommendationsCount: insertedRecs.length,
-  };
+  // --- Phase D: draft + persist DRAFT recommendations ---
+  // CRITICAL: runs regardless of insights phase outcome.
+  let rawDrafts: RecommendationDraft[] = [];
+  {
+    const t0 = Date.now();
+    try {
+      const freshSignals = detectInsightSignals(ctx);
+      rawDrafts = draftRecommendations(freshSignals, ctx);
+      await persistRecommendations(admin, siteId, runId, rawDrafts, competitors);
+      outcome.recommendationsCount = rawDrafts.length;
+      outcome.status.recommendations = 'drafts_only';
+      console.log(`[PostRun] phase=recs.persistDrafts ${logTag} status=ok count=${rawDrafts.length} duration_ms=${Date.now() - t0}`);
+    } catch (err) {
+      console.error(`[PostRun] phase=recs.persistDrafts ${logTag} status=failed duration_ms=${Date.now() - t0} error=${err instanceof Error ? err.message : err}`);
+    }
+  }
+
+  // --- Phase E + F: polish + re-persist polished recs ---
+  if (rawDrafts.length > 0) {
+    const t0 = Date.now();
+    try {
+      const before = rawDrafts;
+      const polished = await polishRecommendationsWithClaude(rawDrafts, profile, { timeoutMs: 12000 });
+      const polishedOk = polished !== before;
+      if (polishedOk) {
+        try {
+          await persistRecommendations(admin, siteId, runId, polished, competitors);
+          outcome.recommendationsCount = polished.length;
+          outcome.status.recommendations = 'ok';
+          console.log(`[PostRun] phase=recs.polish ${logTag} status=success count=${polished.length} duration_ms=${Date.now() - t0}`);
+        } catch (persistErr) {
+          console.error(`[PostRun] phase=recs.repersistPolished ${logTag} status=failed duration_ms=${Date.now() - t0} error=${persistErr instanceof Error ? persistErr.message : persistErr}`);
+        }
+      } else {
+        console.log(`[PostRun] phase=recs.polish ${logTag} status=fallback duration_ms=${Date.now() - t0}`);
+      }
+    } catch (err) {
+      console.error(`[PostRun] phase=recs.polish ${logTag} status=failed duration_ms=${Date.now() - t0} error=${err instanceof Error ? err.message : err}`);
+    }
+  }
+
+  // --- Phase G: auto-populate competitors ---
+  {
+    const t0 = Date.now();
+    try {
+      const autoResult = await autoPopulateCompetitorsForRun(admin, siteId, runId);
+      outcome.competitorsInserted = autoResult.inserted;
+      outcome.competitorsTotal = autoResult.total;
+      outcome.status.competitors = 'ok';
+      console.log(`[PostRun] phase=competitors.autoPopulate ${logTag} status=ok inserted=${autoResult.inserted} updated=${autoResult.updated} total=${autoResult.total} duration_ms=${Date.now() - t0}`);
+    } catch (err) {
+      outcome.status.competitors = 'failed';
+      console.error(`[PostRun] phase=competitors.autoPopulate ${logTag} status=failed duration_ms=${Date.now() - t0} error=${err instanceof Error ? err.message : err}`);
+    }
+  }
+
+  return outcome;
 }
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
@@ -153,15 +278,25 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       tier,
     });
 
-    // Post-run hook: insights + recommendations. Wrapped so failures don't affect the test run.
+    // Post-run hook: insights + recommendations + auto-competitors. The hook
+    // never throws — each phase handles its own errors and logs structured
+    // lines — but we still catch defensively in case something unexpected slips.
     let insightsCount = 0;
     let recommendationsCount = 0;
+    let postRunStatus: PostRunStatus = {
+      insights: 'failed',
+      recommendations: 'failed',
+      competitors: 'skipped',
+    };
+    let competitorsInserted = 0;
     try {
       const hookResult = await runPostRunHook(siteId, run.runId, tier, run.results);
       insightsCount = hookResult.insightsCount;
       recommendationsCount = hookResult.recommendationsCount;
+      postRunStatus = hookResult.status;
+      competitorsInserted = hookResult.competitorsInserted;
     } catch (hookErr) {
-      console.error('[discovery/run-tests] post-run hook failed:', hookErr instanceof Error ? hookErr.message : hookErr);
+      console.error('[discovery/run-tests] post-run hook unexpected error:', hookErr instanceof Error ? hookErr.message : hookErr);
     }
 
     return NextResponse.json({
@@ -179,7 +314,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         },
         insightsCount,
         recommendationsCount,
+        competitorsInserted,
       },
+      postRunStatus,
       resultsCount: run.results.length,
       errorsCount: run.errors.length,
     });
