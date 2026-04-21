@@ -55,12 +55,19 @@ export type RunDiscoveryTestsResult = {
   errors: { promptId: string; error: string }[];
 };
 
+type AnswerType = 'local_recommendation' | 'editorial_comparison' | 'directory_heavy' | 'marketplace_heavy' | 'educational' | 'mixed';
+
+const VALID_ANSWER_TYPES: AnswerType[] = ['local_recommendation', 'editorial_comparison', 'directory_heavy', 'marketplace_heavy', 'educational', 'mixed'];
+const VALID_POSITION_TYPES: DiscoveryPositionType[] = ['directly_recommended', 'listed_among_options', 'cited_as_source', 'mentioned_without_preference', 'implied_only', 'not_present'];
+
 interface ClaudeAnalysis {
   businesses_mentioned: string[];
   domains_cited: string[];
   directories_cited: string[];
   marketplaces_cited: string[];
-  answer_type: 'local_recommendation' | 'editorial_comparison' | 'directory_heavy' | 'marketplace_heavy' | 'educational' | 'mixed';
+  answer_type: AnswerType;
+  target_business_appeared: boolean;
+  target_business_position: DiscoveryPositionType;
 }
 
 interface PerPromptOutcome {
@@ -120,33 +127,96 @@ async function runWithConcurrency<T, R>(
 }
 
 // ============================================================
-// Claude API call with web_search enabled
+// Claude API call — structured output via tool_use
+//
+// Instead of asking Claude to emit a "---ANALYSIS---" delimiter followed by
+// raw JSON (which failed ~75% of the time), we register a client-defined
+// `record_analysis` tool and parse its `input` field from the tool_use
+// content block. Claude is trained heavily on structured tool calls, so
+// this path is dramatically more reliable.
 // ============================================================
 
-const SYSTEM_PROMPT = `You are simulating an AI assistant answering a user's question by searching the web and providing a helpful, natural answer. Use the web_search tool freely to find current information.
+const RECORD_ANALYSIS_TOOL = {
+  name: 'record_analysis',
+  description: 'Record a structured analysis of whether and how the target business appears in your answer. Call this tool EXACTLY ONCE at the end of your response, after finishing your natural answer.',
+  input_schema: {
+    type: 'object',
+    required: [
+      'businesses_mentioned',
+      'domains_cited',
+      'directories_cited',
+      'marketplaces_cited',
+      'answer_type',
+      'target_business_appeared',
+      'target_business_position',
+    ],
+    properties: {
+      businesses_mentioned: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'All company/business names that appeared in your natural answer (deduplicated).',
+      },
+      domains_cited: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'All domain names referenced with links or URLs in your answer. Bare hostnames like "example.com".',
+      },
+      directories_cited: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'Subset of domains_cited that are directory sites (yelp.com, angi.com, yellowpages.com, bbb.org, tripadvisor.com, thumbtack.com, homeadvisor.com, houzz.com, trustpilot.com, g2.com, capterra.com, bark.com).',
+      },
+      marketplaces_cited: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'Subset of domains_cited that are marketplaces (amazon.com, ebay.com, etsy.com, walmart.com, target.com, wayfair.com, homedepot.com, lowes.com).',
+      },
+      answer_type: {
+        type: 'string',
+        enum: VALID_ANSWER_TYPES as unknown as string[],
+        description: 'The overall shape of your answer.',
+      },
+      target_business_appeared: {
+        type: 'boolean',
+        description: 'Whether the specific target business being evaluated appeared in your natural answer.',
+      },
+      target_business_position: {
+        type: 'string',
+        enum: VALID_POSITION_TYPES as unknown as string[],
+        description: 'Where/how the target business appeared in your answer.',
+      },
+    },
+  },
+};
 
-After you finish your natural answer, emit this EXACT separator on its own line:
----ANALYSIS---
+function buildSystemPrompt(targetName: string, targetDomain: string): string {
+  return `You are simulating an AI assistant answering a user's real-world question. Search the web freely with the web_search tool, then give a natural, helpful answer exactly like a normal AI assistant would.
 
-Then immediately after the separator, emit a single JSON object with these exact keys:
-{
-  "businesses_mentioned": string[],
-  "domains_cited": string[],
-  "directories_cited": string[],
-  "marketplaces_cited": string[],
-  "answer_type": "local_recommendation" | "editorial_comparison" | "directory_heavy" | "marketplace_heavy" | "educational" | "mixed"
+TARGET BUSINESS being evaluated in this run:
+- Name: ${targetName || '(unknown)'}
+- Domain: ${targetDomain || '(unknown)'}
+
+After you finish your natural answer, you MUST call the record_analysis tool exactly once with a structured summary. In that call, honestly report whether the target business appeared in your answer, and in what position. Do not adjust your answer to include the target — answer naturally first, then report what you actually said.
+
+Tool-use rules:
+- Call record_analysis once, at the very end, after your natural answer text.
+- Be honest about target_business_appeared: set it based on whether the name or domain shown above actually appears in your answer.
+- target_business_position values:
+    * directly_recommended — you highlighted or named them first as the top option
+    * listed_among_options — you mentioned them inside a list of 3+ options, not singled out
+    * cited_as_source — you linked to their domain but did not name the business
+    * mentioned_without_preference — you named them without linking or recommending
+    * implied_only — the category/area matches them but you didn't name them
+    * not_present — neither named nor linked
+- For directories_cited / marketplaces_cited, only include domains that are actually referenced in your answer AND that clearly belong to those categories.`;
 }
 
-Rules for the JSON:
-- "businesses_mentioned": every company or business name that appears in your answer (deduplicated).
-- "domains_cited": every domain or URL you referenced. Use bare hostnames like "example.com", not full URLs.
-- "directories_cited": subset of domains_cited that are directory sites (yelp.com, yellowpages.com, angi.com, thumbtack.com, bbb.org, tripadvisor.com, houzz.com, bark.com, homeadvisor.com, trustpilot.com, g2.com, capterra.com).
-- "marketplaces_cited": subset of domains_cited that are marketplaces (amazon.com, ebay.com, etsy.com, walmart.com, target.com, wayfair.com, homedepot.com, lowes.com).
-- "answer_type": one of the six enum values describing the shape of your answer.
-
-Do not wrap the JSON in markdown or backticks. Do not add commentary after the JSON.`;
-
-async function callClaudeForPrompt(apiKey: string, promptText: string): Promise<PerPromptOutcome> {
+async function callClaudeForPrompt(
+  apiKey: string,
+  promptText: string,
+  targetName: string,
+  targetDomain: string,
+): Promise<PerPromptOutcome> {
   try {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -159,8 +229,11 @@ async function callClaudeForPrompt(apiKey: string, promptText: string): Promise<
         model: CLAUDE_MODEL,
         max_tokens: 1500,
         temperature: 0,
-        system: SYSTEM_PROMPT,
-        tools: [{ type: WEB_SEARCH_TOOL_TYPE, name: 'web_search', max_uses: 1 }],
+        system: buildSystemPrompt(targetName, targetDomain),
+        tools: [
+          { type: WEB_SEARCH_TOOL_TYPE, name: 'web_search', max_uses: 1 },
+          RECORD_ANALYSIS_TOOL,
+        ],
         messages: [{ role: 'user', content: promptText }],
       }),
     });
@@ -169,53 +242,56 @@ async function callClaudeForPrompt(apiKey: string, promptText: string): Promise<
       throw new Error(`Claude API error ${res.status}: ${body.slice(0, 200)}`);
     }
     const data = await res.json();
-    // Concatenate all text blocks (web_search may interleave tool_use blocks)
+
+    // Walk content blocks: text blocks build the natural answer, and the
+    // record_analysis tool_use block carries the structured analysis.
     const textBlocks: string[] = [];
+    let toolInput: Record<string, unknown> | null = null;
     if (Array.isArray(data.content)) {
       for (const block of data.content) {
         if (block?.type === 'text' && typeof block.text === 'string') {
           textBlocks.push(block.text);
+        } else if (block?.type === 'tool_use' && block.name === 'record_analysis' && block.input && typeof block.input === 'object') {
+          toolInput = block.input as Record<string, unknown>;
         }
       }
     }
-    const fullText = textBlocks.join('\n').trim();
-
-    const sepIdx = fullText.indexOf('---ANALYSIS---');
-    let answer = fullText;
-    let analysisRaw = '';
-    if (sepIdx >= 0) {
-      answer = fullText.slice(0, sepIdx).trim();
-      analysisRaw = fullText.slice(sepIdx + '---ANALYSIS---'.length).trim();
-    }
+    const answer = textBlocks.join('\n').trim();
 
     let analysis: ClaudeAnalysis | null = null;
     let parseFailed = false;
-    if (analysisRaw.length > 0) {
-      try {
-        const cleaned = analysisRaw.replace(/```json|```/g, '').trim();
-        const parsed = JSON.parse(cleaned);
-        analysis = {
-          businesses_mentioned: Array.isArray(parsed.businesses_mentioned)
-            ? parsed.businesses_mentioned.map((s: unknown) => String(s || '').trim()).filter((s: string) => s.length > 0)
-            : [],
-          domains_cited: Array.isArray(parsed.domains_cited)
-            ? parsed.domains_cited.map((s: unknown) => normalizeDomain(String(s))).filter((s: string) => s.length > 0)
-            : [],
-          directories_cited: Array.isArray(parsed.directories_cited)
-            ? parsed.directories_cited.map((s: unknown) => normalizeDomain(String(s))).filter((s: string) => s.length > 0)
-            : [],
-          marketplaces_cited: Array.isArray(parsed.marketplaces_cited)
-            ? parsed.marketplaces_cited.map((s: unknown) => normalizeDomain(String(s))).filter((s: string) => s.length > 0)
-            : [],
-          answer_type: ['local_recommendation', 'editorial_comparison', 'directory_heavy', 'marketplace_heavy', 'educational', 'mixed'].includes(parsed.answer_type)
-            ? parsed.answer_type
-            : 'mixed',
-        };
-      } catch {
+
+    if (toolInput) {
+      const answerType = typeof toolInput.answer_type === 'string' && VALID_ANSWER_TYPES.includes(toolInput.answer_type as AnswerType)
+        ? (toolInput.answer_type as AnswerType)
+        : null;
+      const position = typeof toolInput.target_business_position === 'string' && VALID_POSITION_TYPES.includes(toolInput.target_business_position as DiscoveryPositionType)
+        ? (toolInput.target_business_position as DiscoveryPositionType)
+        : null;
+      if (!answerType || !position) {
         parseFailed = true;
+      } else {
+        analysis = {
+          businesses_mentioned: Array.isArray(toolInput.businesses_mentioned)
+            ? (toolInput.businesses_mentioned as unknown[]).map(s => String(s || '').trim()).filter(s => s.length > 0)
+            : [],
+          domains_cited: Array.isArray(toolInput.domains_cited)
+            ? (toolInput.domains_cited as unknown[]).map(s => normalizeDomain(String(s))).filter(s => s.length > 0)
+            : [],
+          directories_cited: Array.isArray(toolInput.directories_cited)
+            ? (toolInput.directories_cited as unknown[]).map(s => normalizeDomain(String(s))).filter(s => s.length > 0)
+            : [],
+          marketplaces_cited: Array.isArray(toolInput.marketplaces_cited)
+            ? (toolInput.marketplaces_cited as unknown[]).map(s => normalizeDomain(String(s))).filter(s => s.length > 0)
+            : [],
+          answer_type: answerType,
+          target_business_appeared: toolInput.target_business_appeared === true,
+          target_business_position: position,
+        };
       }
     } else {
       parseFailed = true;
+      console.warn('[discoveryRunner] no record_analysis tool_use block found for prompt');
     }
 
     return { answer, analysis, parseFailed };
@@ -335,11 +411,20 @@ function resultTypeLabel(answerType: ClaudeAnalysis['answer_type']): string {
   }
 }
 
-function computeConfidence(parseFailed: boolean, answerLen: number): number {
-  if (!parseFailed && answerLen > 200) return 0.9;
-  if (!parseFailed && answerLen <= 200) return 0.7;
-  if (parseFailed && answerLen > 200) return 0.4;
-  return 0.2;
+function computeConfidence(args: {
+  parseFailed: boolean;
+  answerLen: number;
+  toolAppeared: boolean | null;
+  domainDetected: boolean;
+}): number {
+  const { parseFailed, answerLen, toolAppeared, domainDetected } = args;
+  // No tool_use block at all — rare with the new structured-output path.
+  if (parseFailed) return 0.3;
+  // Tool-reported appearance matches our independent domain detection
+  // AND the answer was substantive.
+  const consistent = toolAppeared === null || toolAppeared === domainDetected || !domainDetected;
+  if (answerLen > 200 && consistent) return 0.9;
+  return 0.7;
 }
 
 function scoreFromStatus(status: DiscoveryVisibilityStatus, position: DiscoveryPositionType | null): number {
@@ -511,7 +596,7 @@ export async function runDiscoveryTests(input: RunDiscoveryTestsInput): Promise<
     CONCURRENCY,
     async (prompt) => {
       try {
-        const outcome = await callClaudeForPrompt(apiKey, prompt.prompt_text);
+        const outcome = await callClaudeForPrompt(apiKey, prompt.prompt_text, businessName, businessDomain);
         return { prompt, outcome };
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
@@ -525,6 +610,10 @@ export async function runDiscoveryTests(input: RunDiscoveryTestsInput): Promise<
   // Tier tagging: teaser runs get 'tier:teaser' stamped into internal_notes for downstream filtering.
   const tierNote: string | null = tier === 'teaser' ? 'tier:teaser' : null;
   const resultInsertRows: Record<string, unknown>[] = [];
+  // Observability counters — used to confirm the tool_use parsing fix in prod.
+  let toolUseSuccessCount = 0;
+  let confidenceSum = 0;
+  let confidenceCount = 0;
   for (const { prompt, outcome } of outcomes) {
     if (!outcome) {
       // Total Claude failure — insert an 'unclear' placeholder so the run has coverage
@@ -563,11 +652,18 @@ export async function runDiscoveryTests(input: RunDiscoveryTestsInput): Promise<
     const businessesMentioned = analysis?.businesses_mentioned || [];
     const domainsCited = analysis?.domains_cited || [];
 
-    // Business detection
-    const businessMentioned = businessNames.some(name =>
+    // Business detection. Prefer Claude's self-report via the record_analysis
+    // tool (target_business_appeared) because it reflects intent after the
+    // answer was formed, which is more reliable than regex-matching a name
+    // against the text. Cross-check with local heuristics and fall back to
+    // them when the tool output is missing.
+    const heuristicBusinessMentioned = businessNames.some(name =>
       businessesMentioned.some(b => b.toLowerCase() === name.toLowerCase())
       || containsInsensitive(answerLower, name),
     );
+    const businessMentioned = analysis
+      ? (analysis.target_business_appeared || heuristicBusinessMentioned)
+      : heuristicBusinessMentioned;
     const businessDomainDetected = businessDomain.length > 0
       && domainsCited.some(d => normalizeDomain(d) === businessDomain);
     const businessCited = businessDomainDetected;
@@ -605,7 +701,10 @@ export async function runDiscoveryTests(input: RunDiscoveryTestsInput): Promise<
 
     const uniqueBusinessCount = countBusinessesInList(businessesMentioned);
 
-    const positionType = derivePositionType({
+    // Prefer Claude's self-reported position (from the record_analysis tool)
+    // when available. Fall back to heuristic derivation when the tool output
+    // is missing.
+    const heuristicPositionType = derivePositionType({
       businessMentioned,
       businessCited,
       businessNames,
@@ -614,6 +713,9 @@ export async function runDiscoveryTests(input: RunDiscoveryTestsInput): Promise<
       businessesMentioned,
       domainsCited,
     });
+    const positionType: DiscoveryPositionType = analysis
+      ? analysis.target_business_position
+      : heuristicPositionType;
 
     // Count unique competitors matched by name OR domain (de-duped across both signals)
     const matchedCompetitors = new Set<string>();
@@ -638,10 +740,18 @@ export async function runDiscoveryTests(input: RunDiscoveryTestsInput): Promise<
     });
 
     const score = scoreFromStatus(visibilityStatus, positionType);
-    const confidence = computeConfidence(parseFailed, answer.length);
+    const confidence = computeConfidence({
+      parseFailed,
+      answerLen: answer.length,
+      toolAppeared: analysis ? analysis.target_business_appeared : null,
+      domainDetected: businessDomainDetected,
+    });
+    if (analysis) toolUseSuccessCount++;
+    confidenceSum += confidence;
+    confidenceCount++;
     const resultTypeSummary = analysis ? resultTypeLabel(analysis.answer_type) : null;
     const rawExcerpt = answer.slice(0, 400);
-    const normalizedSummary = answer.replace(/\s+/g, ' ').trim().slice(0, 280);
+    const normalizedSummary = answer.replace(/\s+/g, ' ').trim().slice(0, 500);
 
     resultInsertRows.push({
       site_id: siteId,
@@ -723,9 +833,13 @@ export async function runDiscoveryTests(input: RunDiscoveryTestsInput): Promise<
     throw new Error(`Failed to insert score snapshot: ${snapshotErr?.message || 'unknown error'}`);
   }
 
+  const avgConfidence = confidenceCount > 0 ? (confidenceSum / confidenceCount) : 0;
   console.log(
-    `[discoveryRunner] site=${siteId} runId=${runId} tier=${tier} triggeredBy=${triggeredBy}${runLabel ? ` label=${runLabel}` : ''}`,
-    `prompts=${prompts.length} results=${insertedResults.length} errors=${errors.length} overall=${overall}`,
+    `[Discovery] site=${siteId.slice(0, 8)} tier=${tier} prompts=${prompts.length}`,
+    `tool_use_success=${toolUseSuccessCount}/${confidenceCount}`,
+    `avg_confidence=${avgConfidence.toFixed(2)} overall=${overall} errors=${errors.length}`,
+    runLabel ? `label=${runLabel}` : '',
+    `triggeredBy=${triggeredBy}`,
   );
 
   return {

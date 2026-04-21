@@ -284,6 +284,9 @@ export interface PageScanResult {
   // CTA detection (all pages)
   hasDemoCTA?: boolean;
   hasContactCTA?: boolean;
+  // Interstitial / bot-challenge detection (e.g. Cloudflare "Just a moment…").
+  // When true, the scraped title is unreliable and must NOT be used as a business name.
+  interstitialBlocked?: boolean;
 }
 
 export interface ScoreResult {

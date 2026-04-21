@@ -15,6 +15,85 @@ const FETCH_TIMEOUT = 10000;
 const MAX_PAGES = 50;
 const CONCURRENT_SCANS = 5;
 
+// ============================================================
+// Interstitial / bot-challenge detection + domain-name fallback.
+// Used by discovery bootstrap to avoid storing "Just a moment..." as a
+// business name when Cloudflare (or similar) blocks the scrape.
+// ============================================================
+
+const INTERSTITIAL_PATTERNS: RegExp[] = [
+  /just a moment/i,
+  /attention required/i,
+  /^cloudflare$/i,
+  /please wait/i,
+  /checking your browser/i,
+  /access denied/i,
+  /\bforbidden\b/i,
+  /\b403\b/,
+  /\b404\b/,
+  /\b500\b/,
+  /recaptcha/i,
+  /verify you are human/i,
+  /are you a robot/i,
+  /enable javascript and cookies/i,
+];
+
+/**
+ * Returns true if the page looks like a bot-challenge / interstitial rather
+ * than a real business page. Uses title as the primary signal, body length
+ * as a secondary hint, and HTTP status for non-200 responses that still
+ * returned HTML.
+ */
+export function isInterstitialPage(
+  title: string | null,
+  bodyText: string,
+  statusCode: number,
+): boolean {
+  if (!title || title.trim().length < 3) return true;
+  const trimmed = title.trim();
+  // Pure punctuation / "..." titles
+  if (/^[\s.·\-—|_]+$/.test(trimmed)) return true;
+  if (INTERSTITIAL_PATTERNS.some(p => p.test(trimmed))) return true;
+  if (statusCode >= 400 && bodyText.trim().length < 400) return true;
+  return false;
+}
+
+/**
+ * Returns true if a candidate business name looks like interstitial garbage,
+ * too-short, or pure punctuation. Safe to reuse downstream.
+ */
+export function isBadBusinessName(candidate: string | null | undefined): boolean {
+  if (!candidate) return true;
+  const s = candidate.trim();
+  if (s.length < 3) return true;
+  if (/^[\s.·\-—|_]+$/.test(s)) return true;
+  if (INTERSTITIAL_PATTERNS.some(p => p.test(s))) return true;
+  return false;
+}
+
+/**
+ * Turn a bare domain into a human-readable fallback name.
+ * candcair.com → "Candcair"
+ * attilio-plumbing.com → "Attilio Plumbing"
+ * rf-bondurant.com → "Rf Bondurant"
+ * Not perfect — the Claude classifier gets a better shot first — but safe.
+ */
+export function formatDomainAsName(input: string | null | undefined): string {
+  if (!input) return '';
+  const stripped = String(input)
+    .trim()
+    .replace(/^https?:\/\//i, '')
+    .replace(/^www\./i, '')
+    .split('/')[0]
+    .replace(/\.(com|io|co|org|net|dev|app|us|uk|ca|de|fr|es|nl|au|biz|info|shop|store)$/i, '');
+  if (!stripped) return '';
+  return stripped
+    .split(/[^a-zA-Z0-9]+/)
+    .filter(s => s.length > 0)
+    .map(s => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase())
+    .join(' ');
+}
+
 const AI_AGENTS = [
   'GPTBot', 'ChatGPT-User', 'Google-Extended', 'Anthropic',
   'ClaudeBot', 'CCBot', 'PerplexityBot', 'Bytespider',
@@ -546,6 +625,11 @@ async function scanPage(url: string, pageType: PageType): Promise<PageScanResult
   else if (title.length < 20) issues.push('Page title is very short');
   else if (title.length > 70) issues.push('Page title is very long (may truncate)');
 
+  // Interstitial / bot-challenge page detection. If the page is a Cloudflare
+  // challenge, captcha gate, or similar, the scraped title/meta is garbage
+  // (e.g. "Just a moment...") and must NOT be used as the business name.
+  const interstitialBlocked = isInterstitialPage(title, $.root().text() || '', res.status);
+
   const metaDescription = $('meta[name="description"]').attr('content')?.trim() || null;
   if (!metaDescription) issues.push('Missing meta description');
   else if (metaDescription.length < 50) issues.push('Meta description is very short');
@@ -904,6 +988,9 @@ async function scanPage(url: string, pageType: PageType): Promise<PageScanResult
     hasTwitterCard, hasTableHeaders, usesSemanticLists, hasViewportMeta, hasAddressInfo,
     // Footer extraction
     footerLinks, footerText,
+    // Interstitial/bot-challenge detection — true when the page was blocked
+    // by Cloudflare, captcha, etc. and the scraped title is garbage.
+    interstitialBlocked,
     // Quality checks (Batch B)
     schemaMissingFields: schemaMissingFields.length > 0 ? schemaMissingFields : undefined,
     metaDescriptionLength, metaDescriptionDuplicatesTitle,

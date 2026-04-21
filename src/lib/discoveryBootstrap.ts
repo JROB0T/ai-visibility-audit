@@ -13,9 +13,40 @@
 // It does NOT auth or parse requests — callers do that. Throws specific
 // Error instances on failure; the route handler maps those to HTTP errors.
 // ============================================================
+//
+// ---------------------------------------------------------------------------
+// DATA CLEANUP (Ticket 7.5) — DOCUMENTATION ONLY, DO NOT EXECUTE FROM CODE
+// ---------------------------------------------------------------------------
+// If a site got seeded with a garbage business_name (e.g. "Just a moment...")
+// from a Cloudflare/interstitial-blocked scrape, its generated prompts are
+// unusable. To clean up, run this in the Supabase SQL Editor (one site at a
+// time). After cleanup, the user should click "Run Full AI Discovery" on
+// that site — the bootstrap will re-derive a correct business name using the
+// new interstitial-aware path and regenerate the prompt library.
+//
+//   BEGIN;
+//   DELETE FROM discovery_results WHERE site_id = '<site_id>';
+//   DELETE FROM discovery_score_snapshots WHERE site_id = '<site_id>';
+//   DELETE FROM discovery_insights WHERE site_id = '<site_id>';
+//   DELETE FROM discovery_recommendations WHERE site_id = '<site_id>';
+//   DELETE FROM discovery_prompts WHERE site_id = '<site_id>';
+//   DELETE FROM discovery_competitors WHERE site_id = '<site_id>';
+//   DELETE FROM discovery_profiles WHERE site_id = '<site_id>';
+//   COMMIT;
+//
+// Quick query to find affected sites:
+//   SELECT dp.site_id, dp.business_name, s.domain
+//   FROM discovery_profiles dp JOIN sites s ON s.id = dp.site_id
+//   WHERE dp.business_name ILIKE 'just a moment%'
+//      OR dp.business_name ILIKE '%attention required%'
+//      OR dp.business_name ILIKE 'please wait%'
+//      OR length(trim(dp.business_name)) < 3;
+// ---------------------------------------------------------------------------
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { clusterDistributionTargets } from '@/lib/discovery';
+import { isBadBusinessName, formatDomainAsName } from '@/lib/scanner';
+import { inferBusinessNameFromDomain } from '@/lib/classify';
 import type {
   DiscoveryBusinessModel,
   DiscoveryCluster,
@@ -128,8 +159,28 @@ export async function ensureDiscoveryProfileAndPrompts(input: BootstrapInput): P
     .eq('audit_id', audit.id as string);
   const homepage = (pages || []).find(p => p.page_type === 'homepage') || (pages || [])[0] || null;
 
-  const businessName = (homepage?.title || '').split(/[—|\-·]/)[0].trim() || (site.domain as string);
+  // Derive business name with defensive fallbacks. Scrapers hit interstitials
+  // (Cloudflare "Just a moment…", captchas, 403s) and return garbage titles.
+  // Order of preference:
+  //   1. Clean homepage title (scraped, split on separators)
+  //   2. Claude's inference from the bare domain (handles expansion like
+  //      "candcair" → "C&C Air")
+  //   3. Formatted-domain fallback ("candcair.com" → "Candcair")
   const domain = site.domain as string;
+  const rawTitleName = (homepage?.title || '').split(/[—|\-·]/)[0].trim();
+  let businessName = rawTitleName;
+  if (isBadBusinessName(businessName)) {
+    const inferred = await inferBusinessNameFromDomain(domain);
+    if (inferred && !isBadBusinessName(inferred)) {
+      businessName = inferred;
+    } else {
+      businessName = formatDomainAsName(domain) || domain;
+    }
+  }
+  // Final sanity check — never persist a garbage name
+  if (isBadBusinessName(businessName)) {
+    businessName = formatDomainAsName(domain) || domain;
+  }
   const vertical = (site.vertical as string | null) || 'other';
   const description = homepage?.meta_description || null;
   const h1 = homepage?.h1_text || null;

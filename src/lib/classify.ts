@@ -11,6 +11,10 @@ interface ClassifyInput {
   bodySnippet: string | null;
   pageUrls: string[];
   schemaTypes: string[];
+  /** When true, the scraper was blocked (Cloudflare / captcha / etc.)
+   * and scraped fields like title/h1 are garbage. Classifier should
+   * lean entirely on the domain. */
+  interstitialBlocked?: boolean;
 }
 
 export async function classifyBusiness(input: ClassifyInput): Promise<string> {
@@ -45,7 +49,11 @@ Categories:
 - local_service (plumbers, electricians, HVAC, cleaning, landscaping, contractors, auto repair)
 - other (anything that doesn't clearly fit above)
 
-Website info:
+${input.interstitialBlocked ? `Website info (SCRAPE BLOCKED BY INTERSTITIAL/CAPTCHA — infer from domain alone):
+Domain: ${input.domain}
+Note: The site returned a bot-challenge page (e.g. Cloudflare). Title, heading,
+description, and body text below are unreliable. Lean primarily on the domain
+name and any URL path hints when classifying.` : `Website info:`}
 Domain: ${input.domain}
 Title: ${input.title || 'unknown'}
 Main heading: ${input.h1 || 'unknown'}
@@ -87,5 +95,49 @@ Return ONLY the slug.`;
   } catch (err) {
     console.error('classifyBusiness fetch error:', err instanceof Error ? err.message : err);
     return 'other';
+  }
+}
+
+/**
+ * Infer a plausible business name from a domain alone. Used as a fallback
+ * when the scraper was blocked by an interstitial / bot challenge and the
+ * scraped page title is garbage.
+ *
+ * Returns a plain string (e.g. "C&C Air") or null if Claude isn't available
+ * or the response is unusable. Caller should apply its own sanity check
+ * on the result before persisting.
+ */
+export async function inferBusinessNameFromDomain(domain: string): Promise<string | null> {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey || !domain) return null;
+
+  const prompt = `Given only a domain name, infer the most likely business name as it would appear on their website or in directories.
+
+Domain: ${domain}
+
+Rules:
+- Return ONLY the business name, nothing else. No explanation, no quotes, no markdown.
+- Expand abbreviations if they're clearly short for a common word (e.g. "ac" → "AC", "hvac" → "HVAC").
+- Preserve ampersands if implied (e.g. "candcair" → "C&C Air").
+- Title-case normal words.
+- Keep it under 60 characters.
+- If the domain is unrecognizable, return a simple title-cased form of the domain root (e.g. "example" → "Example").`;
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+      body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 40, messages: [{ role: 'user', content: prompt }] }),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const raw = (data.content?.[0]?.text || '').trim();
+    // Strip accidental quotes/markdown
+    const cleaned = raw.replace(/^["'`]|["'`]$/g, '').replace(/^#+\s*/, '').trim();
+    if (!cleaned || cleaned.length > 60) return null;
+    return cleaned;
+  } catch (err) {
+    console.error('inferBusinessNameFromDomain fetch error:', err instanceof Error ? err.message : err);
+    return null;
   }
 }

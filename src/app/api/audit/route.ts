@@ -124,6 +124,7 @@ export async function POST(request: NextRequest) {
       bodySnippet: homepage?.firstParagraphText || null,
       pageUrls: scanResult.pages.map(p => p.url),
       schemaTypes: scanResult.pages.flatMap(p => p.schemaTypes),
+      interstitialBlocked: !!homepage?.interstitialBlocked,
     });
     await supabase.from('sites').update({ vertical: aiVertical }).eq('id', site.id);
 
