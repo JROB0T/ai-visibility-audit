@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Sparkles, Target, ListChecks, BarChart3, Users, Lightbulb, TrendingUp } from 'lucide-react';
 import type {
   DiscoveryPrompt,
@@ -88,8 +88,13 @@ export default function DiscoveryTab({ siteId, isPaid, isAdmin }: DiscoveryTabPr
     : null;
 
   const [runningTier, setRunningTier] = useState<DiscoveryTier | null>(null);
+  // Synchronous ref guard: state updates are async, so two rapid clicks (or a
+  // double-fired effect) can both pass a state-based check. The ref flips
+  // immediately and blocks the second invocation before any await.
+  const isRunningRef = useRef(false);
   const handleRunTests = useCallback(async (tierToRun: DiscoveryTier) => {
-    if (runningTier) return;
+    if (isRunningRef.current) return;
+    isRunningRef.current = true;
     setRunningTier(tierToRun);
     try {
       const res = await fetch('/api/discovery/run-tests', {
@@ -107,9 +112,10 @@ export default function DiscoveryTab({ siteId, isPaid, isAdmin }: DiscoveryTabPr
       console.error('[DiscoveryTab] run failed:', err);
       setError('Could not start the discovery run. Try again.');
     } finally {
+      isRunningRef.current = false;
       setRunningTier(null);
     }
-  }, [siteId, loadAll, runningTier]);
+  }, [siteId, loadAll]);
 
   const showUpgradeBanner = tier === 'teaser' && !isPaid && !isAdmin;
   const tierLabel = tier === 'teaser' ? 'Free preview' : (tier === 'full' ? 'Full report' : null);

@@ -1,3 +1,5 @@
+import { claudeFetchWithRetry } from '@/lib/claudeRetry';
+
 const VALID_VERTICALS = ['restaurant', 'saas', 'ecommerce', 'healthcare', 'law_firm', 'professional_services', 'local_service', 'other'];
 
 const RESTAURANT_URL_SIGNALS = ['/menu', '/dinner', '/lunch', '/brunch', '/wine', '/drinks', '/reservations', '/reserve', '/opentable', '/catering', '/private-dining', '/specials', '/happy-hour', '/bar'];
@@ -74,11 +76,14 @@ CRITICAL RULES:
 Return ONLY the slug.`;
 
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 20, messages: [{ role: 'user', content: prompt }] }),
-    });
+    const res = await claudeFetchWithRetry(
+      () => fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+        body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 20, messages: [{ role: 'user', content: prompt }] }),
+      }),
+      { label: 'classifyBusiness' },
+    );
 
     if (!res.ok) {
       const errBody = await res.text();
@@ -233,22 +238,25 @@ Schema types detected: ${(input.schemaTypes || []).join(', ') || '(none)'}
 Example URLs: ${(input.pageUrls || []).slice(0, 8).join(', ') || '(none)'}`;
 
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 1500,
-        temperature: 0,
-        system: systemPrompt,
-        tools: [
-          { type: 'web_search_20250305', name: 'web_search', max_uses: 2 },
-          RECORD_BUSINESS_PROFILE_TOOL,
-        ],
-        tool_choice: { type: 'auto' },
-        messages: [{ role: 'user', content: userMessage }],
+    const res = await claudeFetchWithRetry(
+      () => fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+        body: JSON.stringify({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 1500,
+          temperature: 0,
+          system: systemPrompt,
+          tools: [
+            { type: 'web_search_20250305', name: 'web_search', max_uses: 2 },
+            RECORD_BUSINESS_PROFILE_TOOL,
+          ],
+          tool_choice: { type: 'auto' },
+          messages: [{ role: 'user', content: userMessage }],
+        }),
       }),
-    });
+      { label: 'enrichBusinessProfile:turn1' },
+    );
     if (!res.ok) {
       const body = await res.text();
       console.error('[enrichBusinessProfile] API error:', { status: res.status, body: body.slice(0, 300) });
@@ -270,23 +278,26 @@ Example URLs: ${(input.pageUrls || []).slice(0, 8).join(', ') || '(none)'}`;
     // If Claude skipped the tool, force it with a second turn.
     if (!toolInput) {
       console.warn('[enrichBusinessProfile] tool_use missing on turn 1, forcing turn 2');
-      const turn2 = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
-        body: JSON.stringify({
-          model: 'claude-haiku-4-5-20251001',
-          max_tokens: 1500,
-          temperature: 0,
-          system: systemPrompt,
-          tools: [RECORD_BUSINESS_PROFILE_TOOL],
-          tool_choice: { type: 'tool', name: 'record_business_profile' },
-          messages: [
-            { role: 'user', content: userMessage },
-            { role: 'assistant', content: data.content },
-            { role: 'user', content: 'Please call record_business_profile now with your best structured profile. Use null for fields you cannot verify.' },
-          ],
+      const turn2 = await claudeFetchWithRetry(
+        () => fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+          body: JSON.stringify({
+            model: 'claude-haiku-4-5-20251001',
+            max_tokens: 1500,
+            temperature: 0,
+            system: systemPrompt,
+            tools: [RECORD_BUSINESS_PROFILE_TOOL],
+            tool_choice: { type: 'tool', name: 'record_business_profile' },
+            messages: [
+              { role: 'user', content: userMessage },
+              { role: 'assistant', content: data.content },
+              { role: 'user', content: 'Please call record_business_profile now with your best structured profile. Use null for fields you cannot verify.' },
+            ],
+          }),
         }),
-      });
+        { label: 'enrichBusinessProfile:turn2' },
+      );
       if (!turn2.ok) {
         const body = await turn2.text();
         console.error('[enrichBusinessProfile] turn 2 API error:', { status: turn2.status, body: body.slice(0, 300) });
@@ -364,11 +375,14 @@ Rules:
 - If the domain is unrecognizable, return a simple title-cased form of the domain root (e.g. "example" → "Example").`;
 
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 40, messages: [{ role: 'user', content: prompt }] }),
-    });
+    const res = await claudeFetchWithRetry(
+      () => fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+        body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 40, messages: [{ role: 'user', content: prompt }] }),
+      }),
+      { label: 'inferBusinessNameFromDomain' },
+    );
     if (!res.ok) return null;
     const data = await res.json();
     const raw = (data.content?.[0]?.text || '').trim();

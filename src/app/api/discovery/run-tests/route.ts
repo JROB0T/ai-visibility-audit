@@ -91,6 +91,60 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: 'Full discovery requires a paid plan' }, { status: 403 });
   }
 
+  // Server-side idempotency: if a discovery run for this site landed in the
+  // last 30 seconds, return the existing run's summary instead of kicking off
+  // a duplicate. Guards against client-side double-fire (React StrictMode,
+  // double-clicks, effect loops) on top of the ref-based client guard.
+  {
+    const idempotencyClient = getAdminClient();
+    const { data: recent } = await idempotencyClient
+      .from('discovery_score_snapshots')
+      .select('run_id, overall_score, cluster_scores, prompt_count, strong_count, partial_count, absent_count, competitor_dominant_count, snapshot_date')
+      .eq('site_id', siteId)
+      .gt('snapshot_date', new Date(Date.now() - 30_000).toISOString())
+      .order('snapshot_date', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (recent?.run_id) {
+      console.warn(`[discovery/run-tests] idempotency: returning existing run ${String(recent.run_id).slice(0, 8)} (${recent.snapshot_date}) for site ${siteId.slice(0, 8)} — duplicate within 30s window`);
+      const { count: insightsCount } = await idempotencyClient
+        .from('discovery_insights')
+        .select('id', { count: 'exact', head: true })
+        .eq('site_id', siteId)
+        .eq('run_id', recent.run_id);
+      const { count: recsCount } = await idempotencyClient
+        .from('discovery_recommendations')
+        .select('id', { count: 'exact', head: true })
+        .eq('site_id', siteId)
+        .eq('run_id', recent.run_id);
+      const { count: resultsCount } = await idempotencyClient
+        .from('discovery_results')
+        .select('id', { count: 'exact', head: true })
+        .eq('site_id', siteId)
+        .eq('run_id', recent.run_id);
+      return NextResponse.json({
+        runId: recent.run_id,
+        tier,
+        summary: {
+          overall_score: recent.overall_score,
+          cluster_scores: recent.cluster_scores,
+          counts: {
+            prompt_count: recent.prompt_count,
+            strong_count: recent.strong_count,
+            partial_count: recent.partial_count,
+            absent_count: recent.absent_count,
+            competitor_dominant_count: recent.competitor_dominant_count,
+          },
+          insightsCount: insightsCount || 0,
+          recommendationsCount: recsCount || 0,
+        },
+        resultsCount: resultsCount || 0,
+        errorsCount: 0,
+        idempotent: true,
+      });
+    }
+  }
+
   try {
     const run = await runDiscoveryTests({
       siteId,

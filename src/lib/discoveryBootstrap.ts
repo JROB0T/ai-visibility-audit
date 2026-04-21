@@ -91,6 +91,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { clusterDistributionTargets } from '@/lib/discovery';
 import { isBadBusinessName, formatDomainAsName } from '@/lib/scanner';
 import { inferBusinessNameFromDomain, enrichBusinessProfile, type EnrichedBusinessProfile } from '@/lib/classify';
+import { claudeFetchWithRetry } from '@/lib/claudeRetry';
 import type {
   DiscoveryBusinessModel,
   DiscoveryCluster,
@@ -496,19 +497,22 @@ You MUST call record_prompts exactly once with the full array. Do not respond in
   }
 
   async function callClaudeForPrompts(systemPrompt: string): Promise<GeneratedPrompt[]> {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey!, 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({
-        model: CLAUDE_MODEL,
-        max_tokens: 3500,
-        temperature: 0.4,
-        system: systemPrompt,
-        tools: [RECORD_PROMPTS_TOOL],
-        tool_choice: { type: 'tool', name: 'record_prompts' },
-        messages: [{ role: 'user', content: 'Generate the prompt library now.' }],
+    const res = await claudeFetchWithRetry(
+      () => fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey!, 'anthropic-version': '2023-06-01' },
+        body: JSON.stringify({
+          model: CLAUDE_MODEL,
+          max_tokens: 3500,
+          temperature: 0.4,
+          system: systemPrompt,
+          tools: [RECORD_PROMPTS_TOOL],
+          tool_choice: { type: 'tool', name: 'record_prompts' },
+          messages: [{ role: 'user', content: 'Generate the prompt library now.' }],
+        }),
       }),
-    });
+      { label: 'generatePrompts' },
+    );
     if (!res.ok) {
       const body = await res.text();
       console.error('[discoveryBootstrap] Claude API error:', { status: res.status, body: body.slice(0, 300) });

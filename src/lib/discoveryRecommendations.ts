@@ -6,6 +6,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { InsightSignal, InsightDetectionContext } from '@/lib/discoveryInsights';
+import { claudeFetchWithRetry } from '@/lib/claudeRetry';
 import type {
   DiscoveryCluster,
   DiscoveryCompetitor,
@@ -468,21 +469,24 @@ Return ONLY the JSON array — no markdown fences, no commentary.`;
   const userPrompt = JSON.stringify(drafts);
 
   const callClaude = async (): Promise<RecommendationDraft[]> => {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: CLAUDE_MODEL,
-        max_tokens: 2500,
-        temperature: 0.3,
-        system: systemPrompt,
-        messages: [{ role: 'user', content: userPrompt }],
+    const res = await claudeFetchWithRetry(
+      () => fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+        },
+        body: JSON.stringify({
+          model: CLAUDE_MODEL,
+          max_tokens: 2500,
+          temperature: 0.3,
+          system: systemPrompt,
+          messages: [{ role: 'user', content: userPrompt }],
+        }),
       }),
-    });
+      { label: 'polishRecommendationsWithClaude' },
+    );
     if (!res.ok) throw new Error(`Claude ${res.status}`);
     const data = await res.json();
     const text = Array.isArray(data.content)
