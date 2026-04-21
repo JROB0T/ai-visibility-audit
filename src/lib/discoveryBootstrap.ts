@@ -566,13 +566,13 @@ You MUST call record_prompts exactly once with the full array. Do not respond in
   };
 
   const seen = new Set<string>();
-  let accepted = acceptPrompts(rawPrompts, seen);
+  const accepted = acceptPrompts(rawPrompts, seen);
 
   // Cap per-cluster at max
   const perClusterCount: Record<DiscoveryCluster, number> = {
     core: 0, problem: 0, comparison: 0, long_tail: 0, brand: 0, adjacent: 0,
   };
-  let finalPrompts: GeneratedPrompt[] = [];
+  const finalPrompts: GeneratedPrompt[] = [];
   for (const p of accepted) {
     const max = clusterDistributionTargets[p.cluster].max;
     if (perClusterCount[p.cluster] >= max) continue;
