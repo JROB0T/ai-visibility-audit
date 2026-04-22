@@ -1618,7 +1618,7 @@ export default function AuditResultPage() {
           <p className="mt-1" style={{ color: 'var(--text-tertiary)' }}>{audit.site?.domain} · {new Date(audit.created_at).toLocaleDateString()}{audit.pages_scanned > 0 && ` · ${audit.pages_scanned} pages`}</p>
         </div>
         <div className="flex items-center gap-2">
-          {isAuthenticated && hasPaid && <button onClick={handleExportReport} className="btn-secondary inline-flex items-center gap-2 px-4 py-2 text-sm"><Download className="w-4 h-4" />Export Report</button>}
+          {isAuthenticated && hasPaid && <a href={`/audit/${audit.id}/report`} className="btn-secondary inline-flex items-center gap-2 px-4 py-2 text-sm"><Download className="w-4 h-4" />Export Report</a>}
           <a href="/" className="btn-secondary inline-flex items-center gap-2 px-4 py-2 text-sm"><RefreshCw className="w-4 h-4" />New Audit</a>
         </div>
       </div>
