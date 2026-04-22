@@ -1,0 +1,219 @@
+// ============================================================
+// /audit/[id]/report — report viewer page
+//
+// The report HTML is a complete standalone document (its own
+// <html>/<body>, its own styles, its own fonts). Rendering it
+// inside the existing app chrome with other React components
+// would break the paper-styled fixed-width page layout.
+//
+// We solve this by iframing the HTML via srcDoc. That gives:
+//   - full visual fidelity (paper background, Fraunces/Geist
+//     fonts, 8.5x11 pages with drop shadows)
+//   - clean print behaviour (user's print dialog captures only
+//     the iframe contents; the surrounding chrome is hidden by
+//     the @media print rules already in the CSS)
+//   - zero style bleed in either direction
+//
+// PDF export uses window.print() on the iframe. That's browser-
+// native, works on all major browsers, and respects @page CSS
+// for pagination. If we later need server-side PDFs (e.g. for
+// automated email reports), we add @sparticuz/chromium +
+// puppeteer-core to the API route — this UI doesn't change.
+//
+// Regenerate button POSTs { force: true } to /api/discovery/report
+// and reloads the iframe contents.
+// ============================================================
+
+'use client';
+
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+
+interface ReportMetadata {
+  run_id: string;
+  generated_at: string | null;
+  cached: boolean;
+  model: string | null;
+}
+
+export default function ReportPage() {
+  const params = useParams<{ id: string }>();
+  const auditId = params?.id;
+  const router = useRouter();
+
+  // We need the site_id to call /api/discovery/report. Audit page
+  // already has this; fetch the audit record to get it.
+  const [siteId, setSiteId] = useState<string | null>(null);
+  const [html, setHtml] = useState<string | null>(null);
+  const [meta, setMeta] = useState<ReportMetadata | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [generating, setGenerating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const iframeRef = useRef<HTMLIFrameElement | null>(null);
+
+  // ----- Step 1: fetch the audit to get site_id -----
+  useEffect(() => {
+    if (!auditId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/audit/${auditId}`);
+        if (!res.ok) throw new Error(`Failed to load audit (${res.status})`);
+        const data = await res.json();
+        if (cancelled) return;
+        if (!data?.site_id) throw new Error('Audit has no site_id');
+        setSiteId(data.site_id);
+      } catch (e) {
+        if (!cancelled) {
+          setError(e instanceof Error ? e.message : String(e));
+          setLoading(false);
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [auditId]);
+
+  // ----- Step 2: load (or generate-and-load) the report -----
+  const loadReport = useCallback(async (force: boolean) => {
+    if (!siteId) return;
+    setError(null);
+    if (force) setGenerating(true); else setLoading(true);
+
+    try {
+      // Use POST so force=true is clean; POST always returns JSON
+      // for us so we get metadata alongside HTML.
+      const res = await fetch('/api/discovery/report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ siteId, format: 'json', force }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body?.detail || body?.error || `Request failed (${res.status})`);
+      }
+      const data = await res.json();
+      setHtml(data.html);
+      setMeta({
+        run_id: data.run_id,
+        generated_at: data.generated_at,
+        cached: data.cached,
+        model: data.model,
+      });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLoading(false);
+      setGenerating(false);
+    }
+  }, [siteId]);
+
+  useEffect(() => {
+    if (siteId) loadReport(false);
+  }, [siteId, loadReport]);
+
+  // ----- Actions -----
+  const handlePrint = () => {
+    const frame = iframeRef.current;
+    if (!frame?.contentWindow) return;
+    // Focus the frame first so browsers route the print command there
+    frame.contentWindow.focus();
+    frame.contentWindow.print();
+  };
+
+  const handleRegenerate = () => {
+    if (!confirm('Regenerate the report? This will re-run the narrative generation and may take 15-30 seconds.')) return;
+    loadReport(true);
+  };
+
+  const handleBack = () => router.back();
+
+  // ----- Render -----
+  return (
+    <div className="min-h-screen bg-neutral-900 text-neutral-100">
+      {/* Toolbar */}
+      <div className="sticky top-0 z-10 bg-neutral-950 border-b border-neutral-800">
+        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center gap-3 flex-wrap">
+          <button
+            onClick={handleBack}
+            className="text-xs text-neutral-400 hover:text-neutral-100 transition px-2 py-1"
+          >
+            ← Back
+          </button>
+          <div className="text-sm font-medium">AI Positioning Brief</div>
+          <div className="flex-1" />
+          {meta && (
+            <div className="text-xs text-neutral-500">
+              {meta.cached ? 'Cached' : 'Fresh'}
+              {meta.generated_at && ` · Generated ${new Date(meta.generated_at).toLocaleString()}`}
+              {meta.model && ` · ${meta.model}`}
+            </div>
+          )}
+          <button
+            onClick={handleRegenerate}
+            disabled={loading || generating || !html}
+            className="text-xs px-3 py-1.5 border border-neutral-700 rounded hover:bg-neutral-800 disabled:opacity-50 disabled:cursor-not-allowed transition"
+            title="Re-run narrative generation and rebuild the report"
+          >
+            {generating ? 'Regenerating…' : 'Regenerate'}
+          </button>
+          <button
+            onClick={handlePrint}
+            disabled={!html}
+            className="text-xs px-3 py-1.5 bg-white text-neutral-900 rounded hover:bg-neutral-200 disabled:opacity-50 disabled:cursor-not-allowed transition font-medium"
+          >
+            Download PDF
+          </button>
+        </div>
+      </div>
+
+      {/* Status */}
+      {error && (
+        <div className="max-w-2xl mx-auto mt-12 px-4">
+          <div className="border border-red-800 bg-red-950/40 text-red-200 rounded p-6">
+            <div className="text-sm font-medium mb-2">Couldn&apos;t load the report</div>
+            <div className="text-xs text-red-300 font-mono mb-4">{error}</div>
+            <button
+              onClick={() => loadReport(false)}
+              className="text-xs px-3 py-1.5 border border-red-800 rounded hover:bg-red-900/40 transition"
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+      )}
+
+      {(loading || generating) && !error && (
+        <div className="max-w-2xl mx-auto mt-24 px-4 text-center">
+          <div className="text-sm text-neutral-400">
+            {generating ? 'Generating report…' : 'Loading report…'}
+          </div>
+          <div className="text-xs text-neutral-600 mt-1">
+            {generating ? 'This takes 15-30 seconds.' : null}
+          </div>
+        </div>
+      )}
+
+      {/* Report iframe */}
+      {html && !error && (
+        <iframe
+          ref={iframeRef}
+          srcDoc={html}
+          title="AI Positioning Brief"
+          className="w-full block"
+          style={{
+            // Height sized for 7 letter pages + spacing. The iframe doesn't
+            // auto-grow to content, and cross-origin srcdoc makes measuring
+            // the inner document fiddly. A fixed generous height scrolls
+            // naturally within.
+            height: 'calc(11.5in * 7 + 400px)',
+            minHeight: '200vh',
+            border: 'none',
+            background: '#1e1a12',
+          }}
+          sandbox="allow-same-origin allow-modals allow-popups"
+        />
+      )}
+    </div>
+  );
+}
