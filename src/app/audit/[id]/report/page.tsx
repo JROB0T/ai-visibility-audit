@@ -62,8 +62,13 @@ export default function ReportPage() {
         if (!res.ok) throw new Error(`Failed to load audit (${res.status})`);
         const data = await res.json();
         if (cancelled) return;
-        if (!data?.site_id) throw new Error('Audit has no site_id');
-        setSiteId(data.site_id);
+        // The audit API returns { audit: { site_id, ... }, pages, findings, ... }
+        // — not a flat { site_id } object. Pull from data.audit.site_id.
+        // Fall back to data.audit.site?.id for the edge case where the FK
+        // column is null but the embedded site row is present.
+        const resolvedSiteId = data?.audit?.site_id || data?.audit?.site?.id || null;
+        if (!resolvedSiteId) throw new Error('Audit has no site_id');
+        setSiteId(resolvedSiteId);
       } catch (e) {
         if (!cancelled) {
           setError(e instanceof Error ? e.message : String(e));
