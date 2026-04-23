@@ -37,9 +37,9 @@ import { requireFullDiscoveryAccess } from '@/lib/discoveryAccess';
 import { generateReportNarrative, type ReportExportPayload, type ReportNarrative } from '@/lib/reportNarrative';
 import { buildReportHtml } from '@/lib/reportTemplate';
 
-// Narrative generation is a single Claude call — typically 5-15s.
-// Give it headroom on cold starts but stay within Vercel Hobby's 60s limit.
-export const maxDuration = 60;
+// Narrative generation is a single Claude call — typically 30-90s on Sonnet 4.6.
+// Requires Vercel Pro (or higher) for this timeout.
+export const maxDuration = 300;
 
 function getAdminClient(): SupabaseClient {
   return createClient(
