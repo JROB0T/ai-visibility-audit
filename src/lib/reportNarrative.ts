@@ -398,7 +398,7 @@ const NARRATIVE_TOOL = {
 // ------------------------------------------------------------
 // Main entry point.
 // ------------------------------------------------------------
-const NARRATIVE_MODEL = 'claude-sonnet-4-6-20250929';
+const NARRATIVE_MODEL = 'claude-sonnet-4-6';
 
 export async function generateReportNarrative(
   payload: ReportExportPayload,
