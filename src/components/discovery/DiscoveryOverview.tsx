@@ -28,11 +28,8 @@ interface OverviewProps {
   prompts: DiscoveryPrompt[];
   siteId: string;
   latestRunId: string | null;
-  tier: DiscoveryTier | null;
-  isPaid: boolean;
-  isAdmin: boolean;
   runningTier: DiscoveryTier | null;
-  onRunTests: (tier: DiscoveryTier) => Promise<void>;
+  onRunTests: () => Promise<void>;
   onRefresh: () => Promise<void>;
   onClusterClick?: (cluster: DiscoveryCluster) => void;
 }
@@ -71,7 +68,7 @@ function ownerLabel(owner: string | null): string {
 }
 
 export default function DiscoveryOverview(props: OverviewProps): React.ReactElement {
-  const { snapshot, siteId, latestRunId, tier, isPaid, isAdmin, runningTier, onRunTests, onClusterClick } = props;
+  const { snapshot, siteId, latestRunId, runningTier, onRunTests, onClusterClick } = props;
 
   // ============================================================
   // Insights polling
@@ -210,7 +207,7 @@ export default function DiscoveryOverview(props: OverviewProps): React.ReactElem
           ) : (
             <button
               type="button"
-              onClick={() => onRunTests('full')}
+              onClick={() => onRunTests()}
               className="btn-primary px-5 py-2.5 text-sm font-medium inline-flex items-center gap-2"
             >
               Run AI Discovery
@@ -245,7 +242,7 @@ export default function DiscoveryOverview(props: OverviewProps): React.ReactElem
         <div className="mt-4 flex items-center gap-3 flex-wrap">
           <button
             type="button"
-            onClick={() => onRunTests('full')}
+            onClick={() => onRunTests()}
             disabled={!!runningTier}
             className="btn-primary px-4 py-2 text-sm font-medium"
           >

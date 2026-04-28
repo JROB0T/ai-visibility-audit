@@ -235,11 +235,8 @@ export default function DiscoveryTab({ siteId, isPaid, isAdmin }: DiscoveryTabPr
           prompts={prompts}
           siteId={siteId}
           latestRunId={latestRunId}
-          tier={tier}
-          isPaid={isPaid}
-          isAdmin={isAdmin}
           runningTier={runningTier}
-          onRunTests={handleRunTests}
+          onRunTests={() => handleRunTests('full')}
           onRefresh={loadAll}
         />
       )}

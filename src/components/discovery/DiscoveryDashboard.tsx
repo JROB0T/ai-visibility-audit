@@ -81,15 +81,15 @@ export default function DiscoveryDashboard({
 
   const [runningTier, setRunningTier] = useState<DiscoveryTier | null>(null);
   const isRunningRef = useRef(false);
-  const handleRunTests = useCallback(async (tierToRun: DiscoveryTier) => {
+  const handleRunTests = useCallback(async () => {
     if (isRunningRef.current) return;
     isRunningRef.current = true;
-    setRunningTier(tierToRun);
+    setRunningTier('full');
     try {
       const res = await fetch('/api/discovery/run-tests', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ siteId, tier: tierToRun }),
+        body: JSON.stringify({ siteId, tier: 'full' }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({ error: 'Run failed' }));
@@ -140,9 +140,6 @@ export default function DiscoveryDashboard({
               prompts={prompts}
               siteId={siteId}
               latestRunId={latestRunId}
-              tier={tier}
-              isPaid={isPaid}
-              isAdmin={isAdmin}
               runningTier={runningTier}
               onRunTests={handleRunTests}
               onRefresh={loadAll}
