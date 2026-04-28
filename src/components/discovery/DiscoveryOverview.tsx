@@ -34,6 +34,7 @@ interface OverviewProps {
   runningTier: DiscoveryTier | null;
   onRunTests: (tier: DiscoveryTier) => Promise<void>;
   onRefresh: () => Promise<void>;
+  onClusterClick?: (cluster: DiscoveryCluster) => void;
 }
 
 function formatSnapshotDate(dateStr: string | null): string {
@@ -70,7 +71,7 @@ function ownerLabel(owner: string | null): string {
 }
 
 export default function DiscoveryOverview(props: OverviewProps): React.ReactElement {
-  const { snapshot, siteId, latestRunId, tier, isPaid, isAdmin, runningTier, onRunTests } = props;
+  const { snapshot, siteId, latestRunId, tier, isPaid, isAdmin, runningTier, onRunTests, onClusterClick } = props;
 
   // ============================================================
   // Insights polling
@@ -279,7 +280,18 @@ export default function DiscoveryOverview(props: OverviewProps): React.ReactElem
               style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}
             >
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{clusterLabel(cluster)}</span>
+                {onClusterClick ? (
+                  <button
+                    type="button"
+                    onClick={() => onClusterClick(cluster)}
+                    className="text-sm font-medium text-left hover:underline cursor-pointer"
+                    style={{ color: 'var(--text-primary)' }}
+                  >
+                    {clusterLabel(cluster)}
+                  </button>
+                ) : (
+                  <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{clusterLabel(cluster)}</span>
+                )}
                 <span
                   className="text-sm font-bold"
                   style={{ color: score !== null ? getScoreColor(score) : 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}
