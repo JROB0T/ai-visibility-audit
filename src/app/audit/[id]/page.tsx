@@ -12,6 +12,7 @@ import ClusterDrilldown from '@/components/dashboard/ClusterDrilldown';
 import SidePanel from '@/components/dashboard/SidePanel';
 import AutoRunProgress from '@/components/dashboard/AutoRunProgress';
 import { clusterLabel } from '@/lib/discovery';
+import { scoreToGrade } from '@/components/ScoreRing';
 import type { DiscoveryCluster, DiscoveryScoreSnapshot } from '@/lib/types';
 
 interface ShellAuditData {
@@ -218,6 +219,14 @@ function AuditPageInner(): React.ReactElement {
         onRunDiscovery={undefined}
         isRunningDiscovery={false}
         reportAvailable={reportAvailable}
+        siteReadinessScore={audit.overall_score}
+        siteReadinessGrade={audit.overall_score !== null ? scoreToGrade(audit.overall_score) : null}
+        siteReadinessSubScores={{
+          crawlability: audit.crawlability_score,
+          machineReadability: audit.machine_readability_score,
+          commercialClarity: audit.commercial_clarity_score,
+          trustClarity: audit.trust_clarity_score,
+        }}
       />
 
       {isAuthenticated && hasPaid && (

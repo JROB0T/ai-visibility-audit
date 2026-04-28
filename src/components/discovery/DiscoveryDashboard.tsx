@@ -128,24 +128,26 @@ export default function DiscoveryDashboard({
 
       {!loading && (
         <>
-          <DashboardSection
-            title="How AI sees you"
-            subtitle="Cluster performance and visibility distribution"
-            reportPage={1}
-            reportAuditId={auditId}
-            reportAvailable={reportAvailable}
-          >
-            <DiscoveryOverview
-              snapshot={snapshot}
-              prompts={prompts}
-              siteId={siteId}
-              latestRunId={latestRunId}
-              runningTier={runningTier}
-              onRunTests={handleRunTests}
-              onRefresh={loadAll}
-              onClusterClick={onClusterDrilldown}
-            />
-          </DashboardSection>
+          <div id="how-ai-sees-you" style={{ scrollMarginTop: '24px' }}>
+            <DashboardSection
+              title="How AI sees you"
+              subtitle="Cluster performance and visibility distribution"
+              reportPage={1}
+              reportAuditId={auditId}
+              reportAvailable={reportAvailable}
+            >
+              <DiscoveryOverview
+                snapshot={snapshot}
+                prompts={prompts}
+                siteId={siteId}
+                latestRunId={latestRunId}
+                runningTier={runningTier}
+                onRunTests={handleRunTests}
+                onRefresh={loadAll}
+                onClusterClick={onClusterDrilldown}
+              />
+            </DashboardSection>
+          </div>
 
           <DashboardSection
             title="Trending"
