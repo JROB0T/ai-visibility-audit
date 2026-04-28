@@ -379,7 +379,9 @@ export function draftRecommendations(
     return b.source_signal_keys.length - a.source_signal_keys.length;
   });
 
-  if (ctx.tier === 'teaser') {
+  // Phase 1.5a: tier always 'full' for new runs. Legacy teaser data still
+  // lives in DB but the cap below applies uniformly. Branch removed.
+  if (ctx.tier === 'teaser_legacy') {
     return merged.slice(0, TEASER_MAX);
   }
   return merged.slice(0, FULL_MAX);

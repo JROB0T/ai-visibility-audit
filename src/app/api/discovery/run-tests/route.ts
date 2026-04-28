@@ -202,18 +202,19 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const promptIds = Array.isArray(body.promptIds)
     ? (body.promptIds as unknown[]).filter((x): x is string => typeof x === 'string')
     : undefined;
-  const tier: DiscoveryTier = body.tier === 'teaser' ? 'teaser' : 'full';
+  // Phase 1.5a: teaser killed. Always full.
+  const tier: DiscoveryTier = 'full';
   if (!siteId) {
     return NextResponse.json({ error: 'siteId is required' }, { status: 400 });
   }
 
-  // Auth + ownership (teaser is always allowed; full gate below)
+  // Auth + ownership
   const auth = await requireDiscoveryAccess(request, siteId);
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
-  // Entitlement gate — teaser is free for all logged-in users; full requires paid
-  if (tier === 'full' && !auth.isAdmin && !auth.isPaid) {
-    return NextResponse.json({ error: 'Full discovery requires a paid plan' }, { status: 403 });
+  // Entitlement gate
+  if (!auth.isAdmin && !auth.isPaid) {
+    return NextResponse.json({ error: 'Discovery requires a paid plan' }, { status: 403 });
   }
 
   // Server-side idempotency: if a discovery run for this site landed in the

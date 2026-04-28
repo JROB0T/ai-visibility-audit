@@ -205,15 +205,15 @@ export default function DiscoveryOverview(props: OverviewProps): React.ReactElem
                 className="inline-block w-3 h-3 rounded-full animate-pulse"
                 style={{ background: 'var(--accent)' }}
               />
-              Testing your visibility across AI answers… this takes 30&ndash;90 seconds for a preview, 1&ndash;3 minutes for a full run.
+              Testing your visibility across AI answers… this takes 1&ndash;3 minutes.
             </div>
           ) : (
             <button
               type="button"
-              onClick={() => onRunTests(isPaid || isAdmin ? 'full' : 'teaser')}
+              onClick={() => onRunTests('full')}
               className="btn-primary px-5 py-2.5 text-sm font-medium inline-flex items-center gap-2"
             >
-              {isPaid || isAdmin ? 'Run Full AI Discovery' : 'Run Free Preview'}
+              Run AI Discovery
             </button>
           )}
         </div>
@@ -245,19 +245,12 @@ export default function DiscoveryOverview(props: OverviewProps): React.ReactElem
         <div className="mt-4 flex items-center gap-3 flex-wrap">
           <button
             type="button"
-            onClick={() => onRunTests(isPaid || isAdmin ? 'full' : 'teaser')}
+            onClick={() => onRunTests('full')}
             disabled={!!runningTier}
             className="btn-primary px-4 py-2 text-sm font-medium"
           >
-            {runningTier
-              ? 'Running…'
-              : (isPaid || isAdmin ? 'Run Full AI Discovery (25 prompts)' : 'Run Free Preview (5 prompts)')}
+            {runningTier ? 'Running…' : 'Run AI Discovery'}
           </button>
-          {!isPaid && !isAdmin && (
-            <a href="/pricing" className="text-sm font-medium" style={{ color: 'var(--accent)' }}>
-              Upgrade for full report
-            </a>
-          )}
         </div>
       </div>
     </div>
@@ -319,7 +312,7 @@ export default function DiscoveryOverview(props: OverviewProps): React.ReactElem
   // ============================================================
   // BLOCK 3 — Top insights
   // ============================================================
-  const insightsToShow = insights.slice(0, tier === 'teaser' ? 2 : 3);
+  const insightsToShow = insights.slice(0, 3);
   const insightsBlock = (
     <div className="mb-6">
       <h3 className="text-lg font-bold mb-3" style={{ color: 'var(--text-primary)' }}>What we found</h3>
@@ -381,8 +374,7 @@ export default function DiscoveryOverview(props: OverviewProps): React.ReactElem
   const topComps = Array.from(compCounts.entries())
     .sort((a, b) => b[1] - a[1])
     .slice(0, 3);
-  const showCompBlock = tier !== 'teaser' || topComps.length >= 2;
-  const competitorsBlock = showCompBlock ? (
+  const competitorsBlock = (
     <div className="mb-6">
       <h3 className="text-lg font-bold mb-3" style={{ color: 'var(--text-primary)' }}>Who&rsquo;s showing up instead of you</h3>
       {topComps.length > 0 ? (
@@ -409,12 +401,12 @@ export default function DiscoveryOverview(props: OverviewProps): React.ReactElem
         </div>
       )}
     </div>
-  ) : null;
+  );
 
   // ============================================================
   // BLOCK 5 — Top recommendations
   // ============================================================
-  const recLimit = tier === 'teaser' ? 1 : 3;
+  const recLimit = 3;
   const recsToShow = recommendations.slice(0, recLimit);
   const recsBlock = (
     <div className="mb-6">
@@ -449,22 +441,6 @@ export default function DiscoveryOverview(props: OverviewProps): React.ReactElem
               </div>
             );
           })}
-          {tier === 'teaser' && (
-            <a
-              href="/pricing"
-              className="rounded-xl border p-4 flex flex-col items-start justify-center text-left"
-              style={{
-                background: 'linear-gradient(135deg, rgba(99,102,241,0.08), rgba(16,185,129,0.06))',
-                borderColor: 'var(--border)',
-              }}
-            >
-              <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Unlock your full fix plan</p>
-              <p className="mt-1 text-xs" style={{ color: 'var(--text-secondary)' }}>
-                Get every recommendation tailored to your site — not just the first one.
-              </p>
-              <span className="mt-3 text-xs font-medium" style={{ color: 'var(--accent)' }}>Upgrade →</span>
-            </a>
-          )}
         </div>
       ) : (
         <div

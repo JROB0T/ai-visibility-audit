@@ -45,7 +45,9 @@ export type RunDiscoveryTestsInput = {
   runLabel?: string;
   triggeredBy: 'user' | 'cron' | 'admin';
   tier?: DiscoveryTier;
-  teaserPromptCount?: number;
+  // Best-effort progress callback fired after each prompt completes.
+  // Implementations should not await — these updates are advisory.
+  onProgress?: (done: number, total: number) => void;
 };
 
 export type RunDiscoveryTestsResult = {
@@ -508,8 +510,8 @@ function scoreFromStatus(status: DiscoveryVisibilityStatus, position: DiscoveryP
 
 export async function runDiscoveryTests(input: RunDiscoveryTestsInput): Promise<RunDiscoveryTestsResult> {
   const { siteId, promptIds, runLabel, triggeredBy } = input;
-  const tier: DiscoveryTier = input.tier ?? 'full';
-  const teaserPromptCount = Math.max(1, input.teaserPromptCount ?? 5);
+  // Phase 1.5a: teaser runs are killed — every run is full.
+  const tier: DiscoveryTier = 'full';
   const runId = newRunId();
   const admin = getAdminClient();
   const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -607,32 +609,7 @@ export async function runDiscoveryTests(input: RunDiscoveryTestsInput): Promise<
       return (a.created_at || '').localeCompare(b.created_at || '');
     });
 
-  let prompts: DiscoveryPrompt[];
-  if (tier === 'teaser') {
-    // Teaser: pick a representative subset that covers as many clusters as possible,
-    // then fill remaining slots by priority order. Try to ensure >=3 distinct clusters.
-    const picked: DiscoveryPrompt[] = [];
-    const seenClusters = new Set<DiscoveryCluster>();
-    // Pass 1: one prompt per cluster in priority order
-    for (const p of sortedPrompts) {
-      if (picked.length >= teaserPromptCount) break;
-      if (!seenClusters.has(p.cluster)) {
-        picked.push(p);
-        seenClusters.add(p.cluster);
-      }
-    }
-    // Pass 2: fill any remaining slots with next-best by priority
-    if (picked.length < teaserPromptCount) {
-      const pickedIds = new Set(picked.map(p => p.id));
-      for (const p of sortedPrompts) {
-        if (picked.length >= teaserPromptCount) break;
-        if (!pickedIds.has(p.id)) picked.push(p);
-      }
-    }
-    prompts = picked;
-  } else {
-    prompts = sortedPrompts.slice(0, MAX_PROMPTS_PER_RUN);
-  }
+  const prompts: DiscoveryPrompt[] = sortedPrompts.slice(0, MAX_PROMPTS_PER_RUN);
 
   console.log(
     `[discoveryRunner] tier=${tier} selected=${prompts.length}`,
@@ -650,6 +627,8 @@ export async function runDiscoveryTests(input: RunDiscoveryTestsInput): Promise<
   // 4. Run Claude for each prompt with concurrency cap
   const errors: { promptId: string; error: string }[] = [];
   type WorkOutcome = { prompt: DiscoveryPrompt; outcome: PerPromptOutcome | null };
+  const totalPrompts = prompts.length;
+  let completedPrompts = 0;
   const outcomes = await runWithConcurrency<DiscoveryPrompt, WorkOutcome>(
     prompts,
     CONCURRENCY,
@@ -661,13 +640,20 @@ export async function runDiscoveryTests(input: RunDiscoveryTestsInput): Promise<
         const msg = err instanceof Error ? err.message : String(err);
         errors.push({ promptId: prompt.id, error: msg });
         return { prompt, outcome: null };
+      } finally {
+        completedPrompts++;
+        if (input.onProgress) {
+          try { input.onProgress(completedPrompts, totalPrompts); } catch { /* swallow — progress is advisory */ }
+        }
       }
     },
   );
 
   // 5. Detect + score + build insert rows
-  // Tier tagging: teaser runs get 'tier:teaser' stamped into internal_notes for downstream filtering.
-  const tierNote: string | null = tier === 'teaser' ? 'tier:teaser' : null;
+  // Phase 1.5a: tier tagging removed — every new run is full, so internal_notes
+  // is null for all new rows. Pre-existing rows tagged 'tier:teaser' are
+  // preserved in the DB and continue to render correctly.
+  const tierNote: string | null = null;
   const resultInsertRows: Record<string, unknown>[] = [];
   // Observability counters — used to confirm the tool_use parsing fix in prod.
   let toolUseSuccessCount = 0;

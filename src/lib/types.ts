@@ -440,7 +440,11 @@ export type DiscoveryOwnerType = 'developer' | 'marketer' | 'business_owner';
 
 export type DiscoveryPriority = 'high' | 'medium' | 'low';
 
-export type DiscoveryTier = 'teaser' | 'full';
+// Phase 1.5a: teaser tier killed in favor of immediate full discovery
+// auto-run on first paid view. Type kept for migration safety —
+// existing teaser snapshots in the DB still display correctly. No new
+// teaser runs are ever created.
+export type DiscoveryTier = 'full' | 'teaser_legacy';
 
 export interface DiscoveryClusterWeights {
   core: number;

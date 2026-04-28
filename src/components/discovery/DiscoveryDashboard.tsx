@@ -73,8 +73,10 @@ export default function DiscoveryDashboard({
     void loadAll();
   }, [loadAll]);
 
+  // Pre-1.5a snapshots with ≤5 prompts surface as 'teaser_legacy'. New runs
+  // always have a full prompt set, so the heuristic only matches old data.
   const tier: DiscoveryTier | null = snapshot
-    ? (snapshot.prompt_count <= 5 ? 'teaser' : 'full')
+    ? (snapshot.prompt_count <= 5 ? 'teaser_legacy' : 'full')
     : null;
 
   const [runningTier, setRunningTier] = useState<DiscoveryTier | null>(null);

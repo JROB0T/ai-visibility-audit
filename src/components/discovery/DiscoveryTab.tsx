@@ -84,7 +84,7 @@ export default function DiscoveryTab({ siteId, isPaid, isAdmin }: DiscoveryTabPr
 
   // Derive tier from snapshot.prompt_count (<=5 → teaser)
   const tier: DiscoveryTier | null = snapshot
-    ? (snapshot.prompt_count <= 5 ? 'teaser' : 'full')
+    ? (snapshot.prompt_count <= 5 ? 'teaser_legacy' : 'full')
     : null;
 
   const [runningTier, setRunningTier] = useState<DiscoveryTier | null>(null);
@@ -117,8 +117,8 @@ export default function DiscoveryTab({ siteId, isPaid, isAdmin }: DiscoveryTabPr
     }
   }, [siteId, loadAll]);
 
-  const showUpgradeBanner = tier === 'teaser' && !isPaid && !isAdmin;
-  const tierLabel = tier === 'teaser' ? 'Free preview' : (tier === 'full' ? 'Full report' : null);
+  const showUpgradeBanner = tier === 'teaser_legacy' && !isPaid && !isAdmin;
+  const tierLabel = tier === 'teaser_legacy' ? 'Free preview' : (tier === 'full' ? 'Full report' : null);
 
   return (
     <div>
@@ -148,7 +148,7 @@ export default function DiscoveryTab({ siteId, isPaid, isAdmin }: DiscoveryTabPr
           {!snapshot && !loading && (
             <button
               type="button"
-              onClick={() => handleRunTests(isPaid || isAdmin ? 'full' : 'teaser')}
+              onClick={() => handleRunTests(isPaid || isAdmin ? 'full' : 'teaser_legacy')}
               disabled={!!runningTier}
               className="btn-primary px-5 py-2.5 text-sm font-medium inline-flex items-center gap-2 whitespace-nowrap"
             >

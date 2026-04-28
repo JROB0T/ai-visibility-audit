@@ -54,8 +54,10 @@ function getAdminClient(): SupabaseClient {
 
 function inferTier(results: DiscoveryResult[]): DiscoveryTier {
   const first = results[0];
+  // Pre-1.5a snapshots stamped 'tier:teaser' in internal_notes. We surface
+  // those as 'teaser_legacy' so the downstream type union stays clean.
   if (first && typeof first.internal_notes === 'string' && first.internal_notes.startsWith('tier:teaser')) {
-    return 'teaser';
+    return 'teaser_legacy';
   }
   return 'full';
 }
@@ -67,10 +69,29 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   }
   const runIdInput = request.nextUrl.searchParams.get('runId');
 
-  const auth = await requireFullDiscoveryAccess(request, siteId);
-  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
-
+  // Internal call from /api/discovery/run-and-report. The chained job
+  // handler runs server-side and doesn't have user auth cookies; we
+  // verify the supplied jobId is real, in 'running' state, and tied to
+  // this exact siteId before bypassing the cookie auth.
+  const internalJobHeader = request.headers.get('x-internal-job');
   const admin = getAdminClient();
+  if (internalJobHeader) {
+    const { data: job } = await admin
+      .from('discovery_jobs')
+      .select('id, site_id, status')
+      .eq('id', internalJobHeader)
+      .maybeSingle();
+    if (!job || job.status !== 'running') {
+      return NextResponse.json({ error: 'Invalid internal job reference' }, { status: 401 });
+    }
+    if (job.site_id !== siteId) {
+      return NextResponse.json({ error: 'Job site mismatch' }, { status: 403 });
+    }
+    // Bypass cookie auth, proceed.
+  } else {
+    const auth = await requireFullDiscoveryAccess(request, siteId);
+    if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
+  }
 
   // Resolve run_id — specific or latest
   let runId = runIdInput;

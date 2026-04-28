@@ -77,7 +77,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   // Derive tier from internal_notes (matches rest of pipeline)
   const firstNote = results[0]?.internal_notes;
-  if (typeof firstNote === 'string' && firstNote.startsWith('tier:teaser')) tierFromResults = 'teaser';
+  if (typeof firstNote === 'string' && firstNote.startsWith('tier:teaser')) tierFromResults = 'teaser_legacy';
 
   console.log(`[backfill-post-run] siteId=${siteId.slice(0, 8)} runId=${runId.slice(0, 8)} tier=${tierFromResults} results=${results.length}`);
 

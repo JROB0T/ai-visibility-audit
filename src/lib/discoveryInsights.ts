@@ -261,7 +261,8 @@ export function detectInsightSignals(ctx: InsightDetectionContext): InsightSigna
   }
 
   // TEASER TRIM ------------------------------------------------
-  if (ctx.tier === 'teaser') {
+  // Phase 1.5a: applies only to legacy teaser data; new runs are always 'full'.
+  if (ctx.tier === 'teaser_legacy') {
     const negative = signals.filter(s => s.category !== 'wins');
     const source = negative.length > 0 ? negative : signals;
     const ranked = source.slice().sort((a, b) => {

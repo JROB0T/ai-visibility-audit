@@ -64,7 +64,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     .maybeSingle();
   const sample = (sampleResult || null) as Pick<DiscoveryResult, 'internal_notes'> | null;
   const tier: DiscoveryTier = sample && typeof sample.internal_notes === 'string' && sample.internal_notes.startsWith('tier:teaser')
-    ? 'teaser'
+    ? 'teaser_legacy'
     : 'full';
 
   return NextResponse.json({ recommendations: recs || [], tier, runId });

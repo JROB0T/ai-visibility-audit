@@ -34,7 +34,7 @@ export interface ReportExportPayload {
     domain: string;
     primary_category: string | null;
     service_area: string | null;
-    tier: 'teaser' | 'full';
+    tier: 'full' | 'teaser_legacy';
     snapshot_date: string;
     report_generated_at: string;
     prompt_count: number;

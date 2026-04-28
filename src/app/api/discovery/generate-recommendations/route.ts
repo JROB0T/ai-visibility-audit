@@ -21,7 +21,7 @@ function getAdminClient(): SupabaseClient {
 function inferTierFromResults(results: DiscoveryResult[]): DiscoveryTier {
   if (results.length === 0) return 'full';
   const first = results[0];
-  if (typeof first.internal_notes === 'string' && first.internal_notes.startsWith('tier:teaser')) return 'teaser';
+  if (typeof first.internal_notes === 'string' && first.internal_notes.startsWith('tier:teaser')) return 'teaser_legacy';
   return 'full';
 }
 

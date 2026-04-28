@@ -44,6 +44,15 @@ export default function DashboardHeader({
   const effectiveGrade = grade || (hasSnapshot && overallScore !== null ? scoreToGrade(overallScore) : null);
   const scoreColor = hasSnapshot && overallScore !== null ? getScoreColor(overallScore) : 'var(--text-tertiary)';
 
+  // Phase 1.5a placeholder. Real subscription-gated re-runs ship in 1.5b.
+  const handleRerunClick = () => {
+    alert(
+      'Re-run analysis requires an active subscription.\n\n' +
+      'Subscriptions launch with our next update. ' +
+      'You’ll be able to keep your AI positioning fresh with monthly tracking.',
+    );
+  };
+
   return (
     <header className="mb-10">
       {/* Row 1 — breadcrumb */}
@@ -79,15 +88,15 @@ export default function DashboardHeader({
               View Full Report
             </a>
           )}
-          {hasPaid && hasSnapshot && onRunDiscovery && (
+          {hasPaid && hasSnapshot && (
             <button
               type="button"
-              onClick={onRunDiscovery}
-              disabled={isRunningDiscovery}
-              className="btn-secondary inline-flex items-center gap-2 px-4 py-2 text-sm font-medium"
+              onClick={handleRerunClick}
+              className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded border transition-colors"
+              style={{ borderColor: 'var(--border)', color: 'var(--text-secondary)' }}
             >
-              <RefreshCw className={`w-4 h-4 ${isRunningDiscovery ? 'animate-spin' : ''}`} />
-              {isRunningDiscovery ? 'Running…' : 'Re-run discovery'}
+              <RefreshCw className="w-3 h-3" />
+              Re-run analysis
             </button>
           )}
           {hasPaid && !hasSnapshot && onRunDiscovery && (
