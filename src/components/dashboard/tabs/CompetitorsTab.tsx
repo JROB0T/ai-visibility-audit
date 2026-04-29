@@ -4,8 +4,11 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Plus, Wand2, X } from 'lucide-react';
 import type { DiscoveryCompetitor, DiscoveryResult } from '@/lib/types';
 import { type FindingSeverity } from '@/lib/dashboardColors';
+import { buildCompetitorMatrix, findLosingGround } from '@/lib/competitorAggregation';
 import AddCompetitorForm from '../competitors/AddCompetitorForm';
 import CompetitorRow from '../competitors/CompetitorRow';
+import HeadToHeadMatrix from '../competitors/HeadToHeadMatrix';
+import LosingGround from '../competitors/LosingGround';
 
 interface CompetitorsTabProps {
   siteId: string;
@@ -74,7 +77,6 @@ export default function CompetitorsTab(props: CompetitorsTabProps): React.ReactE
   }
 
   async function handleUpdate(id: string, patch: Partial<DiscoveryCompetitor>): Promise<void> {
-    // The route takes id in the JSON body, not in the URL.
     const res = await fetch('/api/discovery/competitors', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -88,7 +90,6 @@ export default function CompetitorsTab(props: CompetitorsTabProps): React.ReactE
   }
 
   async function handleDelete(id: string): Promise<void> {
-    // The route takes id as a query param, not a path segment.
     const res = await fetch(`/api/discovery/competitors?id=${encodeURIComponent(id)}`, {
       method: 'DELETE',
     });
@@ -125,7 +126,13 @@ export default function CompetitorsTab(props: CompetitorsTabProps): React.ReactE
     }
   }
 
-  // ----- Derived: appearance counts from props.results -----
+  // ----- Aggregations -----
+
+  const matrix = useMemo(
+    () => buildCompetitorMatrix(props.results, competitors),
+    [props.results, competitors],
+  );
+  const losingGround = useMemo(() => findLosingGround(matrix), [matrix]);
 
   const counted = useMemo<CountedCompetitor[]>(() => {
     return competitors.map((c) => {
@@ -148,11 +155,6 @@ export default function CompetitorsTab(props: CompetitorsTabProps): React.ReactE
     });
   }, [competitors, props.results]);
 
-  const major = counted.filter((c) => c.timesAppeared >= 2);
-  const minor = counted.filter((c) => c.timesAppeared === 1);
-  const tracked = counted.filter((c) => c.timesAppeared === 0);
-
-  // ----- Mentions of directories / marketplaces from results -----
   const directories = useMemo(
     () => collectMentions(props.results, (r) => r.directories_detected || []),
     [props.results],
@@ -222,31 +224,70 @@ export default function CompetitorsTab(props: CompetitorsTabProps): React.ReactE
         <AddCompetitorForm onSubmit={handleAdd} onCancel={() => setShowAddForm(false)} />
       )}
 
-      {/* REPEAT APPEARANCES */}
+      {/* HEAD-TO-HEAD MATRIX */}
       <section
         className="rounded-xl border p-6"
         style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}
       >
-        <h3 className="text-sm font-bold uppercase tracking-wider mb-4" style={{ color: 'var(--text-primary)' }}>
-          Repeat appearances ({major.length})
-        </h3>
+        <div className="mb-4">
+          <h3
+            className="text-sm font-bold uppercase tracking-wider"
+            style={{ color: 'var(--text-primary)' }}
+          >
+            Head-to-head
+          </h3>
+          <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>
+            Per cluster, how many prompts each entity appeared in
+          </p>
+        </div>
+        <HeadToHeadMatrix matrix={matrix} yourLabel="You" maxColumns={4} />
+      </section>
 
+      {/* WHERE YOU'RE LOSING GROUND */}
+      <section
+        className="rounded-xl border p-6"
+        style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}
+      >
+        <div className="mb-4">
+          <h3
+            className="text-sm font-bold uppercase tracking-wider"
+            style={{ color: 'var(--text-primary)' }}
+          >
+            Where you&rsquo;re losing ground ({losingGround.length})
+          </h3>
+          <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>
+            Clusters where a competitor appeared more than you
+          </p>
+        </div>
+        <LosingGround entries={losingGround} />
+      </section>
+
+      {/* TRACKED COMPETITORS — single editable list, all of them */}
+      <section
+        className="rounded-xl border p-6"
+        style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}
+      >
+        <div className="mb-4">
+          <h3
+            className="text-sm font-bold uppercase tracking-wider"
+            style={{ color: 'var(--text-primary)' }}
+          >
+            Tracked competitors ({competitors.length})
+          </h3>
+          <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>
+            Edit, add, or remove competitors you want to track in the matrix
+          </p>
+        </div>
         {loading ? (
           <p className="text-sm py-4" style={{ color: 'var(--text-tertiary)' }}>Loading…</p>
-        ) : major.length === 0 ? (
-          <div className="py-8 text-center max-w-md mx-auto">
-            <p className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-              No competitors are appearing in 2+ prompts alongside your business. In your market,
-              AI doesn&rsquo;t have an obvious go-to rival to your brand. Maintaining this gap is
-              defensive priority #1 in your action plan.
-            </p>
-            <p className="text-xs mt-3" style={{ color: 'var(--text-tertiary)' }}>
-              Add known competitors manually above, or detect them from your latest run.
-            </p>
-          </div>
+        ) : competitors.length === 0 ? (
+          <p className="text-sm py-4 text-center" style={{ color: 'var(--text-tertiary)' }}>
+            No tracked competitors yet. Add some manually above, or click &ldquo;Refresh from
+            latest run&rdquo; to detect them automatically.
+          </p>
         ) : (
           <div>
-            {major.map((c) => (
+            {counted.map((c) => (
               <CompetitorRow
                 key={c.competitor.id}
                 competitor={c.competitor}
@@ -260,64 +301,15 @@ export default function CompetitorsTab(props: CompetitorsTabProps): React.ReactE
         )}
       </section>
 
-      {/* SINGLE APPEARANCES */}
-      {minor.length > 0 && (
-        <section
-          className="rounded-xl border p-6"
-          style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}
-        >
-          <h3 className="text-sm font-bold uppercase tracking-wider mb-4" style={{ color: 'var(--text-primary)' }}>
-            Single appearances ({minor.length})
-          </h3>
-          <div>
-            {minor.map((c) => (
-              <CompetitorRow
-                key={c.competitor.id}
-                competitor={c.competitor}
-                severity="low"
-                rightLabel={rightLabelOf(c)}
-                onUpdate={handleUpdate}
-                onDelete={handleDelete}
-              />
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* TRACKED, NOT YET SEEN */}
-      {tracked.length > 0 && (
-        <section
-          className="rounded-xl border p-6"
-          style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}
-        >
-          <h3 className="text-sm font-bold uppercase tracking-wider mb-4" style={{ color: 'var(--text-primary)' }}>
-            Tracked, not yet seen ({tracked.length})
-          </h3>
-          <p className="text-xs mb-3" style={{ color: 'var(--text-tertiary)' }}>
-            Added to your list but haven&rsquo;t appeared in any prompts yet — they&rsquo;ll surface
-            here on the next run.
-          </p>
-          <div>
-            {tracked.map((c) => (
-              <CompetitorRow
-                key={c.competitor.id}
-                competitor={c.competitor}
-                severity="low"
-                rightLabel={rightLabelOf(c)}
-                onUpdate={handleUpdate}
-                onDelete={handleDelete}
-              />
-            ))}
-          </div>
-        </section>
-      )}
-
       {/* DIRECTORIES & MARKETPLACES — preserved from Phase 2 */}
       <section
         className="rounded-xl border p-6"
         style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}
       >
-        <h3 className="text-sm font-bold uppercase tracking-wider mb-4" style={{ color: 'var(--text-primary)' }}>
+        <h3
+          className="text-sm font-bold uppercase tracking-wider mb-4"
+          style={{ color: 'var(--text-primary)' }}
+        >
           Directories & marketplaces
         </h3>
         {directories.length === 0 && marketplaces.length === 0 ? (
@@ -353,7 +345,10 @@ function MentionList({
 }): React.ReactElement {
   return (
     <div>
-      <h4 className="text-xs uppercase tracking-wider font-medium mb-2" style={{ color: 'var(--text-tertiary)' }}>
+      <h4
+        className="text-xs uppercase tracking-wider font-medium mb-2"
+        style={{ color: 'var(--text-tertiary)' }}
+      >
         {title}
       </h4>
       <ul className="space-y-1.5">
@@ -364,7 +359,9 @@ function MentionList({
             style={{ color: 'var(--text-secondary)' }}
           >
             <span>{it.name}</span>
-            <span style={{ color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>{it.count}</span>
+            <span style={{ color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>
+              {it.count}
+            </span>
           </li>
         ))}
       </ul>
