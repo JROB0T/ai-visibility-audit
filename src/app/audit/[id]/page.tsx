@@ -292,8 +292,9 @@ function AuditPageInner(): React.ReactElement {
         {activeTab === 'findings' && !snapshot && <NoSnapshotState />}
         {activeTab === 'priorities' && (
           <PrioritiesTab
-            recommendations={recommendations}
-            onRecDrilldown={(recId) => setDrilldown({ kind: 'rec', recId })}
+            auditId={audit.id}
+            domain={audit.site?.domain}
+            businessName={audit.site?.domain}
           />
         )}
         {activeTab === 'competitors' && (
