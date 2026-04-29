@@ -2,7 +2,6 @@
 
 import { Suspense, useCallback, useEffect, useState } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
-import { isAdminAccount } from '@/lib/entitlements';
 import { createClient } from '@/lib/supabase/client';
 import { scoreToGrade } from '@/components/ScoreRing';
 import LegacyAuditPage from './page.legacy';
