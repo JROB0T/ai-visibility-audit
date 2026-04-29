@@ -2,40 +2,79 @@
 
 import { Suspense, useCallback, useEffect, useState } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
-import { createClient } from '@/lib/supabase/client';
 import { isAdminAccount } from '@/lib/entitlements';
-import LegacyAuditPage from './page.legacy';
-import DashboardHeader from '@/components/dashboard/DashboardHeader';
-import DiscoveryDashboard from '@/components/discovery/DiscoveryDashboard';
-import SiteReadiness from '@/components/dashboard/SiteReadiness';
-import ClusterDrilldown from '@/components/dashboard/ClusterDrilldown';
-import SidePanel from '@/components/dashboard/SidePanel';
-import AutoRunProgress from '@/components/dashboard/AutoRunProgress';
-import { clusterLabel } from '@/lib/discovery';
+import { createClient } from '@/lib/supabase/client';
 import { scoreToGrade } from '@/components/ScoreRing';
-import type { DiscoveryCluster, DiscoveryScoreSnapshot } from '@/lib/types';
+import LegacyAuditPage from './page.legacy';
+import PersistentHeader from '@/components/dashboard/PersistentHeader';
+import OverviewTab from '@/components/dashboard/tabs/OverviewTab';
+import FindingsTab from '@/components/dashboard/tabs/FindingsTab';
+import PrioritiesTab from '@/components/dashboard/tabs/PrioritiesTab';
+import CompetitorsTab from '@/components/dashboard/tabs/CompetitorsTab';
+import TrendsTab from '@/components/dashboard/tabs/TrendsTab';
+import SiteReadinessTab from '@/components/dashboard/tabs/SiteReadinessTab';
+import SidePanel from '@/components/dashboard/SidePanel';
+import ClusterDrilldown from '@/components/dashboard/ClusterDrilldown';
+import AutoRunProgress from '@/components/dashboard/AutoRunProgress';
+import { getLastVisitedTab, setLastVisitedTab } from '@/lib/dashboardTabPreferences';
+import { type DashboardTabId } from '@/components/dashboard/TabNav';
+import { clusterLabel } from '@/lib/discovery';
+import type {
+  AuditFinding,
+  DiscoveryCluster,
+  DiscoveryCompetitor,
+  DiscoveryInsight,
+  DiscoveryRecommendation,
+  DiscoveryResult,
+  DiscoveryScoreSnapshot,
+} from '@/lib/types';
+
+interface ShellAudit {
+  id: string;
+  site_id: string;
+  site: { domain: string; url: string };
+  overall_score: number | null;
+  crawlability_score: number | null;
+  machine_readability_score: number | null;
+  commercial_clarity_score: number | null;
+  trust_clarity_score: number | null;
+  pages_scanned: number;
+  created_at: string;
+  completed_at: string | null;
+}
+
+interface ShellPage {
+  id: string;
+  url: string;
+  page_type: string;
+  title: string | null;
+  has_schema: boolean;
+  schema_types: string[];
+  meta_description: string | null;
+  h1_text: string | null;
+  word_count: number | null;
+  load_time_ms: number | null;
+  status_code: number | null;
+  issues: string[];
+}
 
 interface ShellAuditData {
-  audit: {
-    id: string;
-    site_id: string;
-    site: { domain: string; url: string };
-    overall_score: number | null;
-    crawlability_score: number | null;
-    machine_readability_score: number | null;
-    commercial_clarity_score: number | null;
-    trust_clarity_score: number | null;
-    pages_scanned: number;
-    created_at: string;
-  };
+  audit: ShellAudit;
+  pages?: ShellPage[];
+  findings?: AuditFinding[];
   hasEntitlement?: boolean;
 }
+
+type Drilldown =
+  | { kind: 'cluster'; cluster: DiscoveryCluster }
+  | { kind: 'rec'; recId: string }
+  | { kind: 'page'; pageId: string };
 
 export default function AuditPage(): React.ReactElement {
   return (
     <Suspense
       fallback={
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
+        <div className="max-w-5xl mx-auto px-4 py-8">
           <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>Loading…</p>
         </div>
       }
@@ -51,83 +90,99 @@ function AuditPageInner(): React.ReactElement {
   const auditId = (params?.id as string) || '';
   const isLegacy = searchParams?.get('legacy') === 'true';
 
+  const [activeTab, setActiveTab] = useState<DashboardTabId>('overview');
   const [data, setData] = useState<ShellAuditData | null>(null);
+  const [snapshot, setSnapshot] = useState<DiscoveryScoreSnapshot | null>(null);
+  const [insights, setInsights] = useState<DiscoveryInsight[]>([]);
+  const [recommendations, setRecommendations] = useState<DiscoveryRecommendation[]>([]);
+  const [results, setResults] = useState<DiscoveryResult[]>([]);
+  const [competitors, setCompetitors] = useState<DiscoveryCompetitor[]>([]);
+  const [trendHistory, setTrendHistory] = useState<DiscoveryScoreSnapshot[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
-
-  const [snapshot, setSnapshot] = useState<DiscoveryScoreSnapshot | null>(null);
   const [reportAvailable, setReportAvailable] = useState(false);
 
-  const [drilldownCluster, setDrilldownCluster] = useState<DiscoveryCluster | null>(null);
-
-  // Auto-run state
+  // Auto-run state (Phase 1.5a)
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
   const [autoRunError, setAutoRunError] = useState<string | null>(null);
 
+  const [drilldown, setDrilldown] = useState<Drilldown | null>(null);
+
   useEffect(() => {
-    if (isLegacy) return;
-    if (!auditId) return;
+    if (isLegacy || !auditId) return;
     let cancelled = false;
     (async () => {
       try {
         const supabase = createClient();
-        const { data: userData } = await supabase.auth.getUser();
-        const user = userData?.user;
-        if (cancelled) return;
-        setIsAuthenticated(!!user);
-        setIsAdmin(isAdminAccount(user?.email));
+        await supabase.auth.getUser(); // ensure session is fresh; admin check not needed in shell
 
-        const res = await fetch(`/api/audit/${auditId}`);
-        if (!res.ok) {
+        const auditRes = await fetch(`/api/audit/${auditId}`);
+        if (!auditRes.ok) {
           if (!cancelled) setError('Audit not found');
           return;
         }
-        const auditData = (await res.json()) as ShellAuditData;
+        const auditJson = (await auditRes.json()) as ShellAuditData;
         if (cancelled) return;
-        setData(auditData);
+        setData(auditJson);
 
-        const siteId = auditData?.audit?.site_id;
-        const hasPaid = !!auditData?.hasEntitlement;
-        let haveSnapshot = false;
-        if (siteId) {
-          try {
-            const snapRes = await fetch(`/api/discovery/results?siteId=${encodeURIComponent(siteId)}`);
-            if (snapRes.ok) {
-              const snapData = await snapRes.json();
-              if (!cancelled) {
-                setSnapshot(snapData.snapshot || null);
-                setReportAvailable(!!snapData.snapshot);
-                haveSnapshot = !!snapData.snapshot;
-              }
-            }
-          } catch { /* non-fatal */ }
+        // Restore last-visited tab now that audit is real
+        setActiveTab(getLastVisitedTab(auditId));
+
+        const siteId = auditJson.audit?.site_id;
+        const hasPaid = !!auditJson.hasEntitlement;
+        if (!siteId) return;
+
+        // Parallel discovery loads
+        const [resultsRes, insightsRes, recsRes, competitorsRes, trendsRes] = await Promise.all([
+          fetch(`/api/discovery/results?siteId=${encodeURIComponent(siteId)}`),
+          fetch(`/api/discovery/insights?siteId=${encodeURIComponent(siteId)}`),
+          fetch(`/api/discovery/recommendations?siteId=${encodeURIComponent(siteId)}`),
+          fetch(`/api/discovery/competitors?siteId=${encodeURIComponent(siteId)}`),
+          fetch(`/api/discovery/trends?siteId=${encodeURIComponent(siteId)}`),
+        ]);
+
+        let snapshotForAutoCheck: DiscoveryScoreSnapshot | null = null;
+        if (!cancelled && resultsRes.ok) {
+          const r = await resultsRes.json();
+          snapshotForAutoCheck = r.snapshot || null;
+          setSnapshot(snapshotForAutoCheck);
+          setResults(r.results || []);
+          setReportAvailable(!!snapshotForAutoCheck);
+        }
+        if (!cancelled && insightsRes.ok) {
+          const data = await insightsRes.json();
+          setInsights((data.insights || []) as DiscoveryInsight[]);
+        }
+        if (!cancelled && recsRes.ok) {
+          const data = await recsRes.json();
+          setRecommendations((data.recommendations || []) as DiscoveryRecommendation[]);
+        }
+        if (!cancelled && competitorsRes.ok) {
+          const data = await competitorsRes.json();
+          setCompetitors((data.competitors || []) as DiscoveryCompetitor[]);
+        }
+        if (!cancelled && trendsRes.ok) {
+          const data = await trendsRes.json();
+          setTrendHistory((data.snapshots || []) as DiscoveryScoreSnapshot[]);
         }
 
-        // Auto-fire first run for paid users with no snapshot.
-        // run-and-report's "alreadyRunning: true" branch covers the case where
-        // a job is already in flight (e.g. user refreshed mid-run).
-        if (!cancelled && siteId && hasPaid && !haveSnapshot) {
-          try {
-            const startRes = await fetch('/api/discovery/run-and-report', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ siteId, trigger: 'auto_first_run' }),
-            });
-            if (startRes.ok) {
-              const startData = await startRes.json();
-              if (!cancelled && startData.jobId) setActiveJobId(startData.jobId);
-            } else {
-              const errBody = await startRes.json().catch(() => ({}));
-              if (!cancelled) setAutoRunError(errBody?.error || 'Could not start AI Discovery run');
-            }
-          } catch (err) {
-            if (!cancelled) setAutoRunError(err instanceof Error ? err.message : 'Could not start AI Discovery run');
+        // Phase 1.5a: auto-fire first run for paid users with no snapshot
+        if (!cancelled && hasPaid && !snapshotForAutoCheck) {
+          const startRes = await fetch('/api/discovery/run-and-report', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ siteId, trigger: 'auto_first_run' }),
+          });
+          if (startRes.ok) {
+            const startData = await startRes.json();
+            if (!cancelled && startData.jobId) setActiveJobId(startData.jobId);
+          } else {
+            const errBody = await startRes.json().catch(() => ({}));
+            if (!cancelled) setAutoRunError(errBody?.error || 'Could not start AI Discovery run');
           }
         }
-      } catch {
-        if (!cancelled) setError('Failed to load audit');
+      } catch (err) {
+        if (!cancelled) setError(err instanceof Error ? err.message : String(err));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -135,12 +190,24 @@ function AuditPageInner(): React.ReactElement {
     return () => { cancelled = true; };
   }, [auditId, isLegacy]);
 
-  const handleJobComplete = useCallback(() => {
-    // Cleanest correct behavior: full reload so the new snapshot, prompts,
-    // insights, recs, and cached report all hydrate fresh.
-    window.location.reload();
+  const handleTabChange = useCallback(
+    (id: DashboardTabId) => {
+      setActiveTab(id);
+      setLastVisitedTab(auditId, id);
+    },
+    [auditId],
+  );
+
+  const handleRerun = useCallback(() => {
+    alert(
+      'Re-run analysis requires an active subscription.\n\n' +
+        'Subscriptions launch with our next update.',
+    );
   }, []);
 
+  const handleJobComplete = useCallback(() => {
+    window.location.reload();
+  }, []);
   const handleJobError = useCallback((msg: string) => {
     setActiveJobId(null);
     setAutoRunError(msg);
@@ -150,20 +217,8 @@ function AuditPageInner(): React.ReactElement {
     return <LegacyAuditPage />;
   }
 
-  if (loading) {
-    return (
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
-        <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>Loading…</p>
-      </div>
-    );
-  }
-  if (error || !data) {
-    return (
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
-        <p className="text-sm" style={{ color: '#F87171' }}>{error || 'Audit not found'}</p>
-      </div>
-    );
-  }
+  if (loading) return <LoadingScreen />;
+  if (error || !data) return <ErrorScreen message={error || 'Not found'} />;
 
   if (activeJobId) {
     return (
@@ -186,10 +241,9 @@ function AuditPageInner(): React.ReactElement {
           <h2 className="font-semibold mb-2" style={{ color: '#F87171' }}>
             Couldn&rsquo;t start AI Discovery
           </h2>
-          <p className="text-sm mb-4" style={{ color: 'var(--text-secondary)' }}>
-            {autoRunError}
-          </p>
+          <p className="text-sm mb-4" style={{ color: 'var(--text-secondary)' }}>{autoRunError}</p>
           <button
+            type="button"
             onClick={() => { setAutoRunError(null); window.location.reload(); }}
             className="text-sm px-3 py-1.5 rounded border"
             style={{ borderColor: 'var(--border)', color: 'var(--text-primary)' }}
@@ -205,65 +259,219 @@ function AuditPageInner(): React.ReactElement {
   const hasPaid = !!data.hasEntitlement;
 
   return (
-    <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
-      <DashboardHeader
+    <div className="min-h-screen" style={{ background: 'var(--background)' }}>
+      <PersistentHeader
         auditId={audit.id}
         domain={audit.site?.domain || ''}
-        businessName={audit.site?.domain || null}
-        overallScore={snapshot?.overall_score ?? null}
-        grade={null}
-        strategicPosture={null}
         snapshotDate={snapshot?.snapshot_date ?? null}
-        pagesScanned={audit.pages_scanned}
+        pagesScanned={audit.pages_scanned || 0}
+        aiScore={snapshot?.overall_score ?? null}
+        aiGrade={snapshot?.overall_score !== null && snapshot?.overall_score !== undefined ? scoreToGrade(snapshot.overall_score) : null}
+        readinessScore={audit.overall_score}
+        readinessGrade={audit.overall_score !== null ? scoreToGrade(audit.overall_score) : null}
         hasPaid={hasPaid}
-        onRunDiscovery={undefined}
-        isRunningDiscovery={false}
         reportAvailable={reportAvailable}
-        siteReadinessScore={audit.overall_score}
-        siteReadinessGrade={audit.overall_score !== null ? scoreToGrade(audit.overall_score) : null}
-        siteReadinessSubScores={{
-          crawlability: audit.crawlability_score,
-          machineReadability: audit.machine_readability_score,
-          commercialClarity: audit.commercial_clarity_score,
-          trustClarity: audit.trust_clarity_score,
-        }}
+        onRerun={handleRerun}
+        activeTab={activeTab}
+        onTabChange={handleTabChange}
       />
 
-      {isAuthenticated && hasPaid && (
-        <DiscoveryDashboard
-          auditId={audit.id}
-          siteId={audit.site_id}
-          isPaid={hasPaid}
-          isAdmin={isAdmin}
-          reportAvailable={reportAvailable}
-          onClusterDrilldown={(cluster) => setDrilldownCluster(cluster)}
-        />
-      )}
-
-      {isAuthenticated && hasPaid && (
-        <SiteReadiness
-          crawlabilityScore={audit.crawlability_score}
-          machineReadabilityScore={audit.machine_readability_score}
-          commercialClarityScore={audit.commercial_clarity_score}
-          trustClarityScore={audit.trust_clarity_score}
-          auditId={audit.id}
-          reportAvailable={reportAvailable}
-        />
-      )}
+      <main>
+        {activeTab === 'overview' && snapshot && (
+          <OverviewTab
+            snapshot={snapshot}
+            insights={insights}
+            recommendations={recommendations}
+            onTabChange={(t) => handleTabChange(t)}
+          />
+        )}
+        {activeTab === 'overview' && !snapshot && (
+          <NoSnapshotState />
+        )}
+        {activeTab === 'findings' && snapshot && (
+          <FindingsTab
+            snapshot={snapshot}
+            insights={insights}
+            results={results}
+            onPromptDrilldown={(cluster) => setDrilldown({ kind: 'cluster', cluster })}
+          />
+        )}
+        {activeTab === 'findings' && !snapshot && <NoSnapshotState />}
+        {activeTab === 'priorities' && (
+          <PrioritiesTab
+            recommendations={recommendations}
+            onRecDrilldown={(recId) => setDrilldown({ kind: 'rec', recId })}
+          />
+        )}
+        {activeTab === 'competitors' && (
+          <CompetitorsTab competitors={competitors} results={results} />
+        )}
+        {activeTab === 'trends' && (
+          <TrendsTab currentSnapshot={snapshot} history={trendHistory} />
+        )}
+        {activeTab === 'readiness' && (
+          <SiteReadinessTab
+            auditId={audit.id}
+            audit={audit}
+            findings={data.findings || []}
+            pages={data.pages || []}
+            onPageDrilldown={(pageId) => setDrilldown({ kind: 'page', pageId })}
+          />
+        )}
+      </main>
 
       <SidePanel
-        open={drilldownCluster !== null}
-        onClose={() => setDrilldownCluster(null)}
-        title={drilldownCluster ? `${clusterLabel(drilldownCluster)} cluster` : ''}
-        subtitle="Prompts in this cluster and how the business appeared"
+        open={drilldown !== null}
+        onClose={() => setDrilldown(null)}
+        title={drilldownTitle(drilldown)}
+        subtitle={drilldownSubtitle(drilldown)}
       >
-        {drilldownCluster && (
-          <ClusterDrilldown
-            siteId={audit.site_id}
-            cluster={drilldownCluster}
-          />
+        {drilldown?.kind === 'cluster' && (
+          <ClusterDrilldown siteId={audit.site_id} cluster={drilldown.cluster} />
+        )}
+        {drilldown?.kind === 'rec' && (
+          <RecommendationDrilldown rec={recommendations.find((r) => r.id === drilldown.recId)} />
+        )}
+        {drilldown?.kind === 'page' && (
+          <PageDrilldown page={(data.pages || []).find((p) => p.id === drilldown.pageId)} />
         )}
       </SidePanel>
     </div>
   );
 }
+
+function drilldownTitle(d: Drilldown | null): string {
+  if (!d) return '';
+  if (d.kind === 'cluster') return `${clusterLabel(d.cluster)} cluster`;
+  if (d.kind === 'rec') return 'Recommendation details';
+  if (d.kind === 'page') return 'Page details';
+  return '';
+}
+
+function drilldownSubtitle(d: Drilldown | null): string | undefined {
+  if (!d) return undefined;
+  if (d.kind === 'cluster') return 'Prompts in this cluster and how the business appeared';
+  if (d.kind === 'rec') return 'Full context and rationale';
+  if (d.kind === 'page') return 'Audit findings for this page';
+  return undefined;
+}
+
+function RecommendationDrilldown({
+  rec,
+}: {
+  rec: DiscoveryRecommendation | undefined;
+}): React.ReactElement | null {
+  if (!rec) return null;
+  return (
+    <div className="p-6 space-y-4">
+      <div>
+        <h3 className="font-semibold text-lg" style={{ color: 'var(--text-primary)' }}>
+          {rec.title}
+        </h3>
+        <p className="text-sm mt-1" style={{ color: 'var(--text-tertiary)' }}>
+          {[rec.priority && `${rec.priority} priority`, rec.impact_estimate && `Impact: ${rec.impact_estimate}`, rec.difficulty_estimate && `Effort: ${rec.difficulty_estimate}`, rec.owner_type]
+            .filter(Boolean)
+            .join(' · ')}
+        </p>
+      </div>
+      {rec.description && (
+        <div>
+          <h4 className="text-xs uppercase tracking-wider mb-2" style={{ color: 'var(--text-tertiary)' }}>
+            What to do
+          </h4>
+          <p className="text-sm leading-relaxed" style={{ color: 'var(--text-primary)' }}>
+            {rec.description}
+          </p>
+        </div>
+      )}
+      {rec.why_it_matters && (
+        <div>
+          <h4 className="text-xs uppercase tracking-wider mb-2" style={{ color: 'var(--text-tertiary)' }}>
+            Why it matters
+          </h4>
+          <p className="text-sm leading-relaxed" style={{ color: 'var(--text-primary)' }}>
+            {rec.why_it_matters}
+          </p>
+        </div>
+      )}
+      {rec.suggested_timeline && (
+        <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
+          Suggested timeline: {rec.suggested_timeline}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function PageDrilldown({ page }: { page: ShellPage | undefined }): React.ReactElement {
+  if (!page) {
+    return (
+      <div className="p-6">
+        <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>Page not found.</p>
+      </div>
+    );
+  }
+  return (
+    <div className="p-6 space-y-4">
+      <div>
+        <h3 className="font-semibold text-lg break-all" style={{ color: 'var(--text-primary)' }}>
+          {page.title || page.url}
+        </h3>
+        <a
+          href={page.url}
+          target="_blank"
+          rel="noopener"
+          className="text-xs break-all hover:underline"
+          style={{ color: 'var(--accent)' }}
+        >
+          {page.url}
+        </a>
+      </div>
+      <div className="grid grid-cols-2 gap-3 text-sm" style={{ color: 'var(--text-secondary)' }}>
+        <div><span style={{ color: 'var(--text-tertiary)' }}>Type:</span> {page.page_type || '—'}</div>
+        <div><span style={{ color: 'var(--text-tertiary)' }}>Status:</span> {page.status_code ?? '—'}</div>
+        <div><span style={{ color: 'var(--text-tertiary)' }}>Schema:</span> {page.has_schema ? page.schema_types.join(', ') : 'None'}</div>
+        <div><span style={{ color: 'var(--text-tertiary)' }}>Words:</span> {page.word_count ?? '—'}</div>
+      </div>
+      {page.issues?.length > 0 && (
+        <div>
+          <h4 className="text-xs uppercase tracking-wider mb-2" style={{ color: 'var(--text-tertiary)' }}>
+            Issues ({page.issues.length})
+          </h4>
+          <ul className="space-y-1.5 text-sm" style={{ color: 'var(--text-primary)' }}>
+            {page.issues.map((iss, i) => (
+              <li key={i}>• {iss}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function NoSnapshotState(): React.ReactElement {
+  return (
+    <div className="max-w-2xl mx-auto px-4 py-16 text-center">
+      <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>
+        AI Discovery hasn&rsquo;t been run for this audit yet.
+      </p>
+    </div>
+  );
+}
+
+function LoadingScreen(): React.ReactElement {
+  return (
+    <div className="max-w-5xl mx-auto px-4 py-8">
+      <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>Loading…</p>
+    </div>
+  );
+}
+
+function ErrorScreen({ message }: { message: string }): React.ReactElement {
+  return (
+    <div className="max-w-5xl mx-auto px-4 py-8">
+      <p className="text-sm" style={{ color: '#F87171' }}>{message}</p>
+    </div>
+  );
+}
+
