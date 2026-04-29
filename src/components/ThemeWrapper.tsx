@@ -1,11 +1,17 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { usePathname } from 'next/navigation';
 import { ThemeProvider, ThemeToggle } from '@/components/ThemeToggle';
 import { createClient } from '@/lib/supabase/client';
 import { LogOut } from 'lucide-react';
 
 export function ThemeWrapper({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  // Public share routes (/r/{token}) intentionally render without the app
+  // nav/footer chrome — recipients are not the audience for sign-in CTAs.
+  const isPublicShare = pathname?.startsWith('/r/') ?? false;
+
   const [userEmail, setUserEmail] = useState<string | null>(null);
 
   useEffect(() => {
@@ -35,6 +41,10 @@ export function ThemeWrapper({ children }: { children: React.ReactNode }) {
     await supabase.auth.signOut();
     setUserEmail(null);
     window.location.href = '/';
+  }
+
+  if (isPublicShare) {
+    return <ThemeProvider>{children}</ThemeProvider>;
   }
 
   return (

@@ -114,7 +114,7 @@ async function handleRequest(request: NextRequest, req: RunRequest): Promise<Nex
   if (!req.force) {
     const { data: snap } = await admin
       .from('discovery_score_snapshots')
-      .select('report_html, report_narrative, report_generated_at, report_model')
+      .select('id, report_html, report_narrative, report_generated_at, report_model, share_token')
       .eq('site_id', req.siteId)
       .eq('run_id', runId)
       .maybeSingle();
@@ -127,6 +127,8 @@ async function handleRequest(request: NextRequest, req: RunRequest): Promise<Nex
         generated_at: (snap.report_generated_at as string) || null,
         cached: true,
         run_id: runId,
+        snapshot_id: snap.id as string,
+        share_token: (snap.share_token as string | null) || null,
       });
     }
   }
@@ -174,8 +176,9 @@ async function handleRequest(request: NextRequest, req: RunRequest): Promise<Nex
   const html = buildReportHtml(payload, narrative);
   const generatedAt = new Date().toISOString();
 
-  // Persist on the snapshot.
-  const { error: updateErr } = await admin
+  // Persist on the snapshot. Select() returns the row so we get
+  // snapshot_id (and any pre-existing share_token) without a second fetch.
+  const { data: updatedSnap, error: updateErr } = await admin
     .from('discovery_score_snapshots')
     .update({
       report_html: html,
@@ -184,7 +187,9 @@ async function handleRequest(request: NextRequest, req: RunRequest): Promise<Nex
       report_model: model,
     })
     .eq('site_id', req.siteId)
-    .eq('run_id', runId);
+    .eq('run_id', runId)
+    .select('id, share_token')
+    .maybeSingle();
 
   if (updateErr) {
     // Don't fail the request — the report was generated successfully, just
@@ -199,6 +204,8 @@ async function handleRequest(request: NextRequest, req: RunRequest): Promise<Nex
     generated_at: generatedAt,
     cached: false,
     run_id: runId,
+    snapshot_id: (updatedSnap?.id as string) || '',
+    share_token: (updatedSnap?.share_token as string | null) || null,
   });
 }
 
@@ -209,6 +216,10 @@ interface ResponseBundle {
   generated_at: string | null;
   cached: boolean;
   run_id: string;
+  // Phase 2 share-link addition: returned so the viewer can wire the
+  // share toggle without an extra round-trip.
+  snapshot_id: string;
+  share_token: string | null;
 }
 
 function respond(format: 'html' | 'json', bundle: ResponseBundle): NextResponse {

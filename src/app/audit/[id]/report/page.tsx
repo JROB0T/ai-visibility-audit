@@ -28,6 +28,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import ReportShareToggle from '@/components/dashboard/ReportShareToggle';
 
 interface ReportMetadata {
   run_id: string;
@@ -49,6 +50,8 @@ export default function ReportPage() {
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [snapshotId, setSnapshotId] = useState<string | null>(null);
+  const [shareToken, setShareToken] = useState<string | null>(null);
 
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
 
@@ -105,6 +108,11 @@ export default function ReportPage() {
         cached: data.cached,
         model: data.model,
       });
+      // Phase 2 share-link: capture snapshot id + token for the toggle
+      if (typeof data.snapshot_id === 'string' && data.snapshot_id) {
+        setSnapshotId(data.snapshot_id);
+      }
+      setShareToken((data.share_token as string | null) ?? null);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -170,6 +178,36 @@ export default function ReportPage() {
             Download PDF
           </button>
         </div>
+
+        {/* Share toggle row — wrapped in a light surface and forced into
+            light-mode CSS-variable values, so the toggle reads correctly
+            regardless of the user's app-level theme. The surrounding report
+            viewer is hardcoded dark (Tailwind bg-neutral-900) — this carve-out
+            keeps the share controls legible. */}
+        {snapshotId && html && (
+          <div className="max-w-6xl mx-auto px-4 pb-3">
+            <div
+              className="rounded-lg p-3"
+              style={{
+                background: '#ffffff',
+                color: '#0f172a',
+                '--text-primary': '#0f172a',
+                '--text-secondary': '#475569',
+                '--text-tertiary': '#94a3b8',
+                '--background': '#ffffff',
+                '--border': '#e2e8f0',
+                '--bg-tertiary': '#f1f5f9',
+                '--accent': '#6366F1',
+              } as React.CSSProperties}
+            >
+              <ReportShareToggle
+                snapshotId={snapshotId}
+                initialToken={shareToken}
+                onTokenChange={(t) => setShareToken(t)}
+              />
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Status */}
