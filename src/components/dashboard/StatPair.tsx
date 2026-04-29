@@ -35,22 +35,31 @@ export default function StatPair({
         {label}
       </div>
       <div className="flex items-baseline gap-2">
-        <span className={`${valueClass} font-bold tabular-nums`} style={{ color: valueColor }}>
-          {valueText}
-        </span>
-        {grade && (
-          <span
-            className="px-1.5 py-0.5 rounded text-xs font-semibold"
-            style={{
-              background:
-                scoreForColor !== undefined && scoreForColor !== null
-                  ? severityColor(scoreForColor)
-                  : SEVERITY_COLORS.meh,
-              color: '#fff',
-              fontFamily: 'var(--font-mono)',
-            }}
-          >
-            {grade}
+        {grade ? (
+          <>
+            {/* Grade is the primary visual — bold and colored by severity */}
+            <span
+              className={`${valueClass} font-bold tabular-nums`}
+              style={{
+                color:
+                  scoreForColor !== undefined && scoreForColor !== null
+                    ? severityColor(scoreForColor)
+                    : valueColor,
+              }}
+            >
+              {grade}
+            </span>
+            {/* Number is the secondary — small and muted */}
+            <span
+              className="text-base font-medium tabular-nums"
+              style={{ color: 'var(--text-tertiary)' }}
+            >
+              {valueText}
+            </span>
+          </>
+        ) : (
+          <span className={`${valueClass} font-bold tabular-nums`} style={{ color: valueColor }}>
+            {valueText}
           </span>
         )}
       </div>

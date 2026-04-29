@@ -43,6 +43,8 @@ export default function OverviewTab(props: OverviewTabProps): React.ReactElement
       >
         <div className="grid grid-cols-1 md:grid-cols-[280px,1fr] gap-6">
           <div className="flex justify-center">
+            {/* RadarChart inverts these visually: centerSubLabel (grade) is the headline,
+                centerLabel (number) renders small underneath. */}
             <RadarChart
               clusterScores={props.snapshot.cluster_scores}
               centerLabel={overallScore !== null ? String(overallScore) : '—'}

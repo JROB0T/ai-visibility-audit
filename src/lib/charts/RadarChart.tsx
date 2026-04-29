@@ -119,20 +119,22 @@ export default function RadarChart({
           // Center the overlay over the chart proper (viewBox center is 120/300 ≈ 40%, plus the 30 left pad shifts it a touch)
           style={{ paddingTop: '6%' }}
         >
-          {centerLabel && (
-            <div
-              className="text-3xl font-bold tabular-nums"
-              style={{ color: 'var(--text-primary)' }}
-            >
-              {centerLabel}
-            </div>
-          )}
+          {/* Grade is the primary visual — big and bold */}
           {centerSubLabel && (
             <div
-              className="text-xs uppercase tracking-wider mt-0.5"
-              style={{ color: 'var(--text-tertiary)' }}
+              className="font-bold tabular-nums leading-none"
+              style={{ color: 'var(--text-primary)', fontSize: 44 }}
             >
               {centerSubLabel}
+            </div>
+          )}
+          {/* Number is the secondary — small and muted */}
+          {centerLabel && (
+            <div
+              className="font-medium tabular-nums mt-1"
+              style={{ color: 'var(--text-tertiary)', fontSize: 13 }}
+            >
+              {centerLabel}
             </div>
           )}
         </div>

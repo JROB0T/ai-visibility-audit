@@ -49,7 +49,7 @@ export function ThemeWrapper({ children }: { children: React.ReactNode }) {
             </div>
             <span className="text-sm font-semibold tracking-tight" style={{ color: 'var(--text-primary)' }}>AI Visibility Audit</span>
           </a>
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-2">
             {userEmail ? (
               <>
                 <a href="/dashboard" className="text-sm px-3 py-1.5 rounded-lg transition-colors font-medium" style={{ color: '#6366F1' }}>Dashboard</a>
@@ -64,6 +64,7 @@ export function ThemeWrapper({ children }: { children: React.ReactNode }) {
                 <a href="/auth/signup" className="text-sm font-medium px-3.5 py-1.5 rounded-lg transition-colors text-white" style={{ background: '#6366F1' }}>Get Started</a>
               </>
             )}
+            <span aria-hidden className="w-px h-5 mx-1" style={{ background: 'var(--border)' }} />
             <ThemeToggle />
           </div>
         </div>
