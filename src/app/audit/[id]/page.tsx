@@ -21,7 +21,6 @@ import { clusterLabel } from '@/lib/discovery';
 import type {
   AuditFinding,
   DiscoveryCluster,
-  DiscoveryCompetitor,
   DiscoveryInsight,
   DiscoveryRecommendation,
   DiscoveryResult,
@@ -95,7 +94,6 @@ function AuditPageInner(): React.ReactElement {
   const [insights, setInsights] = useState<DiscoveryInsight[]>([]);
   const [recommendations, setRecommendations] = useState<DiscoveryRecommendation[]>([]);
   const [results, setResults] = useState<DiscoveryResult[]>([]);
-  const [competitors, setCompetitors] = useState<DiscoveryCompetitor[]>([]);
   const [trendHistory, setTrendHistory] = useState<DiscoveryScoreSnapshot[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -131,12 +129,12 @@ function AuditPageInner(): React.ReactElement {
         const hasPaid = !!auditJson.hasEntitlement;
         if (!siteId) return;
 
-        // Parallel discovery loads
-        const [resultsRes, insightsRes, recsRes, competitorsRes, trendsRes] = await Promise.all([
+        // Parallel discovery loads. CompetitorsTab fetches its own list
+        // since it owns the create/edit/delete flow — no point pre-fetching here.
+        const [resultsRes, insightsRes, recsRes, trendsRes] = await Promise.all([
           fetch(`/api/discovery/results?siteId=${encodeURIComponent(siteId)}`),
           fetch(`/api/discovery/insights?siteId=${encodeURIComponent(siteId)}`),
           fetch(`/api/discovery/recommendations?siteId=${encodeURIComponent(siteId)}`),
-          fetch(`/api/discovery/competitors?siteId=${encodeURIComponent(siteId)}`),
           fetch(`/api/discovery/trends?siteId=${encodeURIComponent(siteId)}`),
         ]);
 
@@ -155,10 +153,6 @@ function AuditPageInner(): React.ReactElement {
         if (!cancelled && recsRes.ok) {
           const data = await recsRes.json();
           setRecommendations((data.recommendations || []) as DiscoveryRecommendation[]);
-        }
-        if (!cancelled && competitorsRes.ok) {
-          const data = await competitorsRes.json();
-          setCompetitors((data.competitors || []) as DiscoveryCompetitor[]);
         }
         if (!cancelled && trendsRes.ok) {
           const data = await trendsRes.json();
@@ -303,7 +297,7 @@ function AuditPageInner(): React.ReactElement {
           />
         )}
         {activeTab === 'competitors' && (
-          <CompetitorsTab competitors={competitors} results={results} />
+          <CompetitorsTab siteId={audit.site_id} results={results} />
         )}
         {activeTab === 'trends' && (
           <TrendsTab currentSnapshot={snapshot} history={trendHistory} />
