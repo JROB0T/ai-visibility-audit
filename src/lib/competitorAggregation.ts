@@ -122,19 +122,19 @@ export function buildCompetitorMatrix(
 
   const rows: CompetitorMatrixRow[] = [];
 
-  for (const [norm, total] of totalByName.entries()) {
-    if (total < minAppearances) continue;
+  Array.from(totalByName.entries()).forEach(([norm, total]) => {
+    if (total < minAppearances) return;
     const tracked = trackedByNormName.get(norm);
 
     const casings = displayCasings.get(norm) || new Map<string, number>();
     let bestCasing = norm;
     let bestCount = -1;
-    for (const [casing, count] of casings.entries()) {
+    Array.from(casings.entries()).forEach(([casing, count]) => {
       if (count > bestCount) {
         bestCasing = casing;
         bestCount = count;
       }
-    }
+    });
     const displayName = tracked?.name || bestCasing;
 
     rows.push({
@@ -145,7 +145,7 @@ export function buildCompetitorMatrix(
       trackedId: tracked?.id,
       source: tracked?.source,
     });
-  }
+  });
 
   // Tracked competitors with zero appearances still appear so the user
   // sees their tracked list reflected even when AI hasn't mentioned them.
