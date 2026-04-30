@@ -326,7 +326,7 @@ export type RunScope = 'free' | 'core' | 'core_plus_premium';
 export type PlanStatus = 'free' | 'core' | 'core_premium';
 export type VerticalType = 'saas' | 'professional_services' | 'local_service' | 'ecommerce' | 'healthcare' | 'law_firm' | 'restaurant' | 'other';
 export type FindingState = 'new' | 'ongoing' | 'resolved' | 'regressed';
-export type BillingEventType = 'initial_scan' | 'premium_addon' | 'bundle' | 'manual_rescan' | 'monthly_subscription' | 'monthly_renewal';
+export type BillingEventType = 'initial_scan' | 'premium_addon' | 'bundle' | 'manual_paid_rescan' | 'monthly_subscription' | 'monthly_renewal';
 
 export interface Entitlement {
   id: string;
