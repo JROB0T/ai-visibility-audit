@@ -1,9 +1,9 @@
 'use client';
 
 import { Suspense, useEffect, useState } from 'react';
-import { useParams, useSearchParams } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import ScoreRing, { scoreToGrade } from '@/components/ScoreRing';
-import { ArrowLeft, Clock, TrendingUp, ChevronRight, AlertTriangle, BarChart3, Building2, RefreshCw, CalendarCheck, X } from 'lucide-react';
+import { ArrowLeft, Check, Clock, TrendingUp, ChevronRight, AlertTriangle, BarChart3, Building2, RefreshCw, CalendarCheck, X } from 'lucide-react';
 import { VERTICAL_OPTIONS } from '@/lib/verticals';
 import { getRunTypeLabel } from '@/lib/entitlements';
 
@@ -21,6 +21,7 @@ interface SiteData {
 
 function SiteDashboardContent() {
   const params = useParams();
+  const router = useRouter();
   const [data, setData] = useState<SiteData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -28,7 +29,12 @@ function SiteDashboardContent() {
   const [showRescanModal, setShowRescanModal] = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [checkoutSuccess, setCheckoutSuccess] = useState(false);
+  const [kickoffStatus, setKickoffStatus] = useState<'idle' | 'starting' | 'started' | 'failed'>('idle');
   const searchParams = useSearchParams();
+  const checkoutType = searchParams.get('type');
+  const isRescanSuccess = checkoutSuccess && checkoutType === 'rescan';
+  const isInitialPaymentSuccess = checkoutSuccess && checkoutType === 'initial_scan';
+  const isMonthlySuccess = checkoutSuccess && checkoutType === 'monthly';
 
   useEffect(() => {
     async function load() {
@@ -47,6 +53,38 @@ function SiteDashboardContent() {
   useEffect(() => {
     if (searchParams.get('checkout') === 'success') setCheckoutSuccess(true);
   }, [searchParams]);
+
+  // Round 1.3 rescan handoff: webhook recorded a pending discovery_job
+  // when payment cleared. The user is now back here in their authenticated
+  // context — POST to run-and-report so it picks up the pending job and
+  // runs the work. After kickoff, route to the audit dashboard where
+  // AutoRunProgress takes over via the shell's in-flight job detection.
+  useEffect(() => {
+    if (!isRescanSuccess || kickoffStatus !== 'idle') return;
+    if (!data?.site?.id) return;
+    const latestAuditId = data.audits[0]?.id;
+    if (!latestAuditId) return;
+
+    setKickoffStatus('starting');
+    fetch('/api/discovery/run-and-report', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ siteId: data.site.id, trigger: 'manual_rerun' }),
+    })
+      .then((res) => {
+        if (!res.ok) {
+          setKickoffStatus('failed');
+          return;
+        }
+        setKickoffStatus('started');
+        // Brief pause so the user sees confirmation, then route to the
+        // audit page where AutoRunProgress takes over.
+        setTimeout(() => {
+          router.push(`/audit/${latestAuditId}`);
+        }, 1500);
+      })
+      .catch(() => setKickoffStatus('failed'));
+  }, [isRescanSuccess, kickoffStatus, data, router]);
 
   async function handleCheckout(priceType: 'initial_scan' | 'rescan' | 'monthly') {
     if (!data) return;
@@ -134,11 +172,79 @@ function SiteDashboardContent() {
         </div>
       </div>
 
-      {/* Checkout success banner */}
-      {checkoutSuccess && (
+      {/* Checkout success banners — type-aware. Rescan triggers the
+          discovery kickoff via the useEffect above and includes a soft
+          upgrade nudge. Initial and monthly are simple confirmations. */}
+      {isRescanSuccess && (
+        <div
+          className="mb-6 p-4 rounded-xl border flex items-start gap-3"
+          style={{ background: 'rgba(16,185,129,0.05)', borderColor: 'rgba(16,185,129,0.2)' }}
+        >
+          <Check className="w-5 h-5 mt-0.5 shrink-0" style={{ color: '#10B981' }} />
+          <div className="flex-1">
+            <p className="font-medium" style={{ color: 'var(--text-primary)' }}>
+              Payment confirmed. Your re-scan is starting now.
+            </p>
+            <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>
+              {kickoffStatus === 'failed'
+                ? 'There was a hiccup starting the scan. Refresh in a moment to retry.'
+                : 'This usually takes about 90 seconds. We’ll take you to your dashboard automatically.'}
+            </p>
+            <p className="text-xs mt-2" style={{ color: 'var(--text-tertiary)' }}>
+              Want unlimited re-scans?{' '}
+              <button
+                type="button"
+                onClick={() => handleCheckout('monthly')}
+                disabled={checkoutLoading}
+                className="underline cursor-pointer"
+                style={{ color: 'var(--accent)' }}
+              >
+                Subscribe for $25/month
+              </button>{' '}
+              and re-run anytime.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setCheckoutSuccess(false)}
+            style={{ color: 'var(--text-tertiary)' }}
+            aria-label="Dismiss"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+      {isInitialPaymentSuccess && (
+        <div
+          className="mb-6 p-4 rounded-xl border flex items-center justify-between"
+          style={{ background: 'rgba(16,185,129,0.05)', borderColor: 'rgba(16,185,129,0.2)' }}
+        >
+          <p className="text-sm font-medium" style={{ color: '#10B981' }}>
+            Payment confirmed. Setting up your initial scan…
+          </p>
+          <button onClick={() => setCheckoutSuccess(false)} style={{ color: 'var(--text-tertiary)' }} aria-label="Dismiss">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+      {isMonthlySuccess && (
+        <div
+          className="mb-6 p-4 rounded-xl border flex items-center justify-between"
+          style={{ background: 'rgba(16,185,129,0.05)', borderColor: 'rgba(16,185,129,0.2)' }}
+        >
+          <p className="text-sm font-medium" style={{ color: '#10B981' }}>
+            Subscription active. We&rsquo;ll re-scan automatically every month.
+          </p>
+          <button onClick={() => setCheckoutSuccess(false)} style={{ color: 'var(--text-tertiary)' }} aria-label="Dismiss">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+      {/* Generic fallback for ?checkout=success without a recognized type */}
+      {checkoutSuccess && !isRescanSuccess && !isInitialPaymentSuccess && !isMonthlySuccess && (
         <div className="mb-6 p-4 rounded-xl border flex items-center justify-between" style={{ background: 'rgba(16,185,129,0.05)', borderColor: 'rgba(16,185,129,0.2)' }}>
           <p className="text-sm font-medium" style={{ color: '#10B981' }}>Payment successful! Your scan is being processed.</p>
-          <button onClick={() => setCheckoutSuccess(false)} style={{ color: 'var(--text-tertiary)' }}><X className="w-4 h-4" /></button>
+          <button onClick={() => setCheckoutSuccess(false)} style={{ color: 'var(--text-tertiary)' }} aria-label="Dismiss"><X className="w-4 h-4" /></button>
         </div>
       )}
 

@@ -110,34 +110,33 @@ export async function POST(request: NextRequest) {
         }
 
         if (priceType === 'rescan') {
-          // Create billing event
+          // Record the billing event
           await supabase.from('billing_events').insert({
             user_id: userId,
             site_id: siteId,
-            event_type: 'manual_rescan',
+            event_type: 'manual_paid_rescan',
             stripe_session_id: session.id,
             amount_cents: session.amount_total || 3500,
           });
 
-          // Look up previous completed audit
-          let previousAuditId: string | null = null;
-          const { data: prevAudit } = await supabase
-            .from('audits')
-            .select('id')
-            .eq('site_id', siteId)
-            .eq('status', 'completed')
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .single();
-          if (prevAudit) previousAuditId = prevAudit.id;
-
-          await supabase.from('audits').insert({
+          // Round 1.3: re-runs are discovery-only. Audit re-crawls happen
+          // at initial purchase and via monthly cron for subscribers — not
+          // on Tier 1 paid re-runs. The previous version of this branch
+          // inserted a `pending` audit row that no process picked up; those
+          // orphans are documented for manual cleanup in
+          // docs/orphan-audit-cleanup.md.
+          //
+          // Webhooks should respond fast (Stripe expects ~5s) and don't
+          // have user auth cookies for downstream auth checks. So we record
+          // the user's intent here as a pending discovery_job; the success
+          // page picks it up in the user's authenticated context and POSTs
+          // to /api/discovery/run-and-report which runs the work.
+          await supabase.from('discovery_jobs').insert({
             site_id: siteId,
             user_id: userId,
+            trigger_source: 'manual_rerun',
             status: 'pending',
-            run_type: 'manual_paid_rescan',
-            run_scope: 'core_plus_premium',
-            previous_audit_id: previousAuditId,
+            progress_message: 'Awaiting kickoff…',
           });
         }
 

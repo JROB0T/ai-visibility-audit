@@ -75,17 +75,27 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     console.error('[run-and-report] reapStaleJobs error (non-fatal):', err);
   }
 
-  // Don't double-queue: if there's already an active job for this site, return it
+  // Two cases for active jobs:
+  //   - A *running* job means work is already in flight. Return it as
+  //     alreadyRunning so the caller can join its polling.
+  //   - A *pending* job (status='pending') means a webhook (or another
+  //     entry point) recorded intent but no work has started yet.
+  //     Pick it up: use its id, then proceed to kick off the run.
+  //     Without this pickup, the Stripe rescan flow would create the
+  //     pending job in the webhook and a SECOND job in the success-page
+  //     call here — only the second would run; the first would orphan.
   const existing = await findActiveJobForSite(admin, body.siteId);
-  if (existing) {
+  if (existing && existing.status === 'running') {
     return NextResponse.json({ jobId: existing.id, alreadyRunning: true });
   }
 
-  const job = await createJob(admin, {
-    siteId: body.siteId,
-    userId: auth.userId,
-    trigger: body.trigger || 'auto_first_run',
-  });
+  const job =
+    existing ??
+    (await createJob(admin, {
+      siteId: body.siteId,
+      userId: auth.userId,
+      trigger: body.trigger || 'auto_first_run',
+    }));
 
   // Fire-and-forget. The function-runtime keeps this promise alive until
   // it resolves (or maxDuration expires). Top-level catch marks the job

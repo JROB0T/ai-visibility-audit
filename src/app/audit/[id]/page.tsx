@@ -191,12 +191,48 @@ function AuditPageInner(): React.ReactElement {
     [auditId],
   );
 
-  const handleRerun = useCallback(() => {
-    alert(
-      'Re-run analysis requires an active subscription.\n\n' +
-        'Subscriptions launch with our next update.',
-    );
-  }, []);
+  const handleRerun = useCallback(async () => {
+    if (!data?.audit?.site_id) return;
+    const siteId = data.audit.site_id;
+
+    // Try the subscriber path first — rerun-now returns 402 for non-subscribers.
+    try {
+      const res = await fetch('/api/discovery/rerun-now', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ siteId }),
+      });
+
+      if (res.ok) {
+        // Subscriber — reload so the shell's in-flight job detection
+        // picks up the new job and renders AutoRunProgress.
+        window.location.reload();
+        return;
+      }
+
+      if (res.status === 402) {
+        // Tier 1 — kick off Stripe checkout for the rescan SKU.
+        const checkoutRes = await fetch('/api/checkout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ siteId, priceType: 'rescan' }),
+        });
+        if (checkoutRes.ok) {
+          const { url } = await checkoutRes.json();
+          window.location.href = url;
+          return;
+        }
+        const errBody = await checkoutRes.json().catch(() => ({}));
+        alert(errBody.error || 'Could not start checkout. Try again or contact support.');
+        return;
+      }
+
+      const errBody = await res.json().catch(() => ({}));
+      alert(errBody.error || 'Could not start re-scan. Try again or contact support.');
+    } catch {
+      alert('Could not start re-scan. Network error.');
+    }
+  }, [data]);
 
   const handleJobComplete = useCallback(() => {
     window.location.reload();
