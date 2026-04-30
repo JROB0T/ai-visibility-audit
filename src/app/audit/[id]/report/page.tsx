@@ -26,7 +26,7 @@
 
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import ReportShareToggle from '@/components/dashboard/ReportShareToggle';
 
@@ -53,7 +53,6 @@ export default function ReportPage() {
   const [snapshotId, setSnapshotId] = useState<string | null>(null);
   const [shareToken, setShareToken] = useState<string | null>(null);
 
-  const iframeRef = useRef<HTMLIFrameElement | null>(null);
 
   // ----- Step 1: fetch the audit to get site_id -----
   useEffect(() => {
@@ -126,12 +125,44 @@ export default function ReportPage() {
   }, [siteId, loadReport]);
 
   // ----- Actions -----
-  const handlePrint = () => {
-    const frame = iframeRef.current;
-    if (!frame?.contentWindow) return;
-    // Focus the frame first so browsers route the print command there
-    frame.contentWindow.focus();
-    frame.contentWindow.print();
+  const [downloading, setDownloading] = useState(false);
+
+  const handlePrint = async (): Promise<void> => {
+    if (!snapshotId || downloading) return;
+    setDownloading(true);
+    try {
+      const res = await fetch('/api/discovery/report/pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ snapshotId }),
+      });
+
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({}));
+        alert(errBody.error || 'PDF download failed. Try again.');
+        return;
+      }
+
+      // Pull filename out of Content-Disposition; fall back to a generic name.
+      const contentDisposition = res.headers.get('Content-Disposition') || '';
+      const filenameMatch = contentDisposition.match(/filename="?([^"]+)"?/);
+      const filename = filenameMatch?.[1] || 'ai-visibility-report.pdf';
+
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('PDF download error:', err);
+      alert('PDF download failed. Network error.');
+    } finally {
+      setDownloading(false);
+    }
   };
 
   const handleRegenerate = () => {
@@ -172,10 +203,10 @@ export default function ReportPage() {
           </button>
           <button
             onClick={handlePrint}
-            disabled={!html}
+            disabled={!html || downloading}
             className="text-xs px-3 py-1.5 bg-white text-neutral-900 rounded hover:bg-neutral-200 disabled:opacity-50 disabled:cursor-not-allowed transition font-medium"
           >
-            Download PDF
+            {downloading ? 'Generating PDF…' : 'Download PDF'}
           </button>
         </div>
 
@@ -240,7 +271,6 @@ export default function ReportPage() {
       {/* Report iframe */}
       {html && !error && (
         <iframe
-          ref={iframeRef}
           srcDoc={html}
           title="AI Positioning Brief"
           className="w-full block"
