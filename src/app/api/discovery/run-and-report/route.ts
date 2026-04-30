@@ -16,6 +16,13 @@
 //   maxDuration). The fire-and-forget Promise wrapping
 //   doRunAndReport keeps the runtime in flight until the chain
 //   finishes or maxDuration kicks in.
+//
+// DIAGNOSTIC PATCH (temporary):
+//   - Outer try/catch on POST returns the actual error message to
+//     the client (with [DEBUG] prefix). REVERT once root cause is
+//     identified — see docs/diagnostic-cleanup notes.
+//   - Every catch logs '[RUN_AND_REPORT_ERROR]' with structured
+//     fields. KEEP these — operational hygiene.
 // ============================================================
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -48,73 +55,127 @@ interface RunAndReportRequest {
 }
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
-  let body: RunAndReportRequest;
+  // Captured early for error logging in the top-level catch.
+  let bodyForLog: unknown = null;
+  let userIdForLog: string | null = null;
+
   try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
-  }
+    let body: RunAndReportRequest;
+    try {
+      body = await request.json();
+      bodyForLog = body;
+    } catch (err) {
+      console.error('[RUN_AND_REPORT_ERROR]', {
+        phase: 'parse_body',
+        errorName: err instanceof Error ? err.name : 'UnknownError',
+        errorMessage: err instanceof Error ? err.message : String(err),
+        url: request.url,
+      });
+      return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+    }
 
-  if (!body.siteId) {
-    return NextResponse.json({ error: 'siteId is required' }, { status: 400 });
-  }
+    if (!body.siteId) {
+      return NextResponse.json({ error: 'siteId is required' }, { status: 400 });
+    }
 
-  const auth = await requireDiscoveryAccess(request, body.siteId);
-  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
-  if (!auth.isAdmin && !auth.isPaid) {
-    return NextResponse.json({ error: 'Discovery requires a paid plan' }, { status: 403 });
-  }
+    const auth = await requireDiscoveryAccess(request, body.siteId);
+    if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
+    if (!auth.isAdmin && !auth.isPaid) {
+      return NextResponse.json({ error: 'Discovery requires a paid plan' }, { status: 403 });
+    }
+    userIdForLog = auth.userId;
 
-  const admin = getAdminClient();
+    const admin = getAdminClient();
 
-  // Self-heal: any "running" jobs older than 10 minutes get marked failed
-  // before we check for an active job. Keeps the system from getting wedged.
-  try {
-    await reapStaleJobs(admin);
-  } catch (err) {
-    console.error('[run-and-report] reapStaleJobs error (non-fatal):', err);
-  }
+    // Self-heal: any "running" jobs older than 10 minutes get marked failed
+    // before we check for an active job. Keeps the system from getting wedged.
+    try {
+      await reapStaleJobs(admin);
+    } catch (err) {
+      console.error('[RUN_AND_REPORT_ERROR]', {
+        phase: 'reap_stale_jobs',
+        errorName: err instanceof Error ? err.name : 'UnknownError',
+        errorMessage: err instanceof Error ? err.message : String(err),
+        errorStack: err instanceof Error ? err.stack : undefined,
+        siteId: body.siteId,
+      });
+      // Non-fatal — continue.
+    }
 
-  // Two cases for active jobs:
-  //   - A *running* job means work is already in flight. Return it as
-  //     alreadyRunning so the caller can join its polling.
-  //   - A *pending* job (status='pending') means a webhook (or another
-  //     entry point) recorded intent but no work has started yet.
-  //     Pick it up: use its id, then proceed to kick off the run.
-  //     Without this pickup, the Stripe rescan flow would create the
-  //     pending job in the webhook and a SECOND job in the success-page
-  //     call here — only the second would run; the first would orphan.
-  const existing = await findActiveJobForSite(admin, body.siteId);
-  if (existing && existing.status === 'running') {
-    return NextResponse.json({ jobId: existing.id, alreadyRunning: true });
-  }
+    // Two cases for active jobs:
+    //   - A *running* job means work is already in flight. Return it as
+    //     alreadyRunning so the caller can join its polling.
+    //   - A *pending* job (status='pending') means a webhook (or another
+    //     entry point) recorded intent but no work has started yet.
+    //     Pick it up: use its id, then proceed to kick off the run.
+    //     Without this pickup, the Stripe rescan flow would create the
+    //     pending job in the webhook and a SECOND job in the success-page
+    //     call here — only the second would run; the first would orphan.
+    const existing = await findActiveJobForSite(admin, body.siteId);
+    if (existing && existing.status === 'running') {
+      return NextResponse.json({ jobId: existing.id, alreadyRunning: true });
+    }
 
-  const job =
-    existing ??
-    (await createJob(admin, {
+    const job =
+      existing ??
+      (await createJob(admin, {
+        siteId: body.siteId,
+        userId: auth.userId,
+        trigger: body.trigger || 'auto_first_run',
+      }));
+
+    // Fire-and-forget. The function-runtime keeps this promise alive until
+    // it resolves (or maxDuration expires). Top-level catch marks the job
+    // failed if the chain blows up before its own try/catch handlers.
+    doRunAndReport({
+      admin,
+      jobId: job.id,
       siteId: body.siteId,
-      userId: auth.userId,
-      trigger: body.trigger || 'auto_first_run',
-    }));
-
-  // Fire-and-forget. The function-runtime keeps this promise alive until
-  // it resolves (or maxDuration expires). Top-level catch marks the job
-  // failed if the chain blows up before its own try/catch handlers.
-  doRunAndReport({
-    admin,
-    jobId: job.id,
-    siteId: body.siteId,
-    appOrigin: request.nextUrl.origin,
-  }).catch((err) => {
-    console.error(`[run-and-report] Unhandled error in job ${job.id}:`, err);
-    void updateJob(admin, job.id, {
-      status: 'failed',
-      error: err instanceof Error ? err.message : String(err),
-      completed_at: new Date().toISOString(),
+      appOrigin: request.nextUrl.origin,
+    }).catch((err) => {
+      console.error('[RUN_AND_REPORT_ERROR]', {
+        phase: 'fire_and_forget_unhandled',
+        errorName: err instanceof Error ? err.name : 'UnknownError',
+        errorMessage: err instanceof Error ? err.message : String(err),
+        errorStack: err instanceof Error ? err.stack : undefined,
+        jobId: job.id,
+        siteId: body.siteId,
+      });
+      void updateJob(admin, job.id, {
+        status: 'failed',
+        error: err instanceof Error ? err.message : String(err),
+        completed_at: new Date().toISOString(),
+      });
     });
-  });
 
-  return NextResponse.json({ jobId: job.id, alreadyRunning: false });
+    return NextResponse.json({ jobId: job.id, alreadyRunning: false });
+  } catch (err) {
+    // Top-level catch — surface unexpected exceptions properly.
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    const errorStack = err instanceof Error ? err.stack : undefined;
+    const errorName = err instanceof Error ? err.name : 'UnknownError';
+
+    console.error('[RUN_AND_REPORT_ERROR]', {
+      phase: 'top_level_handler',
+      errorName,
+      errorMessage,
+      errorStack,
+      bodyForLog,
+      userIdForLog,
+      url: request.url,
+      timestamp: new Date().toISOString(),
+    });
+
+    // TEMPORARY: return the actual error message so the UI surfaces it.
+    // Revert this branch to a generic message once the bug is identified.
+    return NextResponse.json(
+      {
+        error: `[DEBUG] ${errorName}: ${errorMessage}`,
+        _debug: true,
+      },
+      { status: 500 },
+    );
+  }
 }
 
 async function doRunAndReport(params: {
@@ -152,10 +213,26 @@ async function doRunAndReport(params: {
     try {
       await runPostRunHook(siteId, runId, 'full', run.results);
     } catch (hookErr) {
-      console.error(`[run-and-report] post-run hook error in job ${jobId}:`, hookErr);
+      console.error('[RUN_AND_REPORT_ERROR]', {
+        phase: 'post_run_hook',
+        errorName: hookErr instanceof Error ? hookErr.name : 'UnknownError',
+        errorMessage: hookErr instanceof Error ? hookErr.message : String(hookErr),
+        errorStack: hookErr instanceof Error ? hookErr.stack : undefined,
+        jobId,
+        siteId,
+        runId,
+      });
       // Don't fail the whole job — insights/recs are nice-to-have.
     }
   } catch (err) {
+    console.error('[RUN_AND_REPORT_ERROR]', {
+      phase: 'discovery_runner',
+      errorName: err instanceof Error ? err.name : 'UnknownError',
+      errorMessage: err instanceof Error ? err.message : String(err),
+      errorStack: err instanceof Error ? err.stack : undefined,
+      jobId,
+      siteId,
+    });
     await updateJob(admin, jobId, {
       status: 'failed',
       phase: 'discovery',
@@ -208,6 +285,15 @@ async function doRunAndReport(params: {
       completed_at: new Date().toISOString(),
     });
   } catch (err) {
+    console.error('[RUN_AND_REPORT_ERROR]', {
+      phase: 'report_generation',
+      errorName: err instanceof Error ? err.name : 'UnknownError',
+      errorMessage: err instanceof Error ? err.message : String(err),
+      errorStack: err instanceof Error ? err.stack : undefined,
+      jobId,
+      siteId,
+      runId,
+    });
     await updateJob(admin, jobId, {
       status: 'failed',
       phase: 'report',
