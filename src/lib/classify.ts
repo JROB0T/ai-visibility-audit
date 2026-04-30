@@ -120,7 +120,16 @@ export interface EnrichedBusinessProfile {
   service_area_region: string | null;  // broader "Central New Jersey" label
   description: string | null;          // 1-2 sentences
   core_services: string[];             // 3-8 specific services
-  target_customer: 'residential' | 'commercial' | 'both' | null;
+  target_customer:
+    | 'residential'
+    | 'commercial'
+    | 'both'
+    | 'consumers'
+    | 'businesses'
+    | 'developers'
+    | 'service_buyers'
+    | 'service_providers'
+    | null;
   branded_terms: string[];             // monitored brand variants (usually [name])
 }
 
@@ -184,8 +193,18 @@ const RECORD_BUSINESS_PROFILE_TOOL = {
       },
       target_customer: {
         type: ['string', 'null'],
-        enum: ['residential', 'commercial', 'both', null],
-        description: 'Primary customer type.',
+        enum: [
+          'residential',
+          'commercial',
+          'both',
+          'consumers',
+          'businesses',
+          'developers',
+          'service_buyers',
+          'service_providers',
+          null,
+        ],
+        description: 'Primary customer type. For local services use residential/commercial/both. For platforms and SaaS use consumers/businesses/developers/service_buyers/service_providers.',
       },
       branded_terms: {
         type: 'array',
@@ -217,13 +236,45 @@ ${scrapeStatus}
 
 You have access to web_search. Use it if the scraped data is thin or uncertain (up to 2 searches). Then call the record_business_profile tool EXACTLY ONCE with your best structured answer.
 
-Key rules:
-- Never guess. If you cannot verify a field from the scraped content, the domain, OR your training-data knowledge of the business, return null for that field. For arrays, return an empty array rather than inventing entries.
-- For well-known local businesses you recognize (e.g. "candcair.com" → C&C Air in New Jersey), your training data is a valid source — use it. But stay conservative: if you're not sure it's the same business, return null.
-- service_area_city should be short (e.g. "Belford NJ" or "Austin TX"), not a full address.
-- service_area_region should be the broader region the business plausibly serves (e.g. "Central New Jersey", "Monmouth County NJ").
-- primary_category should be specific (e.g. "hvac", "plumbing", "dental", "personal_injury_law") rather than the generic "local_service" or "other".
-- branded_terms: include the business name plus one or two common variants (e.g. ["C&C Air", "C&C Air Conditioning"]). Do not include the domain.
+# First: classify the business shape
+
+Before filling fields, decide which of these two shapes the business fits:
+
+**Shape A — Local services.** Operates in a specific city or region. Customers physically interact with the business or its work in that location. Examples: HVAC contractor in Belford NJ, family-law attorney in Austin TX, dentist in Tampa FL, italian restaurant in Brooklyn, regional plumbing company serving 3 counties.
+
+**Shape B — Multi-region, national, or digital.** Operates without a single city anchor. Includes:
+- National platforms / marketplaces (Thumbtack, Upwork, Fiverr, Etsy, Airbnb)
+- SaaS products (Stripe, Notion, Calendly, Coingecko, Vercel)
+- E-commerce brands sold online or nationally (Nike, Patagonia, Allbirds)
+- Digital media or content (NYTimes, Bloomberg, Substack)
+- B2B services without a single metro presence (Accenture, McKinsey, large consulting firms)
+- Software libraries, dev tools, APIs
+
+If you're unsure, default to Shape B. It is far better to leave city/region null than to invent a fake locality.
+
+# How to populate fields based on shape
+
+**For Shape A (local services):**
+- service_area_city: short label like "Belford NJ" or "Austin TX". This is the ONE field that drives downstream local-intent prompts.
+- service_area_region: broader region the business plausibly serves ("Central New Jersey", "Bay Area", "Monmouth County NJ").
+- service_area: free-form sentence describing both ("Belford NJ and Central New Jersey, serving Monmouth County and surrounding areas").
+- primary_category: specific industry like "hvac", "plumbing", "dental", "personal_injury_law".
+- core_services: 3-8 specific services performed by humans ("HVAC repair", "AC installation", "emergency plumbing").
+- target_customer: "residential", "commercial", or "both".
+
+**For Shape B (multi-region, national, or digital):**
+- service_area_city: **NULL.** Do not invent a city. The HQ address is NOT the service area for a national business. Thumbtack's HQ is in San Francisco, but Thumbtack operates nationally — service_area_city should be NULL for Thumbtack.
+- service_area_region: NULL, OR a broad region label like "United States" / "Global" / "North America" if the business genuinely advertises national/global operation. Prefer NULL when in doubt.
+- service_area: NULL, OR a sentence like "United States, online" or "Global SaaS, served via web app".
+- primary_category: specific category that describes the platform or product, not a service vertical. Examples: "services_marketplace", "freelance_platform", "payments_saas", "crypto_data_platform", "athletic_apparel_brand", "developer_tools", "consulting_firm".
+- core_services: the platform's core value propositions or product offerings, not literal services it performs. Examples for Thumbtack: ["service-pro matching", "instant quotes", "verified-pro reviews"]. For Stripe: ["online payments", "payment links", "billing & subscriptions"]. For Nike: ["athletic footwear", "sportswear apparel", "athletic performance gear"].
+- target_customer: pick the option that fits. The enum allows: "residential", "commercial", "both", "consumers", "businesses", "developers", "service_buyers", "service_providers", or null when truly mixed/unclear. Don't force "residential/commercial" onto a B2B platform.
+
+# Other rules (apply to both shapes)
+
+- Never guess. If you can't verify a field from the scraped content, the domain, OR your training-data knowledge of the business, return null. For arrays, return an empty array rather than inventing entries.
+- For well-known businesses you recognize from training data (e.g., "thumbtack.com" → Thumbtack the services marketplace, "candcair.com" → C&C Air in New Jersey), your training data is a valid source. Use it confidently when the match is unambiguous; null when uncertain.
+- branded_terms: include the business name plus 1-2 common variants. Don't include the domain. For Thumbtack: ["Thumbtack"]. For C&C Air: ["C&C Air", "C&C Air Conditioning"].
 
 You MUST call record_business_profile. Do not answer in plain text.`;
 
@@ -329,8 +380,20 @@ Example URLs: ${(input.pageUrls || []).slice(0, 8).join(', ') || '(none)'}`;
       return v.map(x => String(x || '').trim()).filter(x => x.length > 0);
     };
     const targetRaw = toStringOrNull(toolInput.target_customer);
+    const VALID_TARGETS: readonly NonNullable<EnrichedBusinessProfile['target_customer']>[] = [
+      'residential',
+      'commercial',
+      'both',
+      'consumers',
+      'businesses',
+      'developers',
+      'service_buyers',
+      'service_providers',
+    ];
     const target: EnrichedBusinessProfile['target_customer'] =
-      targetRaw === 'residential' || targetRaw === 'commercial' || targetRaw === 'both' ? targetRaw : null;
+      targetRaw && (VALID_TARGETS as readonly string[]).includes(targetRaw)
+        ? (targetRaw as EnrichedBusinessProfile['target_customer'])
+        : null;
 
     return {
       business_name: toStringOrNull(toolInput.business_name),

@@ -451,12 +451,39 @@ export async function ensureDiscoveryProfileAndPrompts(input: BootstrapInput): P
 
   const locationLine = locationAnchor
     ? `- Primary service location (REQUIRED in every core/problem/comparison/long_tail prompt): "${locationAnchor}"${profileRegion && profileRegion !== locationAnchor ? ` (you may substitute "${profileRegion}" when phrasing naturally)` : ''}`
-    : `- Service location unknown — skip location enforcement, but keep prompts commercial and concrete`;
+    : `- Service location: NONE. This business is multi-region, national, or digital — do NOT add a city to any prompt.`;
 
   const categoryForExamples = (primaryCategory || vertical || 'local_service').replace(/_/g, ' ');
   const exampleCity = locationAnchor || '[city]';
 
-  const buildSystemPrompt = (focusCluster?: DiscoveryCluster): string => `You are generating a realistic buyer-intent AI-query library to test a specific local business's AI discoverability. A downstream tester will run each prompt through an AI assistant with web search — the prompts need to be things REAL BUYERS actually type.
+  // Shape-aware cluster guidance.
+  //
+  // Shape A (locationEnforced=true): local-services framing — every commercial
+  //   prompt anchors to a city or region. Same as before this fix.
+  // Shape B (locationEnforced=false): national platform / SaaS / e-commerce /
+  //   digital framing — buyers ask about the product, brand, alternatives, or
+  //   use-case, not "best X in [city]".
+  const clusterGuidanceLocal = `- core: direct commercial intent like "best ${categoryForExamples} in ${exampleCity}" or "emergency ${categoryForExamples} ${exampleCity}".
+- problem: problem-first queries like "${services[0] ? services[0] + ' not working' : 'urgent ' + categoryForExamples + ' problem'} ${exampleCity}".
+- comparison: "best ${categoryForExamples} in ${exampleCity} for small businesses" or "top-rated ${categoryForExamples} ${profileRegion || exampleCity}".
+- long_tail: specific service detail like "${services[1] || services[0] || categoryForExamples} installation cost ${exampleCity}" or "who does weekend ${categoryForExamples} service in ${exampleCity}".
+- brand: "${businessName} reviews", "is ${businessName} good for residential ${categoryForExamples}", "${businessName} service areas".
+- adjacent: related services the business could reasonably serve.`;
+
+  const clusterGuidanceNational = `- core: direct purchase/use intent for the platform or product. Examples for a services marketplace: "best service marketplace for finding contractors", "where to find vetted home pros online". Examples for a SaaS product: "best ${categoryForExamples} for small businesses", "easiest ${categoryForExamples} to set up". No city.
+- problem: problem-first queries that the product solves. Examples: "${services[0] || 'how to ' + categoryForExamples} without hiring an agency", "fastest way to ${services[0] || categoryForExamples}". No city.
+- comparison: "${businessName} vs [a real direct competitor]" or "best alternatives to ${businessName}" or "top ${categoryForExamples} platforms compared". No city.
+- long_tail: specific feature, integration, or use-case queries. Examples: "${services[1] || services[0] || categoryForExamples} for [a niche audience]", "does ${categoryForExamples} support [a specific workflow]". No city.
+- brand: "${businessName} reviews", "is ${businessName} legit", "${businessName} pricing", "${businessName} alternatives".
+- adjacent: related categories the business plausibly extends into, not literal manual services.`;
+
+  const clusterGuidanceBlock = locationEnforced ? clusterGuidanceLocal : clusterGuidanceNational;
+
+  const businessFramingLine = locationEnforced
+    ? `You are generating a realistic buyer-intent AI-query library to test a specific local business's AI discoverability.`
+    : `You are generating a realistic buyer-intent AI-query library to test a specific multi-region / national / digital business's AI discoverability. The business does NOT have a single city anchor — prompts must NOT be tied to any city.`;
+
+  const buildSystemPrompt = (focusCluster?: DiscoveryCluster): string => `${businessFramingLine} A downstream tester will run each prompt through an AI assistant with web search — the prompts need to be things REAL BUYERS actually type.
 
 Business:
 - Name: ${businessName}
@@ -475,18 +502,13 @@ ABSOLUTE RULES — any prompt violating these will be rejected:
 2. NEVER use "near me", "locally", "in my area", or any vague geography substitute.
 3. NEVER ask about specific pricing that can't be verified ("free estimates?", "cheapest X?").
 4. NEVER produce generic educational / how-to prompts ("do companies offer...", "what is...", "how do I choose..."). Every prompt is a commercial-intent real buyer question.
-${locationEnforced ? `5. Prompts in the 'core', 'problem', 'comparison', and 'long_tail' clusters MUST include "${locationAnchor}" (or "${profileRegion}" where it reads naturally). This is non-negotiable.` : '5. (Location enforcement disabled — service area unknown.)'}
+${locationEnforced ? `5. Prompts in the 'core', 'problem', 'comparison', and 'long_tail' clusters MUST include "${locationAnchor}" (or "${profileRegion}" where it reads naturally). This is non-negotiable.` : `5. NEVER add a city or geographic anchor to any prompt. This business is national/digital — prompts asking about "best X in [city]" are wrong shape.`}
 6. 'brand' cluster prompts MUST include the business name "${businessName}" verbatim (not the domain).
 7. 'adjacent' cluster prompts cover related services the business MIGHT plausibly offer but doesn't clearly advertise, using the core services as a starting point.
 8. No duplicates. No near-duplicates.
 
 CLUSTER GUIDANCE with examples for this business:
-- core: direct commercial intent like "best ${categoryForExamples} in ${exampleCity}" or "emergency ${categoryForExamples} ${exampleCity}".
-- problem: problem-first queries like "${services[0] ? services[0] + ' not working' : 'urgent ' + categoryForExamples + ' problem'} ${exampleCity}".
-- comparison: "best ${categoryForExamples} in ${exampleCity} for small businesses" or "top-rated ${categoryForExamples} ${profileRegion || exampleCity}".
-- long_tail: specific service detail like "${services[1] || services[0] || categoryForExamples} installation cost ${exampleCity}" or "who does weekend ${categoryForExamples} service in ${exampleCity}".
-- brand: "${businessName} reviews", "is ${businessName} good for residential ${categoryForExamples}", "${businessName} service areas".
-- adjacent: related services the business could reasonably serve.
+${clusterGuidanceBlock}
 
 Priorities: 'high' for strongest commercial intent (someone ready to buy), 'medium' for secondary discovery, 'low' for long-tail/adjacent.
 
