@@ -124,29 +124,49 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         trigger: body.trigger || 'auto_first_run',
       }));
 
-    // Fire-and-forget. The function-runtime keeps this promise alive until
-    // it resolves (or maxDuration expires). Top-level catch marks the job
-    // failed if the chain blows up before its own try/catch handlers.
-    doRunAndReport({
-      admin,
-      jobId: job.id,
-      siteId: body.siteId,
-      appOrigin: request.nextUrl.origin,
-    }).catch((err) => {
+    // SYNCHRONOUS: await the full chain. The previous fire-and-forget
+    // pattern looked correct but failed in production on Vercel —
+    // serverless terminates the function process when the response is
+    // sent, killing the "background" Promise before it could do real
+    // work. Symptom: jobs stuck in 'running' forever, zero prompts
+    // tested, zero results stored.
+    //
+    // Awaiting the chain keeps the function alive while it works —
+    // that's the supported pattern. Total expected duration ~90s,
+    // within the 300s maxDuration budget.
+    //
+    // The client side is unaffected: AutoRunProgress polls job-status
+    // independently of when this POST returns. With sync, the first
+    // poll typically sees the final state instead of intermediate
+    // 'running'.
+    //
+    // doRunAndReport has its own try/catch around each phase that
+    // updates job state on failure. The catch below is defense-in-depth
+    // for any error escaping that protection.
+    try {
+      await doRunAndReport({
+        admin,
+        jobId: job.id,
+        siteId: body.siteId,
+        appOrigin: request.nextUrl.origin,
+      });
+    } catch (err) {
       console.error('[RUN_AND_REPORT_ERROR]', {
-        phase: 'fire_and_forget_unhandled',
+        phase: 'sync_chain_unhandled',
         errorName: err instanceof Error ? err.name : 'UnknownError',
         errorMessage: err instanceof Error ? err.message : String(err),
         errorStack: err instanceof Error ? err.stack : undefined,
         jobId: job.id,
         siteId: body.siteId,
       });
-      void updateJob(admin, job.id, {
+      await updateJob(admin, job.id, {
         status: 'failed',
         error: err instanceof Error ? err.message : String(err),
         completed_at: new Date().toISOString(),
       });
-    });
+      // Fall through and still return jobId — client polls job-status
+      // and sees the failed state.
+    }
 
     return NextResponse.json({ jobId: job.id, alreadyRunning: false });
   } catch (err) {
