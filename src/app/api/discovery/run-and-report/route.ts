@@ -230,8 +230,18 @@ async function doRunAndReport(params: {
     runId = run.runId;
 
     // Run the post-run hook (insights, recs, competitors). Same as run-tests.
+    // Pass a progress callback so the hook's phase boundaries surface live
+    // in discovery_jobs.progress_message — keeps the user-facing UI moving
+    // during the ~5-15s of post-run work.
+    await updateJob(admin, jobId, {
+      progress_message: 'Identifying competitor patterns…',
+    });
     try {
-      await runPostRunHook(siteId, runId, 'full', run.results);
+      await runPostRunHook(siteId, runId, 'full', run.results, (message) => {
+        // Best-effort. Don't await — runPostRunHook shouldn't be slowed by
+        // progress writes, and a transient DB hiccup mustn't break the run.
+        void updateJob(admin, jobId, { progress_message: message });
+      });
     } catch (hookErr) {
       console.error('[RUN_AND_REPORT_ERROR]', {
         phase: 'post_run_hook',
@@ -265,7 +275,7 @@ async function doRunAndReport(params: {
   // ----- Phase B: Report -----
   await updateJob(admin, jobId, {
     phase: 'report',
-    progress_message: 'Generating your AI Positioning Brief…',
+    progress_message: 'Generating your strategic narrative…',
     run_id: runId,
   });
 
@@ -284,7 +294,15 @@ async function doRunAndReport(params: {
 
     const payload = (await exportRes.json()) as ReportExportPayload;
     const { narrative, model } = await generateReportNarrative(payload);
+
+    // Narrative is the slow part (~30s). Once it's back, update the message
+    // before the fast HTML build + persistence steps so the UI doesn't sit
+    // on "Generating your strategic narrative…" through the tail.
+    void updateJob(admin, jobId, { progress_message: 'Building your report…' });
+
     const html = buildReportHtml(payload, narrative);
+
+    void updateJob(admin, jobId, { progress_message: 'Saving your dashboard…' });
 
     await admin
       .from('discovery_score_snapshots')

@@ -64,9 +64,16 @@ export async function runPostRunHook(
   runId: string,
   tier: DiscoveryTier,
   results: DiscoveryResult[],
+  onProgress?: (message: string) => void,
 ): Promise<PostRunOutcome> {
   const admin = getAdminClient();
   const logTag = `site=${siteId.slice(0, 8)} run=${runId.slice(0, 8)}`;
+  // Best-effort progress notifications. Wrapped so a misbehaving callback
+  // can never break the actual hook work.
+  const tellProgress = (msg: string): void => {
+    if (!onProgress) return;
+    try { onProgress(msg); } catch { /* swallow */ }
+  };
 
   const outcome: PostRunOutcome = {
     insightsCount: 0,
@@ -95,6 +102,8 @@ export async function runPostRunHook(
   }
 
   const ctx = { results, competitors, profile, tier };
+
+  tellProgress('Analyzing visibility patterns…');
 
   // --- Phase A: persist DRAFT insights ---
   let rawSignals: InsightSignal[] = [];
@@ -136,6 +145,8 @@ export async function runPostRunHook(
     }
   }
 
+  tellProgress('Drafting strategic recommendations…');
+
   // --- Phase D: draft + persist DRAFT recommendations ---
   // CRITICAL: runs regardless of insights phase outcome.
   let rawDrafts: RecommendationDraft[] = [];
@@ -176,6 +187,8 @@ export async function runPostRunHook(
       console.error(`[PostRun] phase=recs.polish ${logTag} status=failed duration_ms=${Date.now() - t0} error=${err instanceof Error ? err.message : err}`);
     }
   }
+
+  tellProgress('Mapping the competitive landscape…');
 
   // --- Phase G: auto-populate competitors ---
   {
