@@ -15,6 +15,7 @@ export interface Audit {
   site_id: string;
   user_id: string | null;
   status: 'pending' | 'running' | 'completed' | 'failed';
+  tier: AuditTier;
   overall_score: number | null;
   crawlability_score: number | null;
   machine_readability_score: number | null;
@@ -321,12 +322,70 @@ export interface RecommendationInput {
 // Monetization & billing types
 // ============================================================
 
-export type RunType = 'free_preview' | 'paid_initial' | 'manual_paid_rescan' | 'monthly_auto_rerun';
+// AuditTier — the product-tier dimension of an audit.
+//   free   — public email-capture sample, 6-prompt scan, 2-page summary
+//   tier_1 — full strategic report, no fix list, no technical recommendations
+//   tier_2 — tier_1 contents plus operational fix list and technical recommendations
+// Distinct from DiscoveryTier (runner-internal, legacy 'full' / 'teaser_legacy').
+export type AuditTier = 'free' | 'tier_1' | 'tier_2';
+
+export type RunType =
+  | 'free_preview'           // legacy; preserved for historical rows
+  | 'free_sample'            // new free email-capture scan
+  | 'paid_initial'
+  | 'manual_paid_rescan'
+  | 'monthly_auto_rerun';
 export type RunScope = 'free' | 'core' | 'core_plus_premium';
 export type PlanStatus = 'free' | 'core' | 'core_premium';
 export type VerticalType = 'saas' | 'professional_services' | 'local_service' | 'ecommerce' | 'healthcare' | 'law_firm' | 'restaurant' | 'other';
 export type FindingState = 'new' | 'ongoing' | 'resolved' | 'regressed';
-export type BillingEventType = 'initial_scan' | 'premium_addon' | 'bundle' | 'manual_paid_rescan' | 'monthly_subscription' | 'monthly_renewal';
+export type BillingEventType =
+  | 'initial_scan'
+  | 'premium_addon'
+  | 'bundle'
+  | 'manual_paid_rescan'
+  | 'monthly_subscription'
+  | 'monthly_renewal'
+  | 'tier_1_one_time'
+  | 'tier_1_monthly'
+  | 'tier_2_one_time'
+  | 'tier_2_monthly';
+
+export type SubscriptionStatus = 'active' | 'past_due' | 'canceled' | 'paused';
+export type SubscriptionCadence = 'monthly';
+export type SubscriptionTier = Exclude<AuditTier, 'free'>;
+
+export interface Subscription {
+  id: string;
+  user_id: string;
+  domain: string;
+  tier: SubscriptionTier;
+  cadence: SubscriptionCadence;
+  stripe_subscription_id: string;
+  status: SubscriptionStatus;
+  next_run_at: string | null;
+  last_run_audit_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type FreeScanTrigger = 'public' | 'admin';
+
+export interface FreeScanRequest {
+  id: string;
+  email: string;
+  email_normalized: string;
+  domain: string;
+  domain_normalized: string;
+  audit_id: string | null;
+  ip_address: string | null;
+  user_agent: string | null;
+  triggered_by: FreeScanTrigger;
+  created_at: string;
+  delivered_at: string | null;
+  failed_at: string | null;
+  failure_reason: string | null;
+}
 
 export interface Entitlement {
   id: string;
@@ -586,4 +645,5 @@ export interface DiscoveryScoreSnapshot {
   absent_count: number;
   competitor_dominant_count: number;
   snapshot_date: string;
+  tier: AuditTier;
 }

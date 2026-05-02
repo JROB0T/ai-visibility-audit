@@ -23,6 +23,7 @@ import {
   clusterScore,
 } from '@/lib/discoveryScoring';
 import type {
+  AuditTier,
   DiscoveryCluster,
   DiscoveryPositionType,
   DiscoveryPrompt,
@@ -36,6 +37,7 @@ const CLAUDE_MODEL = 'claude-haiku-4-5-20251001';
 const WEB_SEARCH_TOOL_TYPE = 'web_search_20250305';
 const CONCURRENCY = 4;
 const MAX_PROMPTS_PER_RUN = 40;
+const FREE_TIER_PROMPT_COUNT = 6; // one per cluster
 const ALL_CLUSTERS: DiscoveryCluster[] = ['core', 'problem', 'comparison', 'long_tail', 'brand', 'adjacent'];
 const PRIORITY_ORDER: Record<string, number> = { high: 0, medium: 1, low: 2 };
 
@@ -45,10 +47,45 @@ export type RunDiscoveryTestsInput = {
   runLabel?: string;
   triggeredBy: 'user' | 'cron' | 'admin';
   tier?: DiscoveryTier;
+  // AuditTier controls prompt-count and downstream rendering. Defaults to 'tier_1'
+  // so existing callers that don't pass it keep the full 18-prompt scan.
+  auditTier?: AuditTier;
   // Best-effort progress callback fired after each prompt completes.
   // Implementations should not await — these updates are advisory.
   onProgress?: (done: number, total: number) => void;
 };
+
+// ============================================================
+// selectPromptsForTier
+//
+// Free tier: take the highest-priority prompt from each of the 6 clusters
+// (one per cluster). Falls back to fewer than 6 when a cluster has no
+// active prompts — caller still gets a meaningful but cheaper scan.
+//
+// Tier 1 / Tier 2: full scan, capped at MAX_PROMPTS_PER_RUN.
+//
+// Input is assumed pre-sorted by (priority asc, created_at asc) so taking
+// the first match per cluster yields the highest-signal prompt.
+// ============================================================
+export function selectPromptsForTier(
+  sortedPrompts: DiscoveryPrompt[],
+  tier: AuditTier,
+): DiscoveryPrompt[] {
+  if (tier === 'free') {
+    const seen = new Set<DiscoveryCluster>();
+    const picks: DiscoveryPrompt[] = [];
+    for (const prompt of sortedPrompts) {
+      const cluster = prompt.cluster as DiscoveryCluster;
+      if (!ALL_CLUSTERS.includes(cluster)) continue;
+      if (seen.has(cluster)) continue;
+      seen.add(cluster);
+      picks.push(prompt);
+      if (picks.length >= FREE_TIER_PROMPT_COUNT) break;
+    }
+    return picks;
+  }
+  return sortedPrompts.slice(0, MAX_PROMPTS_PER_RUN);
+}
 
 export type RunDiscoveryTestsResult = {
   runId: string;
@@ -510,8 +547,9 @@ function scoreFromStatus(status: DiscoveryVisibilityStatus, position: DiscoveryP
 
 export async function runDiscoveryTests(input: RunDiscoveryTestsInput): Promise<RunDiscoveryTestsResult> {
   const { siteId, promptIds, runLabel, triggeredBy } = input;
-  // Phase 1.5a: teaser runs are killed — every run is full.
+  // Phase 1.5a: teaser runs are killed — every run is full at the runner-tier level.
   const tier: DiscoveryTier = 'full';
+  const auditTier: AuditTier = input.auditTier ?? 'tier_1';
   const runId = newRunId();
   const admin = getAdminClient();
   const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -609,10 +647,10 @@ export async function runDiscoveryTests(input: RunDiscoveryTestsInput): Promise<
       return (a.created_at || '').localeCompare(b.created_at || '');
     });
 
-  const prompts: DiscoveryPrompt[] = sortedPrompts.slice(0, MAX_PROMPTS_PER_RUN);
+  const prompts: DiscoveryPrompt[] = selectPromptsForTier(sortedPrompts, auditTier);
 
   console.log(
-    `[discoveryRunner] tier=${tier} selected=${prompts.length}`,
+    `[discoveryRunner] tier=${tier} auditTier=${auditTier} selected=${prompts.length}`,
     `clusters=${Array.from(new Set(prompts.map(p => p.cluster))).join(',')}`,
   );
 
@@ -871,6 +909,7 @@ export async function runDiscoveryTests(input: RunDiscoveryTestsInput): Promise<
     partial_count: counts.partialCount,
     absent_count: counts.absentCount,
     competitor_dominant_count: counts.competitorDominantCount,
+    tier: auditTier,
   };
 
   const { data: snapshotInserted, error: snapshotErr } = await admin
