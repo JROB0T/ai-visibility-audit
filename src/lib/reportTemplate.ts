@@ -1491,6 +1491,51 @@ function truncateToSentences(text: string, maxSentences: number, maxChars: numbe
   return out;
 }
 
+// Pick the best excerpt from a weak-prompt response for the free sample.
+// Prefer sentences that name a detected competitor — the excerpt's job is to
+// make "buyers are deciding without you" feel real, and competitor mentions
+// do that work better than generic AI prose. Falls back to leading sentences
+// when no competitor mention is present (or the competitor list is empty).
+function selectFreeSampleExcerpt(
+  text: string,
+  competitorNames: string[],
+  maxSentences: number,
+  maxChars: number,
+): string {
+  const cleaned = text.replace(/\s+/g, ' ').trim();
+  if (cleaned.length === 0) return '';
+  const sentences = cleaned.split(/(?<=[.!?])\s+/).filter(s => s.trim().length > 0);
+  const competitors = competitorNames
+    .map(c => c.toLowerCase().trim())
+    .filter(c => c.length >= 2);
+
+  if (competitors.length > 0) {
+    const lower = sentences.map(s => s.toLowerCase());
+    const competitorIdxs: number[] = [];
+    for (let i = 0; i < lower.length; i++) {
+      if (competitors.some(c => lower[i].includes(c))) competitorIdxs.push(i);
+    }
+    if (competitorIdxs.length > 0) {
+      // Take the first match plus up to (maxSentences - 1) following sentences,
+      // so the excerpt reads naturally instead of jumping between hits.
+      const start = competitorIdxs[0];
+      const end = Math.min(sentences.length, start + maxSentences);
+      let out = sentences.slice(start, end).join(' ');
+      if (out.length > maxChars) {
+        out = out.slice(0, maxChars - 1).replace(/\s+\S*$/, '') + '…';
+      } else if (end < sentences.length) {
+        out += '…';
+      } else if (start > 0) {
+        out = '…' + out;
+      }
+      return out;
+    }
+  }
+
+  // No competitor match — fall back to leading-sentence truncation.
+  return truncateToSentences(cleaned, maxSentences, maxChars);
+}
+
 export interface BuildFreeSampleOptions {
   pricingUrl?: string;
 }
@@ -1512,8 +1557,13 @@ export function buildFreeSampleHtml(
   const totalPrompts = Math.max(counts.prompt_count, 1);
   const interp = `Across ${counts.prompt_count} buyer-intent question${counts.prompt_count === 1 ? '' : 's'} we tested with a live AI assistant, ${businessName} appeared in ${presenceCount} of ${totalPrompts}.`;
 
-  const headlinePrimary = score >= 70 ? 'A solid' : score >= 40 ? 'A working' : 'A starting';
-  const headlineAccent  = score >= 70 ? 'foundation' : score >= 40 ? 'position' : 'point';
+  // Headline structure: "<primary> <em>accent</em>." — accent renders in
+  // red italic. The < 40 case breaks the article+noun pattern of the
+  // higher tiers because the message itself ("Mostly invisible") needs
+  // to land plainly; "Mostly" sits in primary, "invisible" carries the
+  // emphasis.
+  const headlinePrimary = score >= 70 ? 'A solid' : score >= 40 ? 'A working' : 'Mostly';
+  const headlineAccent  = score >= 70 ? 'foundation' : score >= 40 ? 'position' : 'invisible';
 
   // Page 2 data
   const clusterScores = payload.scores.cluster_scores;
@@ -1537,7 +1587,7 @@ export function buildFreeSampleHtml(
           <div class="ask">When a buyer asks an AI</div>
           <div class="q">${esc(weakest.prompt_text)}</div>
           <div class="ai-lab">The AI answers</div>
-          <div class="ai-text">${esc(truncateToSentences(weakest.raw_response_excerpt, 3, 360))}</div>
+          <div class="ai-text">${esc(selectFreeSampleExcerpt(weakest.raw_response_excerpt, weakest.competitor_names_detected || [], 3, 360))}</div>
         </div>`
     : '';
   const whyLine = weakest
@@ -1569,7 +1619,7 @@ export function buildFreeSampleHtml(
     `    <div class="interp">${esc(interp)}</div>`,
     '  </div>',
     '  <div class="framing">',
-    '    <p>When buyers ask an AI assistant for recommendations in your category, that AI gives them a short list. This score is a measure of how often your business is on that list, in your own market and for your own services.</p>',
+    '    <p>When buyers ask an AI assistant for recommendations in your category, that AI gives them a short list. This score is a measure of how often your business is on that list, for your category and the services you offer.</p>',
     '    <p>This sample is the headline number plus one example. The full report shows every question tested, who is being recommended instead, and a strategic plan to change that.</p>',
     '  </div>',
     '</div>',
@@ -1583,7 +1633,7 @@ export function buildFreeSampleHtml(
     '  <div class="cta-row">',
     '    <div class="lead">See the full report.</div>',
     `    <a class="btn" href="${esc(pricingUrl)}">Upgrade to the full report →</a>`,
-    `    <div class="sub">Includes every prompt, the actual AI responses, competitor analysis, and a 30/60/90 plan.</div>`,
+    `    <div class="sub">Includes who's being recommended instead of you, every question tested with the actual AI responses, and a 30/60/90 plan.</div>`,
     '  </div>',
     '</div>',
 

@@ -49,10 +49,18 @@ export async function PATCH(
 
   const { data: audit } = await admin
     .from('audits')
-    .select('id')
+    .select('id, tier')
     .eq('id', auditId)
     .maybeSingle();
   if (!audit) return NextResponse.json({ error: 'Audit not found' }, { status: 404 });
+
+  // Tier gate — see GET /api/audit/[id]/fix-list for rationale.
+  if (audit.tier !== 'tier_2') {
+    return NextResponse.json(
+      { error: 'The operational fix list is available on Tier 2 only.' },
+      { status: 403 },
+    );
+  }
 
   const { data, error } = await admin
     .from('fix_list_items')

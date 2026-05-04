@@ -54,11 +54,24 @@ export async function GET(
 
   const { data: audit, error: auditErr } = await admin
     .from('audits')
-    .select('id, site_id')
+    .select('id, site_id, tier')
     .eq('id', auditId)
     .maybeSingle();
   if (auditErr || !audit) {
     return NextResponse.json({ error: 'Audit not found' }, { status: 404 });
+  }
+
+  // Tier gate: fix list is a Tier 2 feature. The dashboard already hides
+  // the Priorities tab for non-tier_2 audits, but the API must enforce
+  // independently — direct calls (cURL, scripts) bypass the UI.
+  // NOTE: this endpoint also lacks an ownership/auth check (pre-existing —
+  // any audit id can be queried). That's a separate security item, not
+  // addressed here.
+  if (audit.tier !== 'tier_2') {
+    return NextResponse.json(
+      { error: 'The operational fix list is available on Tier 2 only.' },
+      { status: 403 },
+    );
   }
 
   // Audit recommendations + their findings (for affected URLs)
