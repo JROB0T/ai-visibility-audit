@@ -1277,3 +1277,317 @@ function formatDelta(d: number | null): string {
 function cap(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
+
+// ============================================================
+// Free-tier 2-page summary
+//
+// Reuses the Tier 1 narrative (cheap — same Claude call) but renders
+// a stripped-down 2-page document with no jargon. Page 1 = score +
+// static framing; page 2 = cluster heatmap + lowest-scoring prompt
+// with its real AI response excerpt + CTA to upgrade.
+//
+// Self-contained styles — does NOT import REPORT_STYLES because the
+// strategic-brief CSS introduces concepts (radar grids, page-numbered
+// footers, masthead) the free user hasn't been onboarded to.
+// ============================================================
+
+const FREE_SAMPLE_STYLES = `
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    font-family: 'Geist', -apple-system, BlinkMacSystemFont, sans-serif;
+    color: #1a1a1a;
+    background: #f5f3ee;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+  .page {
+    width: 8.5in; min-height: 11in;
+    margin: 0.5in auto;
+    background: #ffffff;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.08);
+    padding: 0.75in 0.85in;
+    page-break-after: always;
+  }
+  .page:last-child { page-break-after: auto; }
+  .domain-line {
+    font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase;
+    color: #888; margin-bottom: 0.4in;
+  }
+  .domain-line strong { color: #1a1a1a; font-weight: 600; }
+  h1.cover-h1 {
+    font-family: 'Fraunces', Georgia, serif;
+    font-weight: 400; font-size: 36px; line-height: 1.15;
+    margin: 0 0 0.35in 0; color: #1a1a1a;
+  }
+  h1.cover-h1 em { font-style: italic; color: #b03030; }
+  .score-block {
+    border: 1px solid #e2e0d8;
+    background: #fdfcf8;
+    padding: 0.4in 0.45in;
+    margin-bottom: 0.4in;
+  }
+  .score-block .label {
+    font-size: 11px; letter-spacing: 0.10em; text-transform: uppercase;
+    color: #888; margin-bottom: 0.1in;
+  }
+  .score-block .num {
+    font-family: 'Fraunces', Georgia, serif;
+    font-weight: 500; font-size: 92px; line-height: 1;
+    color: #1a1a1a;
+  }
+  .score-block .num-denom { font-size: 28px; color: #999; }
+  .score-block .interp {
+    font-size: 16px; color: #444;
+    margin-top: 0.2in; max-width: 5in;
+  }
+  .framing {
+    font-size: 14px; color: #444;
+    max-width: 5.5in;
+  }
+  .framing p { margin: 0 0 0.18in 0; }
+  .framing p:last-child { margin-bottom: 0; }
+  .footer-meta {
+    margin-top: 0.5in; font-size: 11px; color: #999;
+  }
+
+  /* Page 2 */
+  h2.section-h {
+    font-family: 'Fraunces', Georgia, serif;
+    font-weight: 400; font-size: 26px; line-height: 1.2;
+    margin: 0 0 0.3in 0; color: #1a1a1a;
+  }
+  .heatmap {
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    gap: 12px; margin-bottom: 0.4in;
+  }
+  .heat-cell {
+    border: 1px solid #e2e0d8;
+    padding: 14px 16px;
+    background: #fff;
+  }
+  .heat-cell .lab {
+    font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase;
+    color: #888; margin-bottom: 6px;
+  }
+  .heat-cell .row {
+    display: flex; align-items: center; gap: 10px;
+  }
+  .heat-cell .dot {
+    width: 14px; height: 14px; border-radius: 3px; flex-shrink: 0;
+  }
+  .heat-cell .dot.strong { background: #2f8a4f; }
+  .heat-cell .dot.medium { background: #d4a82a; }
+  .heat-cell .dot.weak   { background: #c64a3e; }
+  .heat-cell .dot.none   { background: #d6d3cb; }
+  .heat-cell .desc { font-size: 13px; color: #333; }
+
+  .example {
+    border-left: 3px solid #b03030;
+    padding: 0.15in 0.25in;
+    background: #fbf6f5;
+    margin-bottom: 0.3in;
+  }
+  .example .ask {
+    font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase;
+    color: #888; margin-bottom: 4px;
+  }
+  .example .q {
+    font-family: 'Fraunces', Georgia, serif; font-style: italic;
+    font-size: 17px; color: #1a1a1a; margin-bottom: 0.18in;
+  }
+  .example .ai-lab {
+    font-size: 11px; letter-spacing: 0.10em; text-transform: uppercase;
+    color: #888; margin-bottom: 4px;
+  }
+  .example .ai-text {
+    font-size: 13.5px; color: #333; line-height: 1.55;
+  }
+  .why {
+    font-size: 14px; color: #444; max-width: 5.5in;
+    margin-bottom: 0.45in;
+  }
+  .cta-row {
+    border-top: 1px solid #e2e0d8;
+    padding-top: 0.3in;
+  }
+  .cta-row .lead {
+    font-family: 'Fraunces', Georgia, serif;
+    font-size: 20px; color: #1a1a1a; margin-bottom: 0.18in;
+  }
+  .cta-row .btn {
+    display: inline-block;
+    background: #1a1a1a; color: #fff;
+    padding: 12px 22px; font-size: 14px; font-weight: 500;
+    text-decoration: none; border-radius: 2px;
+  }
+  .cta-row .sub {
+    font-size: 12px; color: #888; margin-top: 0.15in;
+  }
+
+  @media print {
+    html, body { background: #fff; }
+    .page { box-shadow: none; margin: 0 auto; }
+  }
+`;
+
+interface ClusterHeatStrength {
+  label: 'Strong' | 'Building' | 'Weak' | 'Not measured';
+  klass: 'strong' | 'medium' | 'weak' | 'none';
+  desc: string;
+}
+
+function strengthForScore(score: number | null): ClusterHeatStrength {
+  if (score === null) {
+    return { label: 'Not measured', klass: 'none', desc: 'No prompts in this category yet.' };
+  }
+  if (score >= 70) {
+    return { label: 'Strong', klass: 'strong', desc: 'You appear consistently in AI answers here.' };
+  }
+  if (score >= 40) {
+    return { label: 'Building', klass: 'medium', desc: 'You sometimes appear; competitors win the rest.' };
+  }
+  return { label: 'Weak', klass: 'weak', desc: 'You are largely missing from AI answers in this category.' };
+}
+
+const FREE_CLUSTER_LABEL: Record<ClusterKey, string> = {
+  core: 'Core services',
+  problem: 'Problem-driven',
+  comparison: 'Comparison',
+  long_tail: 'Long-tail',
+  brand: 'Brand & branded',
+  adjacent: 'Adjacent',
+};
+
+function pickWeakestPrompt(payload: ReportExportPayload): ReportExportPayload['prompts_tested'][number] | null {
+  const candidates = payload.prompts_tested.filter(p =>
+    !p.business_mentioned && !p.business_cited && (p.raw_response_excerpt || '').length > 40,
+  );
+  if (candidates.length === 0) {
+    // Fall back to lowest-scoring with any excerpt
+    const withExcerpt = payload.prompts_tested.filter(p => (p.raw_response_excerpt || '').length > 40);
+    if (withExcerpt.length === 0) return null;
+    return withExcerpt.slice().sort((a, b) => a.score - b.score)[0];
+  }
+  return candidates.slice().sort((a, b) => a.score - b.score)[0];
+}
+
+function truncateToSentences(text: string, maxSentences: number, maxChars: number): string {
+  const cleaned = text.replace(/\s+/g, ' ').trim();
+  if (cleaned.length <= maxChars) return cleaned;
+  // Split on sentence boundaries
+  const sentences = cleaned.split(/(?<=[.!?])\s+/);
+  let out = '';
+  for (let i = 0; i < Math.min(sentences.length, maxSentences); i++) {
+    const candidate = (out ? out + ' ' : '') + sentences[i];
+    if (candidate.length > maxChars) break;
+    out = candidate;
+  }
+  if (!out) {
+    // No sentence boundary fit — hard truncate
+    return cleaned.slice(0, maxChars - 1).replace(/\s+\S*$/, '') + '…';
+  }
+  if (out.length < cleaned.length) out += '…';
+  return out;
+}
+
+export interface BuildFreeSampleOptions {
+  pricingUrl?: string;
+}
+
+export function buildFreeSampleHtml(
+  payload: ReportExportPayload,
+  options: BuildFreeSampleOptions = {},
+): string {
+  const score = payload.scores.overall_score ?? 0;
+  const counts = payload.scores.counts;
+  const businessName = payload.meta.business_name || payload.meta.domain || 'this site';
+  const domain = payload.meta.domain || '';
+  const scanDate = payload.meta.snapshot_date
+    ? new Date(payload.meta.snapshot_date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+    : '';
+  const pricingUrl = options.pricingUrl || '/pricing';
+
+  const presenceCount = counts.strong_count + counts.partial_count;
+  const totalPrompts = Math.max(counts.prompt_count, 1);
+  const interp = `Across ${counts.prompt_count} buyer-intent question${counts.prompt_count === 1 ? '' : 's'} we tested with a live AI assistant, ${businessName} appeared in ${presenceCount} of ${totalPrompts}.`;
+
+  const headlinePrimary = score >= 70 ? 'A solid' : score >= 40 ? 'A working' : 'A starting';
+  const headlineAccent  = score >= 70 ? 'foundation' : score >= 40 ? 'position' : 'point';
+
+  // Page 2 data
+  const clusterScores = payload.scores.cluster_scores;
+  const heatmapCells = (Object.keys(FREE_CLUSTER_LABEL) as ClusterKey[]).map(key => {
+    const s = clusterScores[key] ?? null;
+    const strength = strengthForScore(s);
+    return `
+      <div class="heat-cell">
+        <div class="lab">${esc(FREE_CLUSTER_LABEL[key])}</div>
+        <div class="row">
+          <div class="dot ${strength.klass}"></div>
+          <div class="desc">${esc(strength.label)}${s !== null ? ` · ${s}/100` : ''}</div>
+        </div>
+      </div>`;
+  }).join('');
+
+  const weakest = pickWeakestPrompt(payload);
+  const exampleBlock = weakest && weakest.raw_response_excerpt
+    ? `
+        <div class="example">
+          <div class="ask">When a buyer asks an AI</div>
+          <div class="q">${esc(weakest.prompt_text)}</div>
+          <div class="ai-lab">The AI answers</div>
+          <div class="ai-text">${esc(truncateToSentences(weakest.raw_response_excerpt, 3, 360))}</div>
+        </div>`
+    : '';
+  const whyLine = weakest
+    ? `Buyers asking questions like this are deciding without you in the conversation. The full report shows where this is happening, who is winning instead, and what to do about it.`
+    : `The full report shows every question we tested, who appeared instead of you, and a 30/60/90 plan to close the gaps.`;
+
+  return [
+    '<!DOCTYPE html>',
+    '<html lang="en">',
+    '<head>',
+    '<meta charset="utf-8">',
+    `<title>AI Visibility Sample — ${esc(businessName)}</title>`,
+    '<link rel="preconnect" href="https://fonts.googleapis.com">',
+    '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>',
+    '<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,500;1,400&family=Geist:wght@400;500;600&display=swap" rel="stylesheet">',
+    '<style>',
+    FREE_SAMPLE_STYLES,
+    '</style>',
+    '</head>',
+    '<body>',
+
+    // Page 1
+    '<div class="page">',
+    `  <div class="domain-line">AI Visibility Sample · <strong>${esc(domain)}</strong>${scanDate ? ` · ${esc(scanDate)}` : ''}</div>`,
+    `  <h1 class="cover-h1">${esc(headlinePrimary)} <em>${esc(headlineAccent)}</em>.</h1>`,
+    '  <div class="score-block">',
+    '    <div class="label">AI Visibility Score</div>',
+    `    <div class="num">${score}<span class="num-denom"> / 100</span></div>`,
+    `    <div class="interp">${esc(interp)}</div>`,
+    '  </div>',
+    '  <div class="framing">',
+    '    <p>When buyers ask an AI assistant for recommendations in your category, that AI gives them a short list. This score is a measure of how often your business is on that list, in your own market and for your own services.</p>',
+    '    <p>This sample is the headline number plus one example. The full report shows every question tested, who is being recommended instead, and a strategic plan to change that.</p>',
+    '  </div>',
+    '</div>',
+
+    // Page 2
+    '<div class="page">',
+    '  <h2 class="section-h">Where the score comes from</h2>',
+    `  <div class="heatmap">${heatmapCells}</div>`,
+    exampleBlock,
+    `  <p class="why">${esc(whyLine)}</p>`,
+    '  <div class="cta-row">',
+    '    <div class="lead">See the full report.</div>',
+    `    <a class="btn" href="${esc(pricingUrl)}">Upgrade to the full report →</a>`,
+    `    <div class="sub">Includes every prompt, the actual AI responses, competitor analysis, and a 30/60/90 plan.</div>`,
+    '  </div>',
+    '</div>',
+
+    '</body>',
+    '</html>',
+  ].join('\n');
+}

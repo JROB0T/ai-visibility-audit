@@ -25,6 +25,7 @@ interface PersistentHeaderProps {
 
   activeTab: DashboardTabId;
   onTabChange: (id: DashboardTabId) => void;
+  visibleTabs?: DashboardTabId[];
 }
 
 function formatDate(iso: string): string {
@@ -109,7 +110,7 @@ export default function PersistentHeader(props: PersistentHeaderProps): React.Re
 
         {/* Tab nav */}
         <div style={{ borderTop: '1px solid var(--border)', marginTop: '8px' }}>
-          <TabNav active={props.activeTab} onChange={props.onTabChange} />
+          <TabNav active={props.activeTab} onChange={props.onTabChange} visibleTabs={props.visibleTabs} />
         </div>
       </div>
     </header>

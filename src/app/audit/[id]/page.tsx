@@ -20,12 +20,23 @@ import { type DashboardTabId } from '@/components/dashboard/TabNav';
 import { clusterLabel } from '@/lib/discovery';
 import type {
   AuditFinding,
+  AuditTier,
   DiscoveryCluster,
   DiscoveryInsight,
   DiscoveryRecommendation,
   DiscoveryResult,
   DiscoveryScoreSnapshot,
 } from '@/lib/types';
+
+// Tabs visible per audit tier. The 'priorities' tab (operational fix
+// list) is Tier 2 only — Tier 1 paying customers see the strategic
+// brief without the technical fix list. Free reports are served via
+// the public share-link path, never through this dashboard.
+const TABS_BY_TIER: Record<AuditTier, DashboardTabId[]> = {
+  free:   ['overview', 'findings', 'competitors', 'trends', 'readiness'],
+  tier_1: ['overview', 'findings', 'competitors', 'trends', 'readiness'],
+  tier_2: ['overview', 'findings', 'priorities', 'competitors', 'trends', 'readiness'],
+};
 
 interface ShellAudit {
   id: string;
@@ -287,6 +298,15 @@ function AuditPageInner(): React.ReactElement {
   const audit = data.audit;
   const hasPaid = !!data.hasEntitlement;
 
+  // Resolve tier off the snapshot. Migration 010 adds tier with
+  // DEFAULT 'tier_1', so post-migration every row has a value. Legacy
+  // rows missing the field still fall back to tier_1.
+  const tier: AuditTier = snapshot?.tier ?? 'tier_1';
+  const visibleTabs = TABS_BY_TIER[tier];
+  // If a user landed on a tab their tier no longer permits, snap them
+  // to overview rather than rendering nothing.
+  const safeActiveTab: DashboardTabId = visibleTabs.includes(activeTab) ? activeTab : 'overview';
+
   return (
     <div className="min-h-screen" style={{ background: 'var(--background)' }}>
       <PersistentHeader
@@ -301,12 +321,13 @@ function AuditPageInner(): React.ReactElement {
         hasPaid={hasPaid}
         reportAvailable={reportAvailable}
         onRerun={handleRerun}
-        activeTab={activeTab}
+        activeTab={safeActiveTab}
         onTabChange={handleTabChange}
+        visibleTabs={visibleTabs}
       />
 
       <main>
-        {activeTab === 'overview' && snapshot && (
+        {safeActiveTab === 'overview' && snapshot && (
           <OverviewTab
             snapshot={snapshot}
             insights={insights}
@@ -314,10 +335,10 @@ function AuditPageInner(): React.ReactElement {
             onTabChange={(t) => handleTabChange(t)}
           />
         )}
-        {activeTab === 'overview' && !snapshot && (
+        {safeActiveTab === 'overview' && !snapshot && (
           <NoSnapshotState />
         )}
-        {activeTab === 'findings' && snapshot && (
+        {safeActiveTab === 'findings' && snapshot && (
           <FindingsTab
             snapshot={snapshot}
             insights={insights}
@@ -325,21 +346,21 @@ function AuditPageInner(): React.ReactElement {
             onPromptDrilldown={(cluster) => setDrilldown({ kind: 'cluster', cluster })}
           />
         )}
-        {activeTab === 'findings' && !snapshot && <NoSnapshotState />}
-        {activeTab === 'priorities' && (
+        {safeActiveTab === 'findings' && !snapshot && <NoSnapshotState />}
+        {safeActiveTab === 'priorities' && tier === 'tier_2' && (
           <PrioritiesTab
             auditId={audit.id}
             domain={audit.site?.domain}
             businessName={audit.site?.domain}
           />
         )}
-        {activeTab === 'competitors' && (
+        {safeActiveTab === 'competitors' && (
           <CompetitorsTab siteId={audit.site_id} results={results} />
         )}
-        {activeTab === 'trends' && (
+        {safeActiveTab === 'trends' && (
           <TrendsTab currentSnapshot={snapshot} history={trendHistory} />
         )}
-        {activeTab === 'readiness' && (
+        {safeActiveTab === 'readiness' && (
           <SiteReadinessTab
             auditId={audit.id}
             audit={audit}

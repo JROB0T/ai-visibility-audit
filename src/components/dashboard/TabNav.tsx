@@ -25,12 +25,16 @@ const TABS: TabDef[] = [
 interface TabNavProps {
   active: DashboardTabId;
   onChange: (id: DashboardTabId) => void;
+  // Restrict which tabs are visible. Default: all tabs. Used to gate
+  // 'priorities' (the operational fix list) on tier_2.
+  visibleTabs?: DashboardTabId[];
 }
 
-export default function TabNav({ active, onChange }: TabNavProps): React.ReactElement {
+export default function TabNav({ active, onChange, visibleTabs }: TabNavProps): React.ReactElement {
+  const visible = visibleTabs ? TABS.filter(t => visibleTabs.includes(t.id)) : TABS;
   return (
     <nav className="flex gap-1 overflow-x-auto" role="tablist" aria-label="Dashboard sections">
-      {TABS.map((t) => {
+      {visible.map((t) => {
         const isActive = t.id === active;
         return (
           <button

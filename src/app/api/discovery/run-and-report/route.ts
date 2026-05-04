@@ -30,8 +30,9 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { requireDiscoveryAccess } from '@/lib/discoveryAccess';
 import { runDiscoveryTests } from '@/lib/discoveryRunner';
 import { runPostRunHook } from '../run-tests/route';
-import { generateReportNarrative, type ReportExportPayload } from '@/lib/reportNarrative';
+import { generateReportNarrative, type ReportExportPayload, type NarrativeTier } from '@/lib/reportNarrative';
 import { buildReportHtml } from '@/lib/reportTemplate';
+import type { AuditTier } from '@/lib/types';
 import {
   createJob,
   updateJob,
@@ -216,9 +217,17 @@ async function doRunAndReport(params: {
   // ----- Phase A: Discovery -----
   let runId: string;
   try {
+    // Phase 4 (Stripe SKUs) will derive this from the user's active
+    // subscription/entitlement. Until then auto-runs are Tier 1 — Tier 2
+    // arrives via the webhook path which creates an audit with the right
+    // tier explicitly. Centralising the literal here keeps Phase 4 a
+    // one-line lookup swap.
+    const auditTier: AuditTier = 'tier_1';
+
     const run = await runDiscoveryTests({
       siteId,
       tier: 'full',
+      auditTier,
       triggeredBy: 'user',
       onProgress: (done, total) => {
         // Best-effort. Don't await — runner shouldn't be slowed by progress writes.
@@ -293,7 +302,18 @@ async function doRunAndReport(params: {
     }
 
     const payload = (await exportRes.json()) as ReportExportPayload;
-    const { narrative, model } = await generateReportNarrative(payload);
+    // Re-resolve from the just-created snapshot so we honor whatever tier
+    // the runner stamped (defends against a future runner change without
+    // touching this call site).
+    const { data: snap } = await admin
+      .from('discovery_score_snapshots')
+      .select('tier')
+      .eq('site_id', siteId)
+      .eq('run_id', runId)
+      .maybeSingle();
+    const snapshotTier: AuditTier = (snap?.tier as AuditTier | undefined) ?? 'tier_1';
+    const narrativeTier: NarrativeTier = snapshotTier === 'tier_2' ? 'tier_2' : 'tier_1';
+    const { narrative, model } = await generateReportNarrative(payload, { tier: narrativeTier });
 
     // Narrative is the slow part (~30s). Once it's back, update the message
     // before the fast HTML build + persistence steps so the UI doesn't sit

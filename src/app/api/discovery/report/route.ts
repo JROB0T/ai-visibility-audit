@@ -34,8 +34,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { requireFullDiscoveryAccess } from '@/lib/discoveryAccess';
-import { generateReportNarrative, type ReportExportPayload, type ReportNarrative } from '@/lib/reportNarrative';
-import { buildReportHtml } from '@/lib/reportTemplate';
+import { generateReportNarrative, type ReportExportPayload, type ReportNarrative, type NarrativeTier } from '@/lib/reportNarrative';
+import { buildReportHtml, buildFreeSampleHtml } from '@/lib/reportTemplate';
+import type { AuditTier } from '@/lib/types';
 
 // Narrative generation is a single Claude call — typically 30-90s on Sonnet 4.6.
 // Requires Vercel Pro (or higher) for this timeout.
@@ -110,6 +111,15 @@ async function handleRequest(request: NextRequest, req: RunRequest): Promise<Nex
     return NextResponse.json({ error: 'No run found for this site' }, { status: 404 });
   }
 
+  // ----- Resolve tier (from snapshot; default tier_1 for legacy rows) -----
+  const { data: snapMeta } = await admin
+    .from('discovery_score_snapshots')
+    .select('tier')
+    .eq('site_id', req.siteId)
+    .eq('run_id', runId)
+    .maybeSingle();
+  const tier: AuditTier = (snapMeta?.tier as AuditTier | undefined) ?? 'tier_1';
+
   // ----- Cache check -----
   if (!req.force) {
     const { data: snap } = await admin
@@ -157,23 +167,33 @@ async function handleRequest(request: NextRequest, req: RunRequest): Promise<Nex
 
   const payload = await exportRes.json() as ReportExportPayload;
 
-  // Narrative generation (Claude call).
-  let narrative: ReportNarrative;
-  let model: string;
-  try {
-    const out = await generateReportNarrative(payload);
-    narrative = out.narrative;
-    model = out.model;
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({
-      error: 'Narrative generation failed',
-      detail: msg,
-    }, { status: 502 });
+  // Free tier uses static framing copy in buildFreeSampleHtml — no narrative
+  // generation needed. Paid tiers always run the narrative (Sonnet ~30-90s).
+  // Skipping narrative on free keeps free-scan total Claude cost under the
+  // $0.10-$0.15 ceiling (runner alone is ~$0.05).
+  let narrative: ReportNarrative | null = null;
+  let model: string | null = null;
+  if (tier !== 'free') {
+    const narrativeTier: NarrativeTier = tier === 'tier_2' ? 'tier_2' : 'tier_1';
+    try {
+      const out = await generateReportNarrative(payload, { tier: narrativeTier });
+      narrative = out.narrative;
+      model = out.model;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return NextResponse.json({
+        error: 'Narrative generation failed',
+        detail: msg,
+      }, { status: 502 });
+    }
   }
 
-  // Stamp template.
-  const html = buildReportHtml(payload, narrative);
+  // Stamp template — free tier renders a 2-page summary; paid tiers get
+  // the full 7-page strategic brief. The fix-list tab is gated separately
+  // in the dashboard (not part of this HTML).
+  const html = tier === 'free' || !narrative
+    ? buildFreeSampleHtml(payload)
+    : buildReportHtml(payload, narrative);
   const generatedAt = new Date().toISOString();
 
   // Persist on the snapshot. Select() returns the row so we get

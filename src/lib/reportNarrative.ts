@@ -20,6 +20,16 @@
 // ============================================================
 
 import { claudeFetchWithRetry } from './claudeRetry';
+import type { AuditTier } from './types';
+
+// Narrative-tier maps audit-tier to a system prompt.
+//   'tier_1' — strategic only; technical recommendations are forbidden
+//              (those land in the operational fix list, owned by Tier 2).
+//   'tier_2' — strategic + technical. Spec-2 expands this with explicit
+//              technical-recommendation sections in the narrative; until
+//              that lands the prompt is identical to tier_1 so Tier 2
+//              reports remain coherent.
+export type NarrativeTier = Extract<AuditTier, 'tier_1' | 'tier_2'>;
 
 // ------------------------------------------------------------
 // Input: the shape of /api/discovery/export-report's response.
@@ -402,13 +412,15 @@ const NARRATIVE_MODEL = 'claude-sonnet-4-6';
 
 export async function generateReportNarrative(
   payload: ReportExportPayload,
+  options: { tier?: NarrativeTier } = {},
 ): Promise<{ narrative: ReportNarrative; model: string }> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
     throw new Error('ANTHROPIC_API_KEY not set');
   }
 
-  const systemPrompt = buildSystemPrompt();
+  const tier: NarrativeTier = options.tier ?? 'tier_1';
+  const systemPrompt = buildSystemPrompt(tier);
   const userPrompt = buildUserPrompt(payload);
 
   const body = {
@@ -478,8 +490,8 @@ export async function generateReportNarrative(
 // ------------------------------------------------------------
 // Prompt construction.
 // ------------------------------------------------------------
-function buildSystemPrompt(): string {
-  return [
+function buildSystemPrompt(tier: NarrativeTier): string {
+  const base = [
     'You are a senior AI-positioning analyst writing a monthly strategy brief for a business owner.',
     '',
     'Your job: read structured data about how AI tools answer buyer-intent questions about this business, and produce the narrative sections of a 7-page printed brief.',
@@ -500,6 +512,34 @@ function buildSystemPrompt(): string {
     '- Output ONLY via the emit_report_narrative tool. Do not write anything else.',
     '- Populate every required field.',
     '- Respect word counts in field descriptions.',
+  ];
+
+  if (tier === 'tier_1') {
+    return [
+      ...base,
+      '',
+      'Scope (Tier 1 — strategic only):',
+      '- The defense_moves and expansion_moves you produce must be STRATEGIC, not technical. Owners of these moves are Marketer or Business Owner, never Developer alone.',
+      '- Forbidden topics in moves and roadmap: schema markup / JSON-LD, structured data implementation, llms.txt, robots.txt, sitemap.xml, canonical tags, hreflang, redirects, page-speed / Core Web Vitals, server-side rendering, hydration, meta tags, Open Graph, image optimization, build pipelines.',
+      '- Permitted moves: content additions (comparison pages, FAQ pages, problem-framing pages), category positioning, naming and description rewrites, partnership and citation outreach, review acquisition, public-relations placements, brand-mention earning, repositioning against rivals, geographic/service-area expansion narrative, pricing-page clarity (as copy, not markup).',
+      '- If the strongest opportunity in the data is technical, translate it into the strategic adjacency — e.g. instead of "add Service schema" write "publish a problems-we-solve page that names the three top buyer queries".',
+      '- Methodology paragraph should not promise technical guidance. Frame the brief as positioning analysis.',
+    ].join('\n');
+  }
+
+  // tier === 'tier_2'
+  // TODO(spec-2): expand with explicit technical-recommendations sections.
+  // Until spec 2 lands, Tier 2 narrative is identical to Tier 1 so reports
+  // remain coherent. Tier 2's distinguishing feature in the meantime is the
+  // operational fix list tab in the dashboard, which already exists.
+  return [
+    ...base,
+    '',
+    'Scope (Tier 2 — strategic + technical):',
+    '- TODO(spec-2): tier_2 will permit technical-recommendation moves once the technical-audit pass lands. Until then, follow the Tier 1 strategic-only constraints below so the narrative is consistent.',
+    '- The defense_moves and expansion_moves you produce must be STRATEGIC, not technical.',
+    '- Forbidden topics in moves and roadmap: schema markup / JSON-LD, structured data implementation, llms.txt, robots.txt, sitemap.xml, canonical tags, hreflang, redirects, page-speed / Core Web Vitals, server-side rendering, hydration, meta tags, Open Graph, image optimization, build pipelines.',
+    '- Permitted moves: content additions, category positioning, naming and description rewrites, partnership and citation outreach, review acquisition, public-relations placements, brand-mention earning, repositioning, geographic/service-area expansion, pricing-page clarity.',
   ].join('\n');
 }
 
