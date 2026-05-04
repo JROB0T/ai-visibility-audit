@@ -311,6 +311,7 @@ async function callClaudeForPrompt(
   promptText: string,
   targetName: string,
   targetDomain: string,
+  webSearchMaxUses: number,
 ): Promise<PerPromptOutcome> {
   const system = buildSystemPrompt(targetName, targetDomain);
 
@@ -326,7 +327,7 @@ async function callClaudeForPrompt(
         temperature: 0,
         system,
         tools: [
-          { type: WEB_SEARCH_TOOL_TYPE, name: 'web_search', max_uses: 2 },
+          { type: WEB_SEARCH_TOOL_TYPE, name: 'web_search', max_uses: webSearchMaxUses },
           RECORD_ANALYSIS_TOOL,
         ],
         tool_choice: { type: 'auto' },
@@ -550,6 +551,11 @@ export async function runDiscoveryTests(input: RunDiscoveryTestsInput): Promise<
   // Phase 1.5a: teaser runs are killed — every run is full at the runner-tier level.
   const tier: DiscoveryTier = 'full';
   const auditTier: AuditTier = input.auditTier ?? 'tier_1';
+  // Cost tuning: free-tier runs use 1 web_search per prompt instead of 2.
+  // Anthropic charges ~$0.01/search; capping at 1 cuts the dominant variable
+  // cost roughly in half. Quality impact is small — most prompts only do 1
+  // search anyway. Paid tiers keep the 2-search budget.
+  const webSearchMaxUses = auditTier === 'free' ? 1 : 2;
   const runId = newRunId();
   const admin = getAdminClient();
   const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -598,7 +604,7 @@ export async function runDiscoveryTests(input: RunDiscoveryTestsInput): Promise<
   if (shouldBootstrap) {
     console.log(`[discoveryRunner] auto-bootstrap starting for site=${siteId}`);
     try {
-      const result = await ensureDiscoveryProfileAndPrompts({ siteId });
+      const result = await ensureDiscoveryProfileAndPrompts({ siteId, tier: auditTier });
       console.log(
         `[discoveryRunner] auto-bootstrap complete for site=${siteId}`,
         `generated=${result.generated} promptCount=${result.prompts.length}`,
@@ -672,7 +678,7 @@ export async function runDiscoveryTests(input: RunDiscoveryTestsInput): Promise<
     CONCURRENCY,
     async (prompt) => {
       try {
-        const outcome = await callClaudeForPrompt(apiKey, prompt.id, prompt.prompt_text, businessName, businessDomain);
+        const outcome = await callClaudeForPrompt(apiKey, prompt.id, prompt.prompt_text, businessName, businessDomain, webSearchMaxUses);
         return { prompt, outcome };
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);

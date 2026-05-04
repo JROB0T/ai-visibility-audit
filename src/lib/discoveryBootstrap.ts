@@ -93,6 +93,7 @@ import { isBadBusinessName, formatDomainAsName } from '@/lib/scanner';
 import { inferBusinessNameFromDomain, enrichBusinessProfile, type EnrichedBusinessProfile } from '@/lib/classify';
 import { claudeFetchWithRetry } from '@/lib/claudeRetry';
 import type {
+  AuditTier,
   DiscoveryBusinessModel,
   DiscoveryCluster,
   DiscoveryPriority,
@@ -109,6 +110,13 @@ export type BootstrapInput = {
   siteId: string;
   auditId?: string;
   force?: boolean;
+  /**
+   * Audit tier driving cost decisions. Free-tier bootstraps skip the
+   * web_search step inside enrichBusinessProfile (the dominant variable
+   * cost). Defaults to tier_1 when omitted, preserving existing behavior
+   * for paid runs.
+   */
+  tier?: AuditTier;
 };
 
 export type BootstrapResult = {
@@ -164,7 +172,8 @@ function inferBusinessModel(vertical: string | null | undefined): DiscoveryBusin
 }
 
 export async function ensureDiscoveryProfileAndPrompts(input: BootstrapInput): Promise<BootstrapResult> {
-  const { siteId, auditId, force } = input;
+  const { siteId, auditId, force, tier } = input;
+  const disableWebSearch = tier === 'free';
   const admin = getAdminClient();
 
   // Load site
@@ -259,9 +268,12 @@ export async function ensureDiscoveryProfileAndPrompts(input: BootstrapInput): P
       pageUrls: [],
       schemaTypes: [],
       interstitialBlocked: false,
+      disableWebSearch,
     });
     console.log(
       `[discoveryBootstrap] enrichment for site=${siteId.slice(0, 8)}`,
+      `tier=${tier ?? 'tier_1'}`,
+      `webSearch=${!disableWebSearch}`,
       `name=${enriched?.business_name || '(null)'}`,
       `category=${enriched?.primary_category || '(null)'}`,
       `city=${enriched?.service_area_city || '(null)'}`,

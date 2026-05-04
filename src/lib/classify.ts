@@ -143,6 +143,13 @@ export interface EnrichInput {
   pageUrls?: string[];
   schemaTypes?: string[];
   interstitialBlocked?: boolean;
+  /**
+   * Skip the web_search tool entirely. Set true for free-tier scans to
+   * cut Anthropic's per-search billing. Quality cost is real for thin /
+   * interstitial-blocked sites — the model falls back to training-data
+   * knowledge alone — but acceptable for a 2-page sample.
+   */
+  disableWebSearch?: boolean;
 }
 
 const RECORD_BUSINESS_PROFILE_TOOL = {
@@ -226,15 +233,25 @@ export async function enrichBusinessProfile(input: EnrichInput): Promise<Enriche
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey || !input.domain) return null;
 
-  const scrapeStatus = input.interstitialBlocked
-    ? 'The site was blocked by a bot-challenge (Cloudflare/captcha). Scraped fields are unreliable — rely primarily on web search and your own knowledge of the business.'
-    : 'Scraped fields below may be thin. Use web search and your knowledge of the business to fill in what the scrape missed.';
+  const useWebSearch = !input.disableWebSearch;
+
+  const scrapeStatus = useWebSearch
+    ? (input.interstitialBlocked
+        ? 'The site was blocked by a bot-challenge (Cloudflare/captcha). Scraped fields are unreliable — rely primarily on web search and your own knowledge of the business.'
+        : 'Scraped fields below may be thin. Use web search and your knowledge of the business to fill in what the scrape missed.')
+    : (input.interstitialBlocked
+        ? 'The site was blocked by a bot-challenge (Cloudflare/captcha). Scraped fields are unreliable — rely on the domain and your training-data knowledge of the business. If you do not recognise the business, return null fields rather than guessing.'
+        : 'Scraped fields below may be thin. Use them plus your training-data knowledge of the business; do not invent details.');
+
+  const toolingClause = useWebSearch
+    ? 'You have access to web_search. Use it if the scraped data is thin or uncertain (up to 2 searches). Then call the record_business_profile tool EXACTLY ONCE with your best structured answer.'
+    : 'Call the record_business_profile tool EXACTLY ONCE with your best structured answer based only on the scraped data, the domain, and your training knowledge.';
 
   const systemPrompt = `You are enriching a business profile so a downstream AI-discovery test can be generated. Be concrete, accurate, and conservative.
 
 ${scrapeStatus}
 
-You have access to web_search. Use it if the scraped data is thin or uncertain (up to 2 searches). Then call the record_business_profile tool EXACTLY ONCE with your best structured answer.
+${toolingClause}
 
 # First: classify the business shape
 
@@ -298,10 +315,12 @@ Example URLs: ${(input.pageUrls || []).slice(0, 8).join(', ') || '(none)'}`;
           max_tokens: 1500,
           temperature: 0,
           system: systemPrompt,
-          tools: [
-            { type: 'web_search_20250305', name: 'web_search', max_uses: 2 },
-            RECORD_BUSINESS_PROFILE_TOOL,
-          ],
+          tools: useWebSearch
+            ? [
+                { type: 'web_search_20250305', name: 'web_search', max_uses: 2 },
+                RECORD_BUSINESS_PROFILE_TOOL,
+              ]
+            : [RECORD_BUSINESS_PROFILE_TOOL],
           tool_choice: { type: 'auto' },
           messages: [{ role: 'user', content: userMessage }],
         }),
