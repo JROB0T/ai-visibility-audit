@@ -19,6 +19,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { runFreeScan } from '@/lib/freeScan';
+import { sendFreeSampleEmail } from '@/lib/email';
 import {
   isValidEmail,
   isValidDomain,
@@ -97,16 +98,27 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   try {
     const result = await runFreeScan({ domain: domainNormalized, requestId });
-    await admin
-      .from('free_scan_requests')
-      .update({ audit_id: result.auditId })
-      .eq('id', requestId);
+
+    // Best-effort email delivery, same semantics as the public path.
+    const shareUrl = `/r/${result.shareToken}`;
+    const emailResult = await sendFreeSampleEmail({
+      to: rawEmail,
+      domain: domainNormalized,
+      shareUrl,
+    });
+
+    const updates: Record<string, string> = { audit_id: result.auditId };
+    if (emailResult.sent) {
+      updates.delivered_at = new Date().toISOString();
+    }
+    await admin.from('free_scan_requests').update(updates).eq('id', requestId);
 
     return NextResponse.json({
       success: true,
       requestId,
       auditId: result.auditId,
-      shareUrl: `/r/${result.shareToken}`,
+      shareUrl,
+      emailSent: emailResult.sent,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

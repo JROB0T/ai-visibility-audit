@@ -25,6 +25,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { runFreeScan } from '@/lib/freeScan';
+import { sendFreeSampleEmail } from '@/lib/email';
 import {
   isValidEmail,
   isValidDomain,
@@ -164,16 +165,28 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   // ----- Run the scan -----
   try {
     const result = await runFreeScan({ domain: domainNormalized, requestId });
-    await admin
-      .from('free_scan_requests')
-      .update({ audit_id: result.auditId })
-      .eq('id', requestId);
 
-    // delivered_at intentionally stays NULL — Phase 4 sets it when Resend
-    // actually sends the notification email.
+    // Send the delivery email best-effort. Failure here does NOT fail the
+    // request — the share link is already valid and the client will show
+    // it in the success state. delivered_at only gets set on a confirmed
+    // send; if the email failed the operator can manually re-send the
+    // share URL from the row.
+    const shareUrl = `/r/${result.shareToken}`;
+    const emailResult = await sendFreeSampleEmail({
+      to: rawEmail,
+      domain: domainNormalized,
+      shareUrl,
+    });
+
+    const updates: Record<string, string> = { audit_id: result.auditId };
+    if (emailResult.sent) {
+      updates.delivered_at = new Date().toISOString();
+    }
+    await admin.from('free_scan_requests').update(updates).eq('id', requestId);
+
     return NextResponse.json({
       success: true,
-      shareUrl: `/r/${result.shareToken}`,
+      shareUrl,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
