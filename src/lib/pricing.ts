@@ -44,10 +44,10 @@ const DOLLAR_ENV: Record<TierSku, string> = {
 // the deployed price MUST match what's in Stripe, and that pairing
 // only happens via env config.
 const DEFAULT_DOLLARS: Record<TierSku, number> = {
-  tier_1_one_time: 50,
-  tier_1_monthly: 30,
-  tier_2_one_time: 60,
-  tier_2_monthly: 40,
+  tier_1_one_time: 49.99,
+  tier_1_monthly: 29.99,
+  tier_2_one_time: 59.99,
+  tier_2_monthly: 39.99,
 };
 
 export interface TierDisplay {
@@ -76,7 +76,8 @@ export function getDisplayPricing(): DisplayPricing {
 function dollarOrDefault(sku: TierSku): number {
   const raw = process.env[DOLLAR_ENV[sku]];
   if (!raw) return DEFAULT_DOLLARS[sku];
-  const n = parseInt(raw, 10);
+  // parseFloat (not parseInt) so $X.99 pricing renders correctly.
+  const n = parseFloat(raw);
   return Number.isFinite(n) && n > 0 ? n : DEFAULT_DOLLARS[sku];
 }
 
@@ -126,5 +127,7 @@ export function stripeModeFor(sku: TierSku): 'payment' | 'subscription' {
 }
 
 export function formatDollars(n: number): string {
-  return `$${n}`;
+  // Show 2 decimals only when the price isn't a whole dollar amount.
+  // $30 stays "$30"; $29.99 becomes "$29.99".
+  return Number.isInteger(n) ? `$${n}` : `$${n.toFixed(2)}`;
 }
