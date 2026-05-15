@@ -611,10 +611,16 @@ export const REPORT_STYLES = `  :root {
     font-weight: 400;
     margin-right: 8px;
   }
-  .seg-strong { background: var(--green); flex: 12; }
-  .seg-partial { background: var(--amber); flex: 7; }
-  .seg-unclear { background: var(--ink-3); flex: 1.2; min-width: 110px; }
-  .seg-absent { background: var(--ink-dim); color: var(--ink-5); flex: 0.8; min-width: 90px; }
+  /* min-widths protect each label from being clipped when its
+     count is small (flex-grow set inline on the segment). Without
+     these, "RECOMMENDED FIRST" loses its last word when the
+     recommended count is low relative to other segments. */
+  .seg-strong { background: var(--green); flex: 12; min-width: 175px; }
+  .seg-partial { background: var(--amber); flex: 7; min-width: 155px; }
+  .seg-unclear { background: var(--ink-3); flex: 1.2; min-width: 130px; }
+  /* ABSENT pill: kept light to feel "muted" but darkened the label
+     so it actually reads against the cream paper background. */
+  .seg-absent { background: var(--ink-dim); color: var(--ink-3); flex: 0.8; min-width: 105px; }
 
   .dist-legend {
     display: flex;
@@ -1350,13 +1356,17 @@ export const REPORT_STYLES = `  :root {
   .meta-row {
     display: flex;
     justify-content: space-between;
+    gap: 12px;
     font-family: 'Geist Mono', monospace;
     font-size: 9px;
     letter-spacing: 0.08em;
     text-transform: uppercase;
   }
-  .meta-row .k { color: var(--ink-5); }
-  .meta-row .v { color: var(--ink-2); font-weight: 500; }
+  /* Owner can be a long phrase ("Business Owner, Marketer") that
+     wraps across lines. text-align:right keeps the wrapped lines
+     visually distinct from the left-column label. */
+  .meta-row .k { color: var(--ink-5); flex-shrink: 0; }
+  .meta-row .v { color: var(--ink-2); font-weight: 500; text-align: right; }
   .meta-row .v.red { color: var(--red); }
   .meta-row .v.amber { color: var(--amber); }
 

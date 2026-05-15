@@ -551,7 +551,14 @@ function buildTrendSvg(history: Ctx['trendHistory']): string {
   const bottomPad = 50;
   const plotW = vbW - leftPad - rightPad;
   const plotH = vbH - topPad - bottomPad;
-  const yMin = 60;
+
+  // Auto-scale the y-range so low scores don't get rendered outside the
+  // plot area (which previously caused the dot to land on top of the
+  // x-axis label). Default range is 60–100; when any score is lower,
+  // drop the floor in 20pt increments with a 5pt margin so the lowest
+  // marker isn't flush with the bottom edge.
+  const dataMin = history.length > 0 ? Math.min(...history.map(h => h.score)) : 60;
+  const yMin = dataMin >= 60 ? 60 : Math.max(0, Math.floor((dataMin - 5) / 20) * 20);
   const yMax = 100;
   const yFor = (score: number) => topPad + plotH * (1 - (score - yMin) / (yMax - yMin));
 
@@ -561,8 +568,12 @@ function buildTrendSvg(history: Ctx['trendHistory']): string {
     return leftPad + (plotW * i) / (n - 1);
   };
 
-  // Gridlines at 100, 90, 80
-  const grid = [100, 90, 80].map(y => {
+  // Gridlines: when range is 60–100 keep the classic 100/90/80 ticks;
+  // when range is wider, space them every 20 units.
+  const gridStep = yMax - yMin <= 40 ? 10 : 20;
+  const gridValues: number[] = [];
+  for (let v = yMax; v >= yMin; v -= gridStep) gridValues.push(v);
+  const grid = gridValues.map(y => {
     const yy = yFor(y);
     return `<line x1="${leftPad}" y1="${yy.toFixed(1)}" x2="${vbW - rightPad}" y2="${yy.toFixed(1)}" stroke="#d4ccb7" stroke-width="0.5" stroke-dasharray="2 3"/>
     <text x="${leftPad - 8}" y="${(yy + 4).toFixed(1)}" font-family="Geist Mono" font-size="9" fill="#a8aebd" text-anchor="end">${y}</text>`;
