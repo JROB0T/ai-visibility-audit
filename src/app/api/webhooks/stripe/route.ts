@@ -63,9 +63,18 @@ export async function POST(request: NextRequest) {
               // takes 60-90s and Stripe expects this webhook back in
               // < 30s. keepalive=true tells the runtime to let the
               // request finish even after the handler returns.
-              const origin = request.headers.get('origin')
-                || process.env.NEXT_PUBLIC_APP_URL
-                || `https://${request.headers.get('host') || 'localhost'}`;
+              // URL resolution: prefer the request's own host header
+              // (always the live Vercel domain when a webhook fires)
+              // over NEXT_PUBLIC_APP_URL (which can be a stale
+              // localhost dev value left in production). Origin header
+              // is unset on Stripe webhooks so it's last.
+              const host = request.headers.get('host');
+              const isLocalhost = host ? /^(localhost|127\.|0\.0\.0\.0)/i.test(host) : false;
+              const origin = host
+                ? `${isLocalhost ? 'http' : 'https'}://${host}`
+                : (process.env.NEXT_PUBLIC_APP_URL
+                  || request.headers.get('origin')
+                  || 'http://localhost:3000');
               const cleanOrigin = origin.replace(/\/+$/, '');
               const workerUrl = `${cleanOrigin}/api/internal/paid-scan/run`;
               const token = process.env.ADMIN_TRIGGER_TOKEN;

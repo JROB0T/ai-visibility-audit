@@ -291,6 +291,29 @@ export async function runPaidScan(params: RunPaidScanParams): Promise<void> {
   }
 
   try {
+    // ----- Idempotency: skip tech scan if audit_pages already exist -----
+    // A previous run may have completed the tech scan portion and then
+    // failed in discovery (e.g. before this fix landed). Retrying the
+    // worker should NOT double-insert audit_pages/findings/recommendations.
+    const { count: existingPagesCount } = await admin
+      .from('audit_pages')
+      .select('id', { count: 'exact', head: true })
+      .eq('audit_id', auditId);
+    const techScanAlreadyDone = (existingPagesCount ?? 0) > 0;
+
+    if (techScanAlreadyDone) {
+      // Defensive: ensure the audit row reflects "tech scan done" so
+      // the discovery bootstrap (which queries audits.status='completed')
+      // can find it.
+      await admin
+        .from('audits')
+        .update({
+          status: 'completed',
+          completed_at: new Date().toISOString(),
+        })
+        .eq('id', auditId);
+      console.log('[paidScan] tech scan results already present, skipping rescan', { auditId });
+    } else {
     // ----- Technical scan -----
     const scanResult = await scanSite(siteUrl);
     const homepage = scanResult.pages.find(p => p.pageType === 'homepage');
@@ -368,6 +391,13 @@ export async function runPaidScan(params: RunPaidScanParams): Promise<void> {
     await admin
       .from('audits')
       .update({
+        // status='completed' must be set here — the discovery
+        // bootstrap step that runs next requires a completed audit
+        // row to derive the business profile from. Marking complete
+        // post-tech-scan also matches the convention used by
+        // /api/audit/route.ts and src/lib/freeScan.ts.
+        status: 'completed',
+        completed_at: new Date().toISOString(),
         overall_score: scores.overall,
         crawlability_score: scores.crawlability.score,
         machine_readability_score: scores.machineReadability.score,
@@ -381,6 +411,7 @@ export async function runPaidScan(params: RunPaidScanParams): Promise<void> {
         scanner_summary: scanResult.scannerSummary || null,
       })
       .eq('id', auditId);
+    } // end of `if (techScanAlreadyDone) { ... } else { ... }`
 
     // ----- Discovery -----
     const run = await runDiscoveryTests({
@@ -443,11 +474,8 @@ export async function runPaidScan(params: RunPaidScanParams): Promise<void> {
       { onConflict: 'user_id,site_id' },
     );
 
-    // ----- Mark audit complete -----
-    await admin
-      .from('audits')
-      .update({ status: 'completed', completed_at: new Date().toISOString() })
-      .eq('id', auditId);
+    // Audit was already marked status='completed' at end of tech scan
+    // (so discovery bootstrap could find it). No second update needed.
 
     // ----- Report-ready email -----
     if (userEmail) {
