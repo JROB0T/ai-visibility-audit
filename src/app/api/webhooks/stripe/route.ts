@@ -5,6 +5,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getStripe } from '@/lib/stripe';
 import { createClient } from '@supabase/supabase-js';
 import type Stripe from 'stripe';
+import { isTierSku } from '@/lib/pricing';
+import { provisionPaidScan } from '@/lib/paidScan';
+import { sendPastDueEmail } from '@/lib/email';
 
 // Use service role for webhook — no user auth context
 function getAdminSupabase() {
@@ -43,6 +46,55 @@ export async function POST(request: NextRequest) {
     switch (event.type) {
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session;
+
+        // ----- Phase 4b.2 path: new tier SKUs -----
+        // The /pricing → /api/checkout/tier flow stamps metadata.sku
+        // with a TierSku value. When we see one, this is an anonymous
+        // first-time purchase: provision the user/site/audit here
+        // and fire the worker. The legacy `priceType` branch below
+        // is left intact for in-app upgrade flows.
+        const newSku = session.metadata?.sku;
+        if (newSku && isTierSku(newSku)) {
+          try {
+            const result = await provisionPaidScan(session);
+            if (!result.alreadyProvisioned && result.auditId) {
+              // Fire the long-running worker fire-and-forget. We
+              // intentionally do NOT await the response — the worker
+              // takes 60-90s and Stripe expects this webhook back in
+              // < 30s. keepalive=true tells the runtime to let the
+              // request finish even after the handler returns.
+              const origin = request.headers.get('origin')
+                || process.env.NEXT_PUBLIC_APP_URL
+                || `https://${request.headers.get('host') || 'localhost'}`;
+              const cleanOrigin = origin.replace(/\/+$/, '');
+              const workerUrl = `${cleanOrigin}/api/internal/paid-scan/run`;
+              const token = process.env.ADMIN_TRIGGER_TOKEN;
+              if (token) {
+                void fetch(workerUrl, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`,
+                  },
+                  body: JSON.stringify({ auditId: result.auditId }),
+                  keepalive: true,
+                }).catch(err => {
+                  console.error('[stripe-webhook] worker dispatch failed:', err);
+                });
+              } else {
+                console.error('[stripe-webhook] missing ADMIN_TRIGGER_TOKEN; worker not dispatched');
+              }
+            }
+          } catch (err) {
+            console.error('[stripe-webhook] provisionPaidScan failed:', err);
+            // Still return 200 so Stripe doesn't retry on a logical
+            // bug. The audit (if it was partially created) will be
+            // visible in the DB for manual repair.
+          }
+          break;
+        }
+
+        // ----- Legacy path: in-app upgrade flows -----
         const userId = session.metadata?.userId;
         const siteId = session.metadata?.siteId;
         const priceType = session.metadata?.priceType;
@@ -217,6 +269,136 @@ export async function POST(request: NextRequest) {
             console.log('[stripe-webhook] Entitlement write succeeded');
           }
         }
+
+        // Phase 4b.2: also mark the new-flow `subscriptions` row as
+        // canceled if the subscription_id matches. Subscriptions
+        // created by the legacy path won't have a row here — that's
+        // expected; the maybeSingle update is a no-op in that case.
+        await supabase
+          .from('subscriptions')
+          .update({ status: 'canceled', updated_at: new Date().toISOString() })
+          .eq('stripe_subscription_id', subscriptionId);
+
+        break;
+      }
+
+      // ============================================================
+      // Phase 4b.2: subscription lifecycle for new-flow customers
+      // ============================================================
+
+      case 'invoice.payment_failed': {
+        // Dunning step. Mark the subscription past_due and notify the
+        // customer so they can update billing. Phase 5's cron will
+        // skip past_due subscriptions when computing next_run_at.
+        const invoice = event.data.object as Stripe.Invoice;
+        const subscriptionId =
+          typeof invoice.subscription === 'string'
+            ? invoice.subscription
+            : invoice.subscription?.id || null;
+        if (!subscriptionId) break;
+
+        const { data: subRow } = await supabase
+          .from('subscriptions')
+          .select('id, user_id, domain')
+          .eq('stripe_subscription_id', subscriptionId)
+          .maybeSingle();
+
+        if (!subRow) {
+          // Not one of ours (legacy flow or stale row) — skip.
+          break;
+        }
+
+        await supabase
+          .from('subscriptions')
+          .update({ status: 'past_due', updated_at: new Date().toISOString() })
+          .eq('id', subRow.id);
+
+        // Send past-due notification. Look up the user's email via
+        // the admin API (auth.users isn't queryable through PostgREST).
+        try {
+          const { data: userRow } = await supabase.auth.admin.getUserById(subRow.user_id as string);
+          const email = userRow.user?.email;
+          if (email) {
+            // The Stripe customer portal URL would ideally be a
+            // generated session URL. Phase 5 wires that; for now we
+            // link to a static /billing route stub the customer can
+            // navigate from after sign-in.
+            await sendPastDueEmail({
+              to: email,
+              domain: (subRow.domain as string) || '',
+              billingPortalUrl: '/billing',
+            });
+          }
+        } catch (err) {
+          console.error('[stripe-webhook] past_due email lookup failed:', err);
+        }
+
+        break;
+      }
+
+      case 'invoice.payment_succeeded': {
+        // Fires on every successful invoice — initial subscription
+        // creation AND each monthly renewal. We only care about
+        // renewals here (initial creation is handled by
+        // checkout.session.completed which provisions everything).
+        // billing_reason='subscription_cycle' means a renewal.
+        const invoice = event.data.object as Stripe.Invoice;
+        if (invoice.billing_reason !== 'subscription_cycle') break;
+
+        const subscriptionId =
+          typeof invoice.subscription === 'string'
+            ? invoice.subscription
+            : invoice.subscription?.id || null;
+        if (!subscriptionId) break;
+
+        const { data: subRow } = await supabase
+          .from('subscriptions')
+          .select('id, user_id, domain, tier')
+          .eq('stripe_subscription_id', subscriptionId)
+          .maybeSingle();
+        if (!subRow) break;
+
+        // Record the renewal as a billing event for accounting.
+        await supabase.from('billing_events').insert({
+          user_id: subRow.user_id,
+          site_id: null,
+          event_type: 'monthly_renewal',
+          stripe_invoice_id: invoice.id,
+          amount_cents: invoice.amount_paid || 0,
+        });
+
+        // Re-mark active in case we'd previously flipped to past_due.
+        await supabase
+          .from('subscriptions')
+          .update({ status: 'active', updated_at: new Date().toISOString() })
+          .eq('id', subRow.id);
+
+        // The actual rerun is fired by Phase 5's hourly cron, which
+        // reads subscriptions.next_run_at <= NOW(). We don't touch
+        // next_run_at here — provisionPaidScan set it to +30d at
+        // initial creation, and the cron advances it on each successful
+        // rerun.
+        break;
+      }
+
+      case 'customer.subscription.updated': {
+        // Status transitions outside of explicit cancel / delete
+        // (e.g. unpaid → active when customer fixes their card,
+        // paused/resumed). Mirror status onto our subscriptions row.
+        const subscription = event.data.object as Stripe.Subscription;
+        const stripeStatus = subscription.status;
+        const mapped =
+          stripeStatus === 'active' ? 'active'
+          : stripeStatus === 'past_due' ? 'past_due'
+          : stripeStatus === 'canceled' ? 'canceled'
+          : stripeStatus === 'paused' ? 'paused'
+          : null;
+        if (!mapped) break;
+
+        await supabase
+          .from('subscriptions')
+          .update({ status: mapped, updated_at: new Date().toISOString() })
+          .eq('stripe_subscription_id', subscription.id);
 
         break;
       }
