@@ -44,10 +44,10 @@ const DOLLAR_ENV: Record<TierSku, string> = {
 // the deployed price MUST match what's in Stripe, and that pairing
 // only happens via env config.
 const DEFAULT_DOLLARS: Record<TierSku, number> = {
-  tier_1_one_time: 49.99,
+  tier_1_one_time: 39.99,
   tier_1_monthly: 29.99,
   tier_2_one_time: 59.99,
-  tier_2_monthly: 39.99,
+  tier_2_monthly: 49.99,
 };
 
 export interface TierDisplay {
