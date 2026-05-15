@@ -618,9 +618,11 @@ export const REPORT_STYLES = `  :root {
   .seg-strong { background: var(--green); flex: 12; min-width: 175px; }
   .seg-partial { background: var(--amber); flex: 7; min-width: 155px; }
   .seg-unclear { background: var(--ink-3); flex: 1.2; min-width: 130px; }
-  /* ABSENT pill: kept light to feel "muted" but darkened the label
-     so it actually reads against the cream paper background. */
-  .seg-absent { background: var(--ink-dim); color: var(--ink-3); flex: 0.8; min-width: 105px; }
+  /* ABSENT pill: kept light to feel "muted" but the label needs to
+     read clearly against the cream paper background. Use the
+     darkest ink token (near-black) for maximum contrast — medium
+     gray (--ink-3) was still too washed out. */
+  .seg-absent { background: var(--ink-dim); color: var(--ink); flex: 0.8; min-width: 105px; }
 
   .dist-legend {
     display: flex;
