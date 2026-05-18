@@ -86,6 +86,13 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const limit = clampInt(params.get('limit'), 1, 5000, 1000);
   const since = params.get('since');
   const tierFilter = params.get('tier') as AuditTier | null;
+  // audit_ids filter — used by the batch-scoped wrapper at
+  // /api/audits/batch/[batchId]/export, but also callable directly
+  // by integrations that hold their own audit-id list.
+  const auditIdsRaw = params.get('audit_ids');
+  const auditIdsFilter = auditIdsRaw
+    ? auditIdsRaw.split(',').map(s => s.trim()).filter(s => s.length > 0)
+    : null;
 
   const admin = getAdminClient();
   const baseUrl = appBaseUrl(request);
@@ -101,6 +108,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   if (since) auditQuery = auditQuery.gte('completed_at', since);
   if (tierFilter === 'free' || tierFilter === 'tier_1' || tierFilter === 'tier_2') {
     auditQuery = auditQuery.eq('tier', tierFilter);
+  }
+  if (auditIdsFilter && auditIdsFilter.length > 0) {
+    auditQuery = auditQuery.in('id', auditIdsFilter);
   }
   const { data: audits, error: auditsErr } = await auditQuery;
   if (auditsErr) {

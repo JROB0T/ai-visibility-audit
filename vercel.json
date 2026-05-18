@@ -3,12 +3,28 @@
     {
       "path": "/api/cron/monthly-reruns",
       "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/cron/run-batch-jobs",
+      "schedule": "*/5 * * * *"
     }
   ],
   "functions": {
     "src/app/api/discovery/report/pdf/route.ts": {
       "memory": 1024,
       "maxDuration": 60
+    },
+    "src/app/api/r/[token]/pdf/route.ts": {
+      "memory": 1024,
+      "maxDuration": 60
+    },
+    "src/app/api/internal/paid-scan/run/route.ts": {
+      "memory": 1024,
+      "maxDuration": 300
+    },
+    "src/app/api/cron/run-batch-jobs/route.ts": {
+      "memory": 1024,
+      "maxDuration": 300
     }
   }
 }
