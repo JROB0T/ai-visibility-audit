@@ -30,6 +30,20 @@ import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import ReportShareToggle from '@/components/dashboard/ReportShareToggle';
 
+interface OutreachEmail {
+  subject: string;
+  body: string;
+  meta: {
+    business_name: string;
+    domain: string;
+    overall_score: number;
+    grade: string;
+    share_url: string;
+    top_missing_query_1: string;
+    top_missing_query_2: string;
+  };
+}
+
 interface ReportMetadata {
   run_id: string;
   generated_at: string | null;
@@ -172,6 +186,51 @@ export default function ReportPage() {
 
   const handleBack = () => router.back();
 
+  // ----- Outreach email snippet (Phase 9) -----
+  // Pulls a pre-written cold email from the server (uses real audit
+  // data — business name, score, top-2 missing queries, share URL).
+  // We don't try to compose it client-side because the data isn't all
+  // loaded here (top-missing queries especially need a DB read).
+  const [outreach, setOutreach] = useState<OutreachEmail | null>(null);
+  const [outreachLoading, setOutreachLoading] = useState(false);
+  const [outreachError, setOutreachError] = useState<string | null>(null);
+  const [copiedField, setCopiedField] = useState<'subject' | 'body' | 'both' | null>(null);
+
+  const handleGenerateOutreach = useCallback(async (): Promise<void> => {
+    if (!auditId) return;
+    setOutreachLoading(true);
+    setOutreachError(null);
+    try {
+      const res = await fetch(`/api/audit/${auditId}/outreach-email`);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setOutreachError(data.error || 'Could not generate the outreach email.');
+        setOutreach(null);
+        return;
+      }
+      setOutreach(data as OutreachEmail);
+    } catch {
+      setOutreachError('Network error.');
+    } finally {
+      setOutreachLoading(false);
+    }
+  }, [auditId]);
+
+  const handleCopyOutreach = useCallback(async (field: 'subject' | 'body' | 'both'): Promise<void> => {
+    if (!outreach) return;
+    const text =
+      field === 'subject' ? outreach.subject :
+      field === 'body' ? outreach.body :
+      `${outreach.subject}\n\n${outreach.body}`;
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedField(field);
+      setTimeout(() => setCopiedField(null), 2200);
+    } catch {
+      // Fallback — user can still select/copy from the textarea manually.
+    }
+  }, [outreach]);
+
   // ----- Render -----
   return (
     <div className="min-h-screen bg-neutral-900 text-neutral-100">
@@ -193,6 +252,14 @@ export default function ReportPage() {
               {meta.model && ` · ${meta.model}`}
             </div>
           )}
+          <button
+            onClick={handleGenerateOutreach}
+            disabled={outreachLoading || !html}
+            className="text-xs px-3 py-1.5 border border-neutral-700 rounded hover:bg-neutral-800 disabled:opacity-50 disabled:cursor-not-allowed transition"
+            title="Pre-write a cold outreach email using this report's data"
+          >
+            {outreachLoading ? 'Generating…' : 'Outreach email'}
+          </button>
           <button
             onClick={handleRegenerate}
             disabled={loading || generating || !html}
@@ -240,6 +307,102 @@ export default function ReportPage() {
           </div>
         )}
       </div>
+
+      {/* ===== Outreach email modal (Phase 9) ===== */}
+      {(outreach || outreachError) && (
+        <div
+          className="fixed inset-0 z-50 flex items-start justify-center px-4 py-12 overflow-y-auto"
+          style={{ background: 'rgba(0,0,0,0.75)' }}
+          onClick={() => { setOutreach(null); setOutreachError(null); }}
+        >
+          <div
+            className="w-full max-w-2xl rounded-xl border bg-neutral-950 border-neutral-800 p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-sm font-semibold text-neutral-100">Outreach email</h2>
+              <button
+                type="button"
+                onClick={() => { setOutreach(null); setOutreachError(null); }}
+                className="text-xs text-neutral-400 hover:text-neutral-100"
+              >
+                Close
+              </button>
+            </div>
+
+            {outreachError && (
+              <div className="rounded-md border border-red-800 bg-red-950/40 text-red-200 text-xs p-3 mb-4">
+                {outreachError}
+              </div>
+            )}
+
+            {outreach && (
+              <>
+                <p className="text-xs text-neutral-400 mb-3">
+                  Pre-written using <span className="text-neutral-200">{outreach.meta.business_name}</span>&rsquo;s
+                  data — score {outreach.meta.overall_score}/100 (grade {outreach.meta.grade}).
+                  Replace <code className="text-neutral-200">{'{{firstName | there}}'}</code> and
+                  <code className="text-neutral-200"> {'{{senderName | -- }}'}</code> with your outreach tool&rsquo;s merge fields
+                  (or hardcode them).
+                </p>
+
+                {/* Subject */}
+                <div className="mb-4">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-xs text-neutral-400 uppercase tracking-wider">Subject</label>
+                    <button
+                      type="button"
+                      onClick={() => handleCopyOutreach('subject')}
+                      className="text-xs px-2 py-0.5 rounded border border-neutral-700 hover:bg-neutral-800 transition"
+                    >
+                      {copiedField === 'subject' ? 'Copied' : 'Copy'}
+                    </button>
+                  </div>
+                  <input
+                    type="text"
+                    readOnly
+                    value={outreach.subject}
+                    className="w-full px-3 py-2 rounded-md text-sm bg-neutral-900 text-neutral-100 border border-neutral-800"
+                  />
+                </div>
+
+                {/* Body */}
+                <div className="mb-4">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-xs text-neutral-400 uppercase tracking-wider">Body</label>
+                    <button
+                      type="button"
+                      onClick={() => handleCopyOutreach('body')}
+                      className="text-xs px-2 py-0.5 rounded border border-neutral-700 hover:bg-neutral-800 transition"
+                    >
+                      {copiedField === 'body' ? 'Copied' : 'Copy'}
+                    </button>
+                  </div>
+                  <textarea
+                    readOnly
+                    value={outreach.body}
+                    rows={10}
+                    className="w-full px-3 py-2 rounded-md text-sm font-mono bg-neutral-900 text-neutral-100 border border-neutral-800 leading-relaxed"
+                  />
+                </div>
+
+                {/* Copy everything */}
+                <button
+                  type="button"
+                  onClick={() => handleCopyOutreach('both')}
+                  className="w-full py-2 rounded-md text-sm font-medium bg-white text-neutral-900 hover:bg-neutral-200 transition"
+                >
+                  {copiedField === 'both' ? 'Copied subject + body' : 'Copy subject + body'}
+                </button>
+
+                <p className="text-xs text-neutral-500 mt-4">
+                  We don&rsquo;t send the email from here — paste it into Instantly, Apollo, Clay, or your tool of choice.
+                </p>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Status */}
       {error && (
