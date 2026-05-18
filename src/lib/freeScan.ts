@@ -41,7 +41,7 @@ import {
 import { classifyBusiness } from '@/lib/classify';
 import { runDiscoveryTests } from '@/lib/discoveryRunner';
 import { buildFreeSampleHtml } from '@/lib/reportTemplate';
-import { generateShareToken } from '@/lib/shareTokens';
+import { mintShareToken } from '@/lib/shareTokens';
 import type { ReportExportPayload, ClusterKey } from '@/lib/reportNarrative';
 
 export interface RunFreeScanParams {
@@ -372,23 +372,5 @@ function overallGrade(score: number): string {
   return 'F';
 }
 
-/**
- * Mint a share_token onto the snapshot, retrying on the unique-violation
- * collision (cosmically unlikely with 16 chars from a 56-char alphabet).
- * Mirrors the pattern in /api/discovery/report/share/route.ts.
- */
-async function mintShareToken(admin: SupabaseClient, snapshotId: string): Promise<string> {
-  for (let attempt = 0; attempt < 3; attempt++) {
-    const token = generateShareToken();
-    const now = new Date().toISOString();
-    const { error } = await admin
-      .from('discovery_score_snapshots')
-      .update({ share_token: token, shared_at: now })
-      .eq('id', snapshotId);
-    if (!error) return token;
-    if (error.code !== '23505') {
-      throw new Error(`free-scan: share token persist failed: ${error.message}`);
-    }
-  }
-  throw new Error('free-scan: could not mint share token after retries');
-}
+// mintShareToken extracted to src/lib/shareTokens.ts so paidScan can
+// share the implementation.

@@ -252,7 +252,8 @@ export interface SendReportReadyEmailArgs {
   to: string;
   tier: 'tier_1' | 'tier_2';
   domain: string;
-  reportUrl: string;           // path to /audit/[id] or /audit/[id]/report
+  reportUrl: string;             // /audit/[id]/report — requires sign-in
+  shareUrl?: string | null;      // /r/[token] — public, optional
   isMonthlyRerun?: boolean;
 }
 
@@ -262,10 +263,27 @@ export async function sendReportReadyEmail(args: SendReportReadyEmailArgs): Prom
     ? `${tierLabel} report refreshed for ${args.domain}`
     : `Your ${tierLabel} report is ready for ${args.domain}`;
   const url = args.reportUrl.startsWith('http') ? args.reportUrl : appUrl(args.reportUrl);
+  const publicUrl = args.shareUrl
+    ? (args.shareUrl.startsWith('http') ? args.shareUrl : appUrl(args.shareUrl))
+    : null;
 
   const lede = args.isMonthlyRerun
     ? `Your monthly ${tierLabel} refresh for <strong>${esc(args.domain)}</strong> just completed. Open it to see what moved versus last month.`
     : `Your ${tierLabel} AI Visibility report for <strong>${esc(args.domain)}</strong> is ready to view.`;
+
+  // Share-block: only renders when a public token is provided. Gives the
+  // owner a one-click way to grab the link for outreach without opening
+  // the dashboard first.
+  const shareBlock = publicUrl
+    ? `
+    <hr style="border:none;border-top:1px solid #e2e0d8;margin:24px 0;">
+    <p style="font-size:13px;line-height:1.6;color:#555;margin:0 0 8px 0;">
+      Need a shareable link (no sign-in required)? This URL works for anyone you send it to:
+    </p>
+    <p style="font-size:12px;line-height:1.5;color:#1a1a1a;margin:0;word-break:break-all;">
+      <a href="${esc(publicUrl)}" style="color:#1a1a1a;">${esc(publicUrl)}</a>
+    </p>`
+    : '';
 
   const bodyHtml = `
     <h1 style="font-family:Georgia,serif;font-weight:400;font-size:24px;line-height:1.3;margin:0 0 16px 0;color:#1a1a1a;">
@@ -278,6 +296,7 @@ export async function sendReportReadyEmail(args: SendReportReadyEmailArgs): Prom
     <p style="font-size:13px;line-height:1.6;color:#555;margin:24px 0 0 0;">
       You can revisit, export, or share the report at any time from your dashboard.
     </p>
+    ${shareBlock}
   `;
 
   const text = [
@@ -288,6 +307,7 @@ export async function sendReportReadyEmail(args: SendReportReadyEmailArgs): Prom
       : `Your ${tierLabel} AI Visibility report for ${args.domain} is ready to view.`,
     ``,
     `Open it: ${url}`,
+    ...(publicUrl ? ['', `Shareable link (no sign-in required): ${publicUrl}`] : []),
   ].join('\n');
 
   return send(

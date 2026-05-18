@@ -29,3 +29,38 @@ export function looksLikeShareToken(s: string): boolean {
   }
   return true;
 }
+
+// ============================================================
+// mintShareToken — persist a fresh share_token on a snapshot row.
+//
+// Used by:
+//   - src/lib/freeScan.ts        (free-scan flow auto-mints)
+//   - src/lib/paidScan.ts        (paid-scan flow auto-mints, Phase 6)
+//   - any future audit-generation path that needs a public link
+//
+// Retries on Postgres 23505 (unique-violation) — collisions are
+// cosmically unlikely with 16 chars from a 56-char alphabet, but
+// the retry costs nothing and removes a class of bug entirely.
+// Throws after 3 attempts so failures surface.
+// ============================================================
+
+import type { SupabaseClient } from '@supabase/supabase-js';
+
+export async function mintShareToken(
+  admin: SupabaseClient,
+  snapshotId: string,
+): Promise<string> {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const token = generateShareToken();
+    const now = new Date().toISOString();
+    const { error } = await admin
+      .from('discovery_score_snapshots')
+      .update({ share_token: token, shared_at: now })
+      .eq('id', snapshotId);
+    if (!error) return token;
+    if (error.code !== '23505') {
+      throw new Error(`mintShareToken: persist failed: ${error.message}`);
+    }
+  }
+  throw new Error('mintShareToken: could not mint share token after retries');
+}

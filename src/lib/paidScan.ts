@@ -40,6 +40,7 @@ import { classifyBusiness } from '@/lib/classify';
 import { runDiscoveryTests } from '@/lib/discoveryRunner';
 import { generateReportNarrative, type ClusterKey, type ReportExportPayload, type ReportNarrative, type NarrativeTier } from '@/lib/reportNarrative';
 import { buildReportHtml } from '@/lib/reportTemplate';
+import { mintShareToken } from '@/lib/shareTokens';
 import { sendReportReadyEmail } from '@/lib/email';
 import { findOrCreateUserByEmail } from '@/lib/userProvisioning';
 import {
@@ -440,6 +441,25 @@ export async function runPaidScan(params: RunPaidScanParams): Promise<void> {
       // the 7-page brief will be unavailable until regenerated.
     }
 
+    // ----- Share token (auto-mint, mirrors free-scan flow) -----
+    // Phase 6: every audit gets a public share token at creation so the
+    // owner can use the URL in outreach without flipping a UI toggle
+    // first. Idempotent: re-running the worker reuses the existing
+    // token. Lookup happens by snapshot id, so we need it whether or
+    // not the narrative succeeded.
+    let snapshotId: string | null = null;
+    let shareToken: string | null = null;
+    {
+      const { data: snapRow } = await admin
+        .from('discovery_score_snapshots')
+        .select('id, share_token')
+        .eq('site_id', siteId)
+        .eq('run_id', runId)
+        .maybeSingle();
+      snapshotId = (snapRow?.id as string | undefined) || null;
+      shareToken = (snapRow?.share_token as string | null) || null;
+    }
+
     if (narrative) {
       const html = buildReportHtml(payload, narrative);
       const { error: snapErr } = await admin
@@ -454,6 +474,22 @@ export async function runPaidScan(params: RunPaidScanParams): Promise<void> {
         .eq('run_id', runId);
       if (snapErr) {
         console.error('[PAID_SCAN_ERROR]', { phase: 'snapshot_html_update', auditId, message: snapErr.message });
+      }
+    }
+
+    if (snapshotId && !shareToken) {
+      try {
+        shareToken = await mintShareToken(admin, snapshotId);
+      } catch (err) {
+        // Non-fatal: the dashboard report still works without a share
+        // token; outreach uses are degraded. Log loudly so this gets
+        // noticed in monitoring.
+        console.error('[PAID_SCAN_ERROR]', {
+          phase: 'mint_share_token',
+          auditId,
+          snapshotId,
+          message: err instanceof Error ? err.message : String(err),
+        });
       }
     }
 
@@ -480,11 +516,13 @@ export async function runPaidScan(params: RunPaidScanParams): Promise<void> {
     // ----- Report-ready email -----
     if (userEmail) {
       const reportUrl = `/audit/${auditId}/report`;
+      const shareUrl = shareToken ? `/r/${shareToken}` : null;
       await sendReportReadyEmail({
         to: userEmail,
         tier: tier === 'tier_2' ? 'tier_2' : 'tier_1',
         domain,
         reportUrl,
+        shareUrl,
         isMonthlyRerun: false,
       });
     }

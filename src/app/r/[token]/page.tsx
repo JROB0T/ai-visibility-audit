@@ -84,17 +84,36 @@ export default function PublicReportPage(): React.ReactElement {
       {/* Minimal attribution header — does NOT shout the product brand. The
           report itself carries the strategic narrative weight. */}
       <header
-        className="border-b py-3 px-4 flex items-center justify-between text-xs"
+        className="border-b py-3 px-4 flex items-center justify-between gap-3 text-xs"
         style={{ background: '#fff', borderColor: 'var(--border, #e5e5e5)' }}
       >
-        <span style={{ color: 'var(--text-tertiary, #888)' }}>
+        <span className="truncate" style={{ color: 'var(--text-tertiary, #888)' }}>
           AI Visibility Report · {data.domain}
         </span>
-        <span style={{ color: 'var(--text-tertiary, #888)' }}>
+        <div className="flex items-center gap-3 shrink-0">
           {data.report_generated_at && (
-            <>Generated {new Date(data.report_generated_at).toLocaleDateString()}</>
+            <span style={{ color: 'var(--text-tertiary, #888)' }}>
+              Generated {new Date(data.report_generated_at).toLocaleDateString()}
+            </span>
           )}
-        </span>
+          {/* Public PDF download. No auth required — share token is the
+              authorization. /api/r/[token]/pdf streams the binary with a
+              filename header so the browser saves it directly. */}
+          <a
+            href={`/api/r/${encodeURIComponent(token)}/pdf`}
+            className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium transition"
+            style={{
+              background: '#1a1a1a',
+              color: '#ffffff',
+              textDecoration: 'none',
+            }}
+            // download attribute is a hint; the Content-Disposition header
+            // from the server is what authoritatively triggers download.
+            download
+          >
+            Download PDF
+          </a>
+        </div>
       </header>
 
       <iframe
