@@ -10,6 +10,20 @@ interface ShareData {
   report_generated_at: string | null;
 }
 
+// Reports are rendered inside an <iframe srcdoc>. Without this, the
+// "Upgrade to the full report" anchor (and any other link) navigates
+// the iframe itself — relative URLs resolve against about:srcdoc,
+// which silently fails. Injecting <base target="_top"> makes every
+// anchor break out to the top window so /pricing actually loads.
+// Applies to ALL existing reports without a DB migration since we
+// patch the persisted HTML at render time.
+function injectTopTarget(html: string): string {
+  const tag = '<base target="_top">';
+  if (html.includes('<head>')) return html.replace('<head>', `<head>${tag}`);
+  if (html.includes('<html>')) return html.replace('<html>', `<html><head>${tag}</head>`);
+  return tag + html;
+}
+
 export default function PublicReportPage(): React.ReactElement {
   const params = useParams<{ token: string }>();
   const token = (params?.token as string) || '';
@@ -117,7 +131,7 @@ export default function PublicReportPage(): React.ReactElement {
       </header>
 
       <iframe
-        srcDoc={data.html}
+        srcDoc={injectTopTarget(data.html)}
         title={`AI Visibility Report for ${data.domain}`}
         style={{
           width: '100%',
