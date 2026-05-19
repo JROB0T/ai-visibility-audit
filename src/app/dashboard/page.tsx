@@ -110,13 +110,22 @@ function DashboardContent() {
           <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>Your Sites</h1>
           <p className="mt-1 text-sm" style={{ color: 'var(--text-tertiary)' }}>{sites.length} site{sites.length !== 1 ? 's' : ''} · {sites.reduce((sum, s) => sum + s.audit_count, 0)} total scans</p>
         </div>
-        <a
-          href="/dashboard/api-keys"
-          className="text-xs inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border transition self-start sm:self-auto"
-          style={{ borderColor: 'var(--border)', color: 'var(--text-secondary)' }}
-        >
-          API keys
-        </a>
+        <div className="flex items-center gap-2 self-start sm:self-auto">
+          <a
+            href="/dashboard/batch-upload"
+            className="text-xs inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border transition"
+            style={{ borderColor: 'var(--border)', color: 'var(--text-secondary)' }}
+          >
+            Batch upload
+          </a>
+          <a
+            href="/dashboard/api-keys"
+            className="text-xs inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border transition"
+            style={{ borderColor: 'var(--border)', color: 'var(--text-secondary)' }}
+          >
+            API keys
+          </a>
+        </div>
       </div>
 
       <form onSubmit={handleNewAudit} className="mb-8">
