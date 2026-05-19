@@ -17,6 +17,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { requireApiKeyOrSession } from '@/lib/apiAuth';
+import { getDisplayPricing, formatDollars } from '@/lib/pricing';
 
 export const maxDuration = 15;
 
@@ -125,6 +126,14 @@ export async function GET(
   const shareUrl = snapshot.share_token
     ? `${baseUrl}/r/${snapshot.share_token as string}`
     : '';
+  const pricingUrl = `${baseUrl}/pricing`;
+
+  // Pull Tier 1 prices from env so the email always shows what the
+  // pricing page actually charges. If the operator changes the price
+  // in Vercel + Stripe, outreach copy updates automatically.
+  const pricing = getDisplayPricing();
+  const monthlyPrice = formatDollars(pricing.tier_1.monthly);
+  const oneTimePrice = formatDollars(pricing.tier_1.oneTime);
 
   // ----- Template -----
   const subject = `${businessName}'s AI visibility score: ${score}/100`;
@@ -134,19 +143,22 @@ export async function GET(
   // can wire the merge tag into their own tool without editing copy.
   const greeting = `Hey {{firstName | there}},`;
 
-  // Body assembly — two variants depending on whether we have the top-2
-  // missing queries. Below ~5 prompts tested we sometimes don't.
+  // Body: pivoted from "let's hop on a call" to self-serve upgrade.
+  // The free sample (shareUrl) proves the value, the pricing page does
+  // the selling. No call ask — the recipient buys directly from /pricing.
   const missingLine = missingQ1 && missingQ2
-    ? `The biggest gap: you're not showing up at all for "${missingQ1}" or "${missingQ2}" — the exact searches that drive real buyer decisions.`
+    ? `You're missing from buyer-intent searches like "${missingQ1}" and "${missingQ2}". Competitors are getting recommended in your place.`
     : missingQ1
-    ? `The biggest gap: you're not showing up for "${missingQ1}" — exactly the kind of search that drives real buyer decisions.`
-    : `What stood out: across the buyer-intent prompts we tested, your visibility was inconsistent — competitors were getting recommended for searches you should be winning.`;
+    ? `You're missing from buyer-intent searches like "${missingQ1}" — exactly the kind that drives real customer decisions.`
+    : `Across the buyer-intent searches we tested, your visibility was inconsistent — competitors were getting recommended for searches you should be winning.`;
 
-  const reportLine = shareUrl
-    ? `I put together your full report here: ${shareUrl}`
-    : `I put together your full report — happy to send it over when you have a minute.`;
+  const sampleLine = shareUrl
+    ? `Your sample (2 pages, takes a minute): ${shareUrl}`
+    : `Happy to send the sample report over when you have a moment.`;
 
-  const closer = `Worth a 15-minute call to walk through what it means?`;
+  const fullLine = `Full report — who's being recommended instead of you, every question we tested, and a 30/60/90 plan to fix it:`;
+  const ctaLine = `→ ${pricingUrl}  (${monthlyPrice}/mo or ${oneTimePrice} one-time)`;
+
   const signoff = `{{senderName | -- }}`;
 
   const bodyLines: string[] = [
@@ -156,9 +168,10 @@ export async function GET(
     '',
     missingLine,
     '',
-    reportLine,
+    sampleLine,
     '',
-    closer,
+    fullLine,
+    ctaLine,
     '',
     signoff,
   ];
@@ -175,6 +188,9 @@ export async function GET(
       overall_score: score,
       grade,
       share_url: shareUrl,
+      pricing_url: pricingUrl,
+      tier_1_monthly_price: monthlyPrice,
+      tier_1_one_time_price: oneTimePrice,
       top_missing_query_1: missingQ1,
       top_missing_query_2: missingQ2,
     },
