@@ -1,9 +1,9 @@
 // ============================================================
 // /pricing — public pricing page
 //
-// Renders Free + Tier 1 (monthly + one-time). Tier 2 is intentionally
-// hidden until spec 2 ships — the SKUs and price IDs exist in env
-// (so webhooks resolve them) but they're not customer-facing.
+// Renders Free + Tier 1 Monthly. Tier 1 one-time was retired
+// 2026-05-21; SKU stays valid for existing customers but is hidden
+// from the UI. Tier 2 is intentionally hidden until spec 2 ships.
 //
 // Server component: prices come from env vars at request time. To
 // change a price, update the PRICE_TIER_*_DOLLARS env var in Vercel
@@ -42,7 +42,7 @@ export default function PricingPage(): React.ReactElement {
         </header>
 
         {/* ===== Cards ===== */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5 max-w-4xl mx-auto">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 max-w-3xl mx-auto">
           {/* Free */}
           <PlanCard
             name="Free Sample"
@@ -87,21 +87,11 @@ export default function PricingPage(): React.ReactElement {
             <BuyButton sku="tier_1_monthly" label="Subscribe" variant="primary" />
           </PlanCard>
 
-          {/* Tier 1 one-time */}
-          <PlanCard
-            name="One-time"
-            priceLine={formatDollars(pricing.tier_1.oneTime)}
-            priceSub="one-time payment"
-            features={[
-              '18-prompt AI visibility scan',
-              'Full strategic report',
-              'Competitor analysis',
-              '30/60/90 plan',
-              'No recurring charge',
-            ]}
-          >
-            <BuyButton sku="tier_1_one_time" label="Buy once" variant="secondary" />
-          </PlanCard>
+          {/* The one-time tier was retired on 2026-05-21. Stripe products
+              for `tier_1_one_time` still exist in env so existing
+              one-time customers continue to webhook through cleanly,
+              and the SKU stays valid in /api/checkout/tier — but the
+              UI no longer offers it for new purchase. */}
         </div>
 
         {/* ===== Footnotes ===== */}

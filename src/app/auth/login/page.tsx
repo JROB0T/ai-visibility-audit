@@ -20,6 +20,8 @@ function LoginForm() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [magicLoading, setMagicLoading] = useState(false);
+  const [magicSent, setMagicSent] = useState(false);
   const [error, setError] = useState('');
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -62,6 +64,32 @@ function LoginForm() {
     router.refresh();
   }
 
+  // Magic-link sign-in: emails the user a one-click sign-in URL.
+  // This is the primary path for new paying subscribers who paid via
+  // Stripe and don't have a password set yet.
+  async function handleMagicLink() {
+    if (!email) {
+      setError('Enter your email above first.');
+      return;
+    }
+    setMagicLoading(true);
+    setError('');
+    const supabase = createClient();
+    const { error: authError } = await supabase.auth.signInWithOtp({
+      email,
+      options: {
+        emailRedirectTo:
+          window.location.origin + '/auth/callback?redirect=' + encodeURIComponent(redirect),
+      },
+    });
+    setMagicLoading(false);
+    if (authError) {
+      setError(authError.message);
+      return;
+    }
+    setMagicSent(true);
+  }
+
   return (
     <div className="max-w-sm mx-auto px-4 py-16">
       <h1 className="text-2xl font-bold text-gray-900 text-center">Sign in</h1>
@@ -69,6 +97,21 @@ function LoginForm() {
         Access your audit reports and scan history.
       </p>
 
+      {magicSent ? (
+        <div className="mt-8 p-5 rounded-lg border border-green-200 bg-green-50 text-center">
+          <p className="text-sm font-medium text-green-900">Check your email</p>
+          <p className="mt-1 text-xs text-green-700">
+            We sent a sign-in link to <strong>{email}</strong>. Click it to sign in.
+          </p>
+          <button
+            type="button"
+            onClick={() => setMagicSent(false)}
+            className="mt-3 text-xs text-green-700 underline"
+          >
+            Use a different email
+          </button>
+        </div>
+      ) : (
       <div className="mt-8">
         <button
           onClick={handleGoogleLogin}
@@ -106,19 +149,34 @@ function LoginForm() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              required
             />
           </div>
           {error && <p className="text-sm text-red-600">{error}</p>}
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || !password}
             className="w-full py-2.5 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors text-sm"
           >
-            {loading ? 'Signing in…' : 'Sign in'}
+            {loading ? 'Signing in…' : 'Sign in with password'}
           </button>
         </form>
+
+        {/* Magic-link path — primary for paying subscribers who paid
+            via Stripe and never set a password. Reuses the email field
+            above, no password needed. */}
+        <button
+          type="button"
+          onClick={handleMagicLink}
+          disabled={magicLoading || !email}
+          className="mt-3 w-full py-2.5 text-sm font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg disabled:opacity-50 transition-colors"
+        >
+          {magicLoading ? 'Sending…' : 'Email me a sign-in link'}
+        </button>
+        <p className="mt-2 text-center text-xs text-gray-500">
+          No password yet? Use the sign-in link option.
+        </p>
       </div>
+      )}
 
       <p className="mt-6 text-center text-sm text-gray-600">
         Don&apos;t have an account?{' '}

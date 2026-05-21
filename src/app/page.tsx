@@ -51,7 +51,7 @@ export default function HomePage() {
             <div className="flex-1 text-center lg:text-left">
               <div className="inline-flex items-center gap-2 text-xs font-medium px-3 py-1.5 rounded-full mb-6 border" style={{ color: '#818CF8', borderColor: 'rgba(99,102,241,0.2)', background: 'rgba(99,102,241,0.08)' }}>
                 <Sparkles className="w-3 h-3" />
-                AI Visibility Audit
+                AIVA · AI Visibility Audit
               </div>
               <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-white leading-[1.1] tracking-tight">
                 See how AI finds{' '}
@@ -171,72 +171,55 @@ export default function HomePage() {
             <h2 className="mt-3 text-3xl sm:text-4xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>Simple, transparent pricing</h2>
             <p className="mt-4 max-w-xl mx-auto" style={{ color: 'var(--text-secondary)' }}>Start free. Upgrade when you&apos;re ready to get the full picture.</p>
           </div>
-          <div className="grid sm:grid-cols-3 gap-5">
-            {/* Free Scan */}
+          {/* Two tiers post-launch: Free Sample (email-gated) and Monthly
+              ($29.99/mo). One-time tier retired 2026-05-21. Prices here
+              are hardcoded — the /pricing page reads the same values
+              from env vars at request time; if those env vars change,
+              update these two numbers too. */}
+          <div className="grid sm:grid-cols-2 gap-5 max-w-3xl mx-auto">
+            {/* Free Sample */}
             <div className="card-glow p-6 flex flex-col">
               <div className="mb-4">
-                <p className="text-sm font-semibold" style={{ color: 'var(--text-tertiary)' }}>Free Scan</p>
+                <p className="text-sm font-semibold" style={{ color: 'var(--text-tertiary)' }}>Free Sample</p>
                 <div className="mt-2 flex items-baseline gap-1">
                   <span className="text-3xl font-extrabold" style={{ color: 'var(--text-primary)' }}>$0</span>
                 </div>
               </div>
               <ul className="space-y-3 mb-6 flex-1">
-                {['AI Visibility Score', 'Top 5 issues identified', '4 category grades', 'Key pages check', 'AI bot access status'].map((item) => (
+                {['6-prompt AI visibility scan', '2-page summary report', 'Cluster heatmap', 'One example weak prompt', 'One free per email + site'].map((item) => (
                   <li key={item} className="flex items-start gap-2.5 text-sm" style={{ color: 'var(--text-secondary)' }}>
                     <CheckCircle className="w-4 h-4 mt-0.5 shrink-0" style={{ color: '#10B981' }} />
                     <span>{item}</span>
                   </li>
                 ))}
               </ul>
-              <a href="/auth/signup" className="w-full py-2.5 rounded-lg border text-sm font-medium text-center transition-colors" style={{ color: '#6366F1', borderColor: 'rgba(99,102,241,0.3)' }}>
-                Start Free
+              <a href="/free-scan" className="w-full py-2.5 rounded-lg border text-sm font-medium text-center transition-colors" style={{ color: '#6366F1', borderColor: 'rgba(99,102,241,0.3)' }}>
+                Get free sample
               </a>
             </div>
 
-            {/* Full Audit */}
+            {/* Monthly */}
             <div className="card-glow p-6 flex flex-col relative" style={{ borderColor: 'rgba(99,102,241,0.3)', boxShadow: '0 0 30px -10px rgba(99,102,241,0.2)' }}>
               <div className="absolute -top-3 left-1/2 -translate-x-1/2">
                 <span className="text-xs font-semibold px-3 py-1 rounded-full" style={{ color: 'white', background: '#6366F1' }}>Most Popular</span>
               </div>
               <div className="mb-4">
-                <p className="text-sm font-semibold" style={{ color: '#6366F1' }}>Full Audit</p>
+                <p className="text-sm font-semibold" style={{ color: '#6366F1' }}>Monthly</p>
                 <div className="mt-2 flex items-baseline gap-1">
-                  <span className="text-3xl font-extrabold" style={{ color: 'var(--text-primary)' }}>$50</span>
-                  <span className="text-sm" style={{ color: 'var(--text-tertiary)' }}>one-time</span>
+                  <span className="text-3xl font-extrabold" style={{ color: 'var(--text-primary)' }}>$29.99</span>
+                  <span className="text-sm" style={{ color: 'var(--text-tertiary)' }}>/month</span>
                 </div>
               </div>
               <ul className="space-y-3 mb-6 flex-1">
-                {['Everything in Free, plus:', 'All findings with code fixes', 'AI Perception Check', 'Growth Strategy & benchmarks', 'Detailed page analysis', 'Exportable report'].map((item, i) => (
+                {['18-prompt AI visibility scan', 'Full strategic report', 'Competitor analysis', '30/60/90 plan', 'Refreshed monthly', 'Cancel anytime'].map((item, i) => (
                   <li key={item} className="flex items-start gap-2.5 text-sm" style={{ color: i === 0 ? 'var(--text-tertiary)' : 'var(--text-secondary)' }}>
                     <CheckCircle className="w-4 h-4 mt-0.5 shrink-0" style={{ color: '#6366F1' }} />
                     <span>{item}</span>
                   </li>
                 ))}
               </ul>
-              <a href="/auth/signup" className="w-full py-2.5 btn-primary rounded-lg text-sm font-medium text-center">
-                Get Your Audit
-              </a>
-            </div>
-
-            {/* Monthly Monitoring */}
-            <div className="card-glow p-6 flex flex-col">
-              <div className="mb-4">
-                <p className="text-sm font-semibold" style={{ color: '#10B981' }}>Monthly Monitoring</p>
-                <div className="mt-2 flex items-baseline gap-1">
-                  <span className="text-3xl font-extrabold" style={{ color: 'var(--text-primary)' }}>$25</span>
-                  <span className="text-sm" style={{ color: 'var(--text-tertiary)' }}>/month</span>
-                </div>
-              </div>
-              <ul className="space-y-3 mb-6 flex-1">
-                {['Everything in Full Audit, plus:', 'Automatic monthly rescans', 'Score trend tracking', 'Change detection & alerts', 'Monthly action plans', 'New vs resolved issues'].map((item, i) => (
-                  <li key={item} className="flex items-start gap-2.5 text-sm" style={{ color: i === 0 ? 'var(--text-tertiary)' : 'var(--text-secondary)' }}>
-                    <CheckCircle className="w-4 h-4 mt-0.5 shrink-0" style={{ color: '#10B981' }} />
-                    <span>{item}</span>
-                  </li>
-                ))}
-              </ul>
-              <a href="/auth/signup" className="w-full py-2.5 rounded-lg border text-sm font-medium text-center transition-colors" style={{ color: '#10B981', borderColor: 'rgba(16,185,129,0.3)' }}>
-                Start Monitoring
+              <a href="/pricing" className="w-full py-2.5 btn-primary rounded-lg text-sm font-medium text-center">
+                Subscribe
               </a>
             </div>
           </div>

@@ -317,7 +317,7 @@ export default function ApiKeysPage(): React.ReactElement {
             border: '1px solid var(--border, #2a2a2a)',
           }}
         >
-{`curl https://ai-visibility-audit-bvdd.vercel.app/api/audits/export?format=csv \\
+{`curl https://aivascan.com/api/audits/export?format=csv \\
   -H "Authorization: Bearer avak_live_…"`}
         </pre>
       </div>

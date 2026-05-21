@@ -157,7 +157,7 @@ function emailShell(args: { preheader: string; bodyHtml: string }): string {
         </td></tr>
       </table>
       <p style="font-size:11px;color:#888;margin:16px 0 0 0;">
-        AI Visibility Audit · See how AI assistants describe your business.
+        AIVA · See how AI assistants describe your business.
       </p>
     </td></tr>
   </table>
@@ -254,6 +254,12 @@ export interface SendReportReadyEmailArgs {
   domain: string;
   reportUrl: string;             // /audit/[id]/report — requires sign-in
   shareUrl?: string | null;      // /r/[token] — public, optional
+  // One-click sign-in URL generated via Supabase admin generateLink
+  // (magic link). When provided, the primary CTA uses this so the
+  // recipient is signed in AND landed on the report in one click —
+  // critical for subscribers who paid via Stripe and never set a
+  // password. Falls back to reportUrl if omitted.
+  signInUrl?: string | null;
   isMonthlyRerun?: boolean;
 }
 
@@ -262,6 +268,12 @@ export async function sendReportReadyEmail(args: SendReportReadyEmailArgs): Prom
   const subject = args.isMonthlyRerun
     ? `${tierLabel} report refreshed for ${args.domain}`
     : `Your ${tierLabel} report is ready for ${args.domain}`;
+  // Prefer the magic-link sign-in URL when available — it's a one-click
+  // path that signs the recipient in and lands them on the report. Fall
+  // back to the bare report URL if magic-link generation failed upstream.
+  const ctaUrl = args.signInUrl
+    ? args.signInUrl
+    : (args.reportUrl.startsWith('http') ? args.reportUrl : appUrl(args.reportUrl));
   const url = args.reportUrl.startsWith('http') ? args.reportUrl : appUrl(args.reportUrl);
   const publicUrl = args.shareUrl
     ? (args.shareUrl.startsWith('http') ? args.shareUrl : appUrl(args.shareUrl))
@@ -292,7 +304,7 @@ export async function sendReportReadyEmail(args: SendReportReadyEmailArgs): Prom
     <p style="font-size:15px;line-height:1.55;color:#333;margin:0 0 20px 0;">
       ${lede}
     </p>
-    ${ctaButton(url, args.isMonthlyRerun ? 'Open the refresh' : 'Open the report')}
+    ${ctaButton(ctaUrl, args.isMonthlyRerun ? 'Open the refresh' : 'Open the report')}
     <p style="font-size:13px;line-height:1.6;color:#555;margin:24px 0 0 0;">
       You can revisit, export, or share the report at any time from your dashboard.
     </p>
@@ -306,7 +318,7 @@ export async function sendReportReadyEmail(args: SendReportReadyEmailArgs): Prom
       ? `Your monthly ${tierLabel} refresh for ${args.domain} just completed.`
       : `Your ${tierLabel} AI Visibility report for ${args.domain} is ready to view.`,
     ``,
-    `Open it: ${url}`,
+    `Open it: ${ctaUrl}`,
     ...(publicUrl ? ['', `Shareable link (no sign-in required): ${publicUrl}`] : []),
   ].join('\n');
 
@@ -337,7 +349,7 @@ export interface SendPastDueEmailArgs {
 }
 
 export async function sendPastDueEmail(args: SendPastDueEmailArgs): Promise<EmailSendResult> {
-  const subject = `Action needed: your AI Visibility Audit subscription`;
+  const subject = `Action needed: your AIVA subscription`;
   const url = args.billingPortalUrl.startsWith('http')
     ? args.billingPortalUrl
     : appUrl(args.billingPortalUrl);

@@ -3,12 +3,14 @@ import './globals.css';
 import { ThemeWrapper } from '@/components/ThemeWrapper';
 
 export const metadata: Metadata = {
-  title: 'AI Visibility Audit — Can AI systems find your site?',
-  description: 'Discover whether AI crawlers, AI search engines, and AI assistants can find, interpret, and recommend your key pages. Get actionable fixes.',
+  metadataBase: new URL('https://aivascan.com'),
+  title: 'AIVA — See how AI describes your business',
+  description: 'AIVA scans how AI assistants (ChatGPT, Claude, Perplexity, Gemini) answer buyer-intent questions about your business — and tells you what to fix.',
   openGraph: {
-    title: 'AI Visibility Audit',
-    description: 'Find out if AI systems can discover your key pages — and what to fix first.',
+    title: 'AIVA — AI Visibility Audit',
+    description: 'See how AI assistants describe your business — and what to fix first.',
     type: 'website',
+    siteName: 'AIVA',
   },
 };
 

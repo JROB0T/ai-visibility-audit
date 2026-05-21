@@ -57,7 +57,7 @@ export function ThemeWrapper({ children }: { children: React.ReactNode }) {
                 <circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" />
               </svg>
             </div>
-            <span className="text-sm font-semibold tracking-tight" style={{ color: 'var(--text-primary)' }}>AI Visibility Audit</span>
+            <span className="text-sm font-semibold tracking-tight" style={{ color: 'var(--text-primary)' }}>AIVA</span>
           </a>
           <div className="flex items-center gap-2">
             {userEmail ? (
@@ -87,9 +87,14 @@ export function ThemeWrapper({ children }: { children: React.ReactNode }) {
               <div className="w-5 h-5 rounded-md bg-gradient-to-br from-indigo-500 to-indigo-600 flex items-center justify-center">
                 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></svg>
               </div>
-              <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>AI Visibility Audit</span>
+              <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>AIVA · © {new Date().getFullYear()}</span>
             </div>
-            <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>Helping businesses get found by AI systems</p>
+            <nav className="flex items-center gap-4 text-xs" style={{ color: 'var(--text-tertiary)' }}>
+              <a href="/pricing" className="hover:underline">Pricing</a>
+              <a href="/terms" className="hover:underline">Terms</a>
+              <a href="/privacy" className="hover:underline">Privacy</a>
+              <a href="/contact" className="hover:underline">Contact</a>
+            </nav>
           </div>
         </div>
       </footer>

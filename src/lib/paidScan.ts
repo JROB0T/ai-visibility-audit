@@ -517,12 +517,38 @@ export async function runPaidScan(params: RunPaidScanParams): Promise<void> {
     if (userEmail) {
       const reportUrl = `/audit/${auditId}/report`;
       const shareUrl = shareToken ? `/r/${shareToken}` : null;
+
+      // Generate a one-click magic-link so first-time paying subscribers
+      // can sign in without ever setting a password. Supabase's admin
+      // generateLink returns a URL that signs the user in and redirects
+      // to `redirectTo` in one click. Best-effort: if generation fails
+      // (e.g. SMTP misconfig, perm issue) we still send the email
+      // pointing at the report URL — they'll just hit the login page
+      // and can use the magic-link button there.
+      let signInUrl: string | null = null;
+      try {
+        const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000').replace(/\/+$/, '');
+        const { data: linkData, error: linkErr } = await admin.auth.admin.generateLink({
+          type: 'magiclink',
+          email: userEmail,
+          options: {
+            redirectTo: `${baseUrl}${reportUrl}`,
+          },
+        });
+        if (!linkErr && linkData?.properties?.action_link) {
+          signInUrl = linkData.properties.action_link as string;
+        }
+      } catch (err) {
+        console.error('[PAID_SCAN] magic-link generation failed:', err);
+      }
+
       await sendReportReadyEmail({
         to: userEmail,
         tier: tier === 'tier_2' ? 'tier_2' : 'tier_1',
         domain,
         reportUrl,
         shareUrl,
+        signInUrl,
         isMonthlyRerun: false,
       });
     }

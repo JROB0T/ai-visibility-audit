@@ -125,6 +125,13 @@ function DashboardContent() {
           >
             API keys
           </a>
+          <a
+            href="/dashboard/account"
+            className="text-xs inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border transition"
+            style={{ borderColor: 'var(--border)', color: 'var(--text-secondary)' }}
+          >
+            Account
+          </a>
         </div>
       </div>
 
