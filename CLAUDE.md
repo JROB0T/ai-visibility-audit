@@ -110,6 +110,98 @@ and works on `main` directly. Deploys are continuous via Vercel.
 
 ---
 
+## Pre-launch checklist (Jon's to-do list)
+
+The code side is complete. Everything below is dashboard / DNS / billing
+config that only Jon can do. Work top to bottom — items lower in the
+list depend on the ones above.
+
+### 1. Supabase
+- [ ] Apply migration 015 via SQL Editor:
+  ```sql
+  ALTER TABLE audit_jobs ADD COLUMN IF NOT EXISTS email TEXT;
+  ```
+
+### 2. Stripe Customer Portal config
+Stripe Dashboard → Settings → Billing → Customer Portal:
+- [ ] Allow customers to **cancel subscriptions**
+- [ ] Choose **"At end of billing period"** (recommended) for cancellations
+- [ ] Allow customers to **update payment method**
+- [ ] Allow customers to **view invoices and payment history**
+- [ ] Set the "Return to business" URL → `https://aivascan.com/dashboard/account`
+  (use the current Vercel URL until domain is swapped)
+
+### 3. Stripe email + dunning config
+Stripe Dashboard → Settings → Emails (in current sandbox mode AND repeat
+in live mode later):
+- [ ] Enable "Successful payments" customer email
+- [ ] Enable "Failed payments" customer email
+- [ ] Enable "Upcoming renewal" customer email (heads-up before charge)
+- [ ] Settings → Billing → Subscriptions and emails → confirm Smart
+  Retries is on (default — retries failed payments automatically over
+  ~3 weeks before canceling)
+
+### 4. Domain swap to aivascan.com
+Full step-by-step in "Domain swap" section below.
+
+### 5. Legal pages — replace `[TODO]` placeholders
+Files: `src/app/terms/page.tsx`, `src/app/privacy/page.tsx`,
+`src/app/contact/page.tsx`. Easiest paths:
+- [ ] Use **Termly** or **Iubenda** (~$10-20/mo, generates compliant ToS +
+  Privacy from a questionnaire) — paste their output into the pages
+- [ ] OR have an attorney review the scaffolded drafts
+- [ ] Fill in: legal entity name, jurisdiction, support email
+  (e.g. `support@aivascan.com`), privacy email, dated "last updated"
+
+### 6. End-to-end smoke test (still in Stripe sandbox before going live)
+- [ ] Free scan from `/free-scan` → confirmation email arrives → click
+  share link → 2-page sample report renders → "Upgrade to the full
+  report" CTA opens `/pricing`
+- [ ] Click Subscribe on `/pricing` → Stripe Checkout opens → pay with
+  card `4242 4242 4242 4242`, any future expiry, any CVC/ZIP
+- [ ] Within ~90 seconds: report-ready email arrives → click the
+  primary CTA → land directly on the report, signed in (magic link
+  worked)
+- [ ] Visit `/dashboard/account` → click **Manage billing** → Stripe
+  Customer Portal opens → confirm it shows your subscription, invoices,
+  payment method
+- [ ] In the portal: cancel the subscription → return to the app →
+  confirm `Subscription: No active subscription` shows on
+  `/dashboard/account`
+- [ ] Run a batch upload via `/dashboard/batch-upload` with a 2-row
+  CSV including an `email` column → wait for completion → Download
+  CSV → confirm `email`, `outreach_subject`, `outreach_body` columns
+  are populated
+
+### 7. Stripe live mode flip (when ready for real money)
+- [ ] Stripe Dashboard → switch from Sandbox to live account
+- [ ] Live mode → Products → recreate the Monthly subscription product
+  → copy its `price_…` ID
+- [ ] Live mode → Developers → API keys → copy the `sk_live_…`
+  secret key
+- [ ] Vercel env vars → update `STRIPE_SECRET_KEY` and
+  `STRIPE_PRICE_TIER_1_MONTHLY` with the live values
+- [ ] Live mode → Webhooks → add endpoint at
+  `https://aivascan.com/api/webhooks/stripe` → copy its signing
+  secret → update `STRIPE_WEBHOOK_SECRET` in Vercel
+- [ ] Trigger a Vercel redeploy so the new env vars take effect
+- [ ] Repeat the section-6 smoke test with a real card (cancel right
+  after to avoid being charged twice)
+- [ ] Stripe Dashboard → Products → **archive** the test-mode one-time
+  product. (Don't delete — Archive keeps webhook history intact.)
+
+### 8. Operational tooling
+- [ ] Set up monitoring for the daily cron at `/api/cron/monthly-reruns`
+  (Vercel Logs → filter to that path; consider adding an alert if it
+  reports `failed > 0` for several days in a row)
+- [ ] Bookmark Stripe Dashboard → Customers (to handle support tickets
+  about billing without diving into code)
+- [ ] Confirm `CRON_SECRET` env var exists in Vercel (lets you trigger
+  the monthly cron manually for testing via `Authorization: Bearer
+  $CRON_SECRET`)
+
+---
+
 ## Domain swap to aivascan.com — manual checklist
 
 The code references `aivascan.com` in metadata + footer + Terms/Privacy

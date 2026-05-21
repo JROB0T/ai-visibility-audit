@@ -264,10 +264,13 @@ export interface SendReportReadyEmailArgs {
 }
 
 export async function sendReportReadyEmail(args: SendReportReadyEmailArgs): Promise<EmailSendResult> {
-  const tierLabel = args.tier === 'tier_2' ? 'Tier 2' : 'Tier 1';
+  // Internal tier codes (tier_1 / tier_2) are not exposed in the subject
+  // line — recipients see the product brand instead. The tier still drives
+  // pricing/feature gating server-side; this is purely a copy choice.
+  void args.tier;
   const subject = args.isMonthlyRerun
-    ? `${tierLabel} report refreshed for ${args.domain}`
-    : `Your ${tierLabel} report is ready for ${args.domain}`;
+    ? `Your AIVA report has been refreshed for ${args.domain}`
+    : `Your AIVA report is ready for ${args.domain}`;
   // Prefer the magic-link sign-in URL when available — it's a one-click
   // path that signs the recipient in and lands them on the report. Fall
   // back to the bare report URL if magic-link generation failed upstream.
@@ -279,8 +282,8 @@ export async function sendReportReadyEmail(args: SendReportReadyEmailArgs): Prom
     : null;
 
   const lede = args.isMonthlyRerun
-    ? `Your monthly ${tierLabel} refresh for <strong>${esc(args.domain)}</strong> just completed. Open it to see what moved versus last month.`
-    : `Your ${tierLabel} AI Visibility report for <strong>${esc(args.domain)}</strong> is ready to view.`;
+    ? `Your monthly AIVA refresh for <strong>${esc(args.domain)}</strong> just completed. Open it to see what moved versus last month.`
+    : `Your AIVA report for <strong>${esc(args.domain)}</strong> is ready to view.`;
 
   // Share-block: only renders when a public token is provided. Gives the
   // owner a one-click way to grab the link for outreach without opening
@@ -311,11 +314,11 @@ export async function sendReportReadyEmail(args: SendReportReadyEmailArgs): Prom
   `;
 
   const text = [
-    args.isMonthlyRerun ? `Refresh complete.` : `Your ${tierLabel} report is ready.`,
+    args.isMonthlyRerun ? `Refresh complete.` : `Your AIVA report is ready.`,
     ``,
     args.isMonthlyRerun
-      ? `Your monthly ${tierLabel} refresh for ${args.domain} just completed.`
-      : `Your ${tierLabel} AI Visibility report for ${args.domain} is ready to view.`,
+      ? `Your monthly AIVA refresh for ${args.domain} just completed.`
+      : `Your AIVA report for ${args.domain} is ready to view.`,
     ``,
     `Open it: ${ctaUrl}`,
     ...(publicUrl ? ['', `Shareable link (no sign-in required): ${publicUrl}`] : []),
@@ -327,8 +330,8 @@ export async function sendReportReadyEmail(args: SendReportReadyEmailArgs): Prom
       subject,
       html: emailShell({
         preheader: args.isMonthlyRerun
-          ? `Your monthly ${tierLabel} refresh for ${args.domain} just completed.`
-          : `Your ${tierLabel} AI Visibility report for ${args.domain} is ready.`,
+          ? `Your monthly AIVA refresh for ${args.domain} just completed.`
+          : `Your AIVA report for ${args.domain} is ready.`,
         bodyHtml,
       }),
       text,
