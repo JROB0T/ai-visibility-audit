@@ -18,7 +18,14 @@
 // Output (CSV header / JSON keys):
 //   audit_id, business_name, website, location, industry,
 //   tier, overall_score, grade, share_url, report_url, absent_prompts,
-//   top_missing_query_1, top_missing_query_2, generated_at
+//   top_missing_query_1, top_missing_query_2, email,
+//   outreach_subject, outreach_body, generated_at
+//
+// email / outreach_subject / outreach_body are for cold-outreach
+// workflows. `email` is the contact address from the batch-upload
+// CSV (blank for non-batch audits). `outreach_*` are pre-written
+// snippets built from the same template as the per-audit /outreach-
+// email endpoint so on-screen and exported copy stay in sync.
 //
 // In Phase 8 we'll add /api/audits/batch/[batchId]/export which
 // internally calls this same data-fetch logic with an extra
@@ -29,6 +36,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { requireApiKeyOrSession } from '@/lib/apiAuth';
 import type { AuditTier } from '@/lib/types';
+import { getDisplayPricing, formatDollars } from '@/lib/pricing';
+import { buildOutreachEmail } from '@/lib/outreachEmail';
 
 export const maxDuration = 60;
 
@@ -72,6 +81,9 @@ export interface ExportRow {
   absent_prompts: number;
   top_missing_query_1: string;
   top_missing_query_2: string;
+  email: string;
+  outreach_subject: string;
+  outreach_body: string;
   generated_at: string;
 }
 
@@ -125,13 +137,15 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     });
   }
 
-  // ----- Bulk-load related rows in three round-trips, not N per audit -----
+  // ----- Bulk-load related rows in a few round-trips, not N per audit -----
   const siteIds = Array.from(new Set(audits.map(a => a.site_id as string)));
+  const allAuditIds = audits.map(a => a.id as string);
 
   const [
     { data: sites },
     { data: profiles },
     { data: latestSnapshots },
+    { data: jobs },
   ] = await Promise.all([
     admin.from('sites').select('id, domain, vertical').in('id', siteIds),
     admin
@@ -143,7 +157,22 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       .select('id, site_id, run_id, overall_score, absent_count, share_token, snapshot_date')
       .in('site_id', siteIds)
       .order('snapshot_date', { ascending: false }),
+    // audit_jobs carries the contact email from the batch CSV. Only
+    // populated for audits created via /api/audits/batch — manual
+    // dashboard scans have no matching row, hence the left-join
+    // shape (lookup returns undefined → empty email).
+    admin
+      .from('audit_jobs')
+      .select('audit_id, email')
+      .in('audit_id', allAuditIds),
   ]);
+
+  const emailByAudit = new Map<string, string>();
+  for (const j of (jobs || [])) {
+    const aid = j.audit_id as string | null;
+    const e = (j.email as string | null) ?? '';
+    if (aid && e) emailByAudit.set(aid, e);
+  }
 
   const siteById = new Map<string, { domain: string; vertical: string | null }>();
   for (const s of (sites || [])) {
@@ -206,6 +235,12 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     }),
   );
 
+  // Tier 1 pricing for outreach snippets — pulled once per export.
+  const pricing = getDisplayPricing();
+  const monthlyPrice = formatDollars(pricing.tier_1.monthly);
+  const oneTimePrice = formatDollars(pricing.tier_1.oneTime);
+  const pricingUrl = `${baseUrl}/pricing`;
+
   // ----- Assemble rows -----
   const rows: ExportRow[] = audits.map(a => {
     const auditId = a.id as string;
@@ -218,21 +253,41 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const domain = site?.domain || '';
     const shareUrl = snap?.share_token ? `${baseUrl}/r/${snap.share_token}` : '';
     const reportUrl = `${baseUrl}/audit/${auditId}/report`;
+    const businessName = profile?.business_name || domain;
+    const score = snap?.overall_score ?? 0;
+    const grade = gradeFor(snap?.overall_score ?? null);
+
+    // Pre-written outreach copy. Same template as /api/audit/[id]/
+    // outreach-email — built from a shared lib so they can't drift.
+    const { subject: outreachSubject, body: outreachBody } = buildOutreachEmail({
+      businessName,
+      score,
+      grade,
+      shareUrl,
+      pricingUrl,
+      monthlyPrice,
+      oneTimePrice,
+      topMissingQuery1: missing?.[0] || '',
+      topMissingQuery2: missing?.[1] || '',
+    });
 
     return {
       audit_id: auditId,
-      business_name: profile?.business_name || domain,
+      business_name: businessName,
       website: domain,
       location: profile?.service_area || '',
       industry: profile?.primary_category || site?.vertical || '',
       tier: (a.tier as AuditTier) || '',
       overall_score: snap?.overall_score ?? null,
-      grade: gradeFor(snap?.overall_score ?? null),
+      grade,
       share_url: shareUrl,
       report_url: reportUrl,
       absent_prompts: snap?.absent_count ?? 0,
       top_missing_query_1: missing?.[0] || '',
       top_missing_query_2: missing?.[1] || '',
+      email: emailByAudit.get(auditId) || '',
+      outreach_subject: outreachSubject,
+      outreach_body: outreachBody,
       generated_at: snap?.snapshot_date || (a.completed_at as string) || (a.created_at as string),
     };
   });
@@ -264,6 +319,9 @@ const CSV_COLUMNS: Array<keyof ExportRow> = [
   'absent_prompts',
   'top_missing_query_1',
   'top_missing_query_2',
+  'email',
+  'outreach_subject',
+  'outreach_body',
   'generated_at',
 ];
 

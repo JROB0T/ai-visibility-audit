@@ -74,7 +74,7 @@ export async function GET(
 
   const { data: jobs, error: jobsErr } = await admin
     .from('audit_jobs')
-    .select('id, business_name, website, location, industry, tier, status, audit_id, error, created_at, started_at, completed_at')
+    .select('id, business_name, website, location, industry, tier, email, status, audit_id, error, created_at, started_at, completed_at')
     .eq('batch_id', batchId)
     .order('created_at', { ascending: true });
   if (jobsErr) {
@@ -152,6 +152,7 @@ export async function GET(
       location: (j.location as string | null) ?? null,
       industry: (j.industry as string | null) ?? null,
       tier: j.tier as AuditTier,
+      email: (j.email as string | null) ?? null,
       status: j.status as 'queued' | 'processing' | 'completed' | 'failed',
       audit_id: auditId,
       error: (j.error as string | null) ?? null,

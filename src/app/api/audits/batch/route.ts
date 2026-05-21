@@ -13,12 +13,15 @@
 //   {
 //     "businesses": [
 //       { "name": "...", "website": "...", "location": "...",
-//         "industry": "...", "tier": "free" | "tier_1" | "tier_2" }
+//         "industry": "...", "tier": "free" | "tier_1" | "tier_2",
+//         "email": "..." }
 //     ],
 //     "notify_webhook": "https://..."  // optional, currently stubbed
 //   }
 //
-// `tier` defaults to 'free' per business if omitted.
+// `tier` defaults to 'free' per business if omitted. `email` is
+// optional contact address passed through to the export CSV for
+// cold-outreach workflows — never sent from this app.
 //
 // Constraints: max 50 businesses per submission (Vercel function
 // + DB write budget). Larger jobs should be split client-side.
@@ -38,6 +41,7 @@ interface BusinessInput {
   location?: unknown;
   industry?: unknown;
   tier?: unknown;
+  email?: unknown;
 }
 
 interface BatchBody {
@@ -117,6 +121,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     location: string | null;
     industry: string | null;
     tier: AuditTier;
+    email: string | null;
   }> = [];
   const errors: Array<{ index: number; error: string }> = [];
 
@@ -135,12 +140,16 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       typeof b?.tier === 'string' && VALID_TIERS.includes(b.tier as AuditTier)
         ? (b.tier as AuditTier)
         : 'free';
+    // Email is passed through — no strict validation (operator owns
+    // the list, may contain merge tags or placeholders). Just trim.
+    const emailRaw = typeof b?.email === 'string' ? b.email.trim().slice(0, 320) : '';
     cleaned.push({
       business_name: typeof b?.name === 'string' ? b.name.trim().slice(0, 200) || null : null,
       website: normalizeDomain(websiteRaw),
       location: typeof b?.location === 'string' ? b.location.trim().slice(0, 200) || null : null,
       industry: typeof b?.industry === 'string' ? b.industry.trim().slice(0, 200) || null : null,
       tier,
+      email: emailRaw || null,
     });
   }
 
@@ -174,6 +183,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     location: c.location,
     industry: c.industry,
     tier: c.tier,
+    email: c.email,
   }));
   const { data: insertedJobs, error: jobsErr } = await admin
     .from('audit_jobs')

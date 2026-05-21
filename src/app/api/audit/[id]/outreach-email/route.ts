@@ -18,6 +18,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { requireApiKeyOrSession } from '@/lib/apiAuth';
 import { getDisplayPricing, formatDollars } from '@/lib/pricing';
+import { buildOutreachEmail } from '@/lib/outreachEmail';
 
 export const maxDuration = 15;
 
@@ -135,47 +136,18 @@ export async function GET(
   const monthlyPrice = formatDollars(pricing.tier_1.monthly);
   const oneTimePrice = formatDollars(pricing.tier_1.oneTime);
 
-  // ----- Template -----
-  const subject = `${businessName}'s AI visibility score: ${score}/100`;
-
-  // Recipient first name comes from outreach tools' merge fields (e.g.
-  // {{firstName}} in Instantly). We leave a placeholder so the operator
-  // can wire the merge tag into their own tool without editing copy.
-  const greeting = `Hey {{firstName | there}},`;
-
-  // Body: pivoted from "let's hop on a call" to self-serve upgrade.
-  // The free sample (shareUrl) proves the value, the pricing page does
-  // the selling. No call ask — the recipient buys directly from /pricing.
-  const missingLine = missingQ1 && missingQ2
-    ? `You're missing from buyer-intent searches like "${missingQ1}" and "${missingQ2}". Competitors are getting recommended in your place.`
-    : missingQ1
-    ? `You're missing from buyer-intent searches like "${missingQ1}" — exactly the kind that drives real customer decisions.`
-    : `Across the buyer-intent searches we tested, your visibility was inconsistent — competitors were getting recommended for searches you should be winning.`;
-
-  const sampleLine = shareUrl
-    ? `Your sample (2 pages, takes a minute): ${shareUrl}`
-    : `Happy to send the sample report over when you have a moment.`;
-
-  const fullLine = `Full report — who's being recommended instead of you, every question we tested, and a 30/60/90 plan to fix it:`;
-  const ctaLine = `→ ${pricingUrl}  (${monthlyPrice}/mo or ${oneTimePrice} one-time)`;
-
-  const signoff = `{{senderName | -- }}`;
-
-  const bodyLines: string[] = [
-    greeting,
-    '',
-    `I ran ${businessName} through our AI visibility checker — you scored ${score}/100 (grade ${grade || '—'}).`,
-    '',
-    missingLine,
-    '',
-    sampleLine,
-    '',
-    fullLine,
-    ctaLine,
-    '',
-    signoff,
-  ];
-  const body = bodyLines.join('\n');
+  // ----- Compose via shared helper (also used by export route) -----
+  const { subject, body } = buildOutreachEmail({
+    businessName,
+    score,
+    grade,
+    shareUrl,
+    pricingUrl,
+    monthlyPrice,
+    oneTimePrice,
+    topMissingQuery1: missingQ1,
+    topMissingQuery2: missingQ2,
+  });
 
   return NextResponse.json({
     subject,

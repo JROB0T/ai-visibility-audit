@@ -27,6 +27,7 @@ interface ParsedRow {
   website: string;
   location: string;
   industry: string;
+  email: string;
 }
 
 interface InvalidRow {
@@ -67,6 +68,7 @@ const COLUMN_ALIASES: Record<keyof ParsedRow, string[]> = {
   website: ['website', 'url', 'domain', 'site'],
   location: ['location', 'city', 'address'],
   industry: ['industry', 'vertical', 'category'],
+  email: ['email', 'contact_email', 'contact email', 'e-mail'],
 };
 
 // Minimal CSV parser. Handles quoted fields, escaped quotes (""),
@@ -188,7 +190,7 @@ export default function BatchUploadPage(): React.ReactElement {
         columns = headerCandidates;
         dataStart = 1;
       } else {
-        columns = { name: 0, website: 1, location: 2, industry: 3 };
+        columns = { name: 0, website: 1, location: 2, industry: 3, email: 4 };
         dataStart = 0;
       }
 
@@ -221,6 +223,7 @@ export default function BatchUploadPage(): React.ReactElement {
           website,
           location: get('location'),
           industry: get('industry'),
+          email: get('email'),
         });
       }
 
@@ -250,6 +253,7 @@ export default function BatchUploadPage(): React.ReactElement {
           website: r.website,
           location: r.location || undefined,
           industry: r.industry || undefined,
+          email: r.email || undefined,
           tier,
         })),
       };
@@ -403,7 +407,11 @@ export default function BatchUploadPage(): React.ReactElement {
               Choose a CSV file
             </p>
             <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
-              Columns: <code>name, website, location, industry</code> — only website is required.
+              Columns: <code>name, website, location, industry, email</code> — only website is required.
+              <br />
+              <span style={{ color: 'var(--text-tertiary)' }}>
+                Email is passed through to the export CSV for cold-outreach tools.
+              </span>
             </p>
             <input
               type="file"
@@ -464,6 +472,7 @@ export default function BatchUploadPage(): React.ReactElement {
                   <tr style={{ background: 'var(--surface)' }}>
                     <th className="text-left px-3 py-2 font-medium" style={{ color: 'var(--text-tertiary)' }}>Name</th>
                     <th className="text-left px-3 py-2 font-medium" style={{ color: 'var(--text-tertiary)' }}>Website</th>
+                    <th className="text-left px-3 py-2 font-medium" style={{ color: 'var(--text-tertiary)' }}>Email</th>
                     <th className="text-left px-3 py-2 font-medium" style={{ color: 'var(--text-tertiary)' }}>Location</th>
                     <th className="text-left px-3 py-2 font-medium" style={{ color: 'var(--text-tertiary)' }}>Industry</th>
                   </tr>
@@ -473,6 +482,7 @@ export default function BatchUploadPage(): React.ReactElement {
                     <tr key={i} style={{ borderTop: '1px solid var(--border)' }}>
                       <td className="px-3 py-2" style={{ color: 'var(--text-primary)' }}>{r.name || <span style={{ color: 'var(--text-tertiary)' }}>—</span>}</td>
                       <td className="px-3 py-2 font-mono" style={{ color: 'var(--text-secondary)' }}>{r.website}</td>
+                      <td className="px-3 py-2 font-mono" style={{ color: 'var(--text-secondary)' }}>{r.email || <span style={{ color: 'var(--text-tertiary)' }}>—</span>}</td>
                       <td className="px-3 py-2" style={{ color: 'var(--text-secondary)' }}>{r.location || <span style={{ color: 'var(--text-tertiary)' }}>—</span>}</td>
                       <td className="px-3 py-2" style={{ color: 'var(--text-secondary)' }}>{r.industry || <span style={{ color: 'var(--text-tertiary)' }}>—</span>}</td>
                     </tr>
@@ -653,7 +663,7 @@ export default function BatchUploadPage(): React.ReactElement {
             <div className="mt-5 p-4 rounded-md flex items-start gap-2" style={{ background: 'rgba(16,185,129,0.05)', border: '1px solid rgba(16,185,129,0.3)' }}>
               <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0" style={{ color: '#10B981' }} />
               <div className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-                Each completed row has a share URL above. Use the report&apos;s <strong>Outreach email</strong> button to copy a pre-written cold email for that business.
+                The CSV download includes <strong>email</strong>, <strong>outreach_subject</strong>, and <strong>outreach_body</strong> columns — pre-written cold-email copy per row, ready to paste into Instantly, Smartlead, or your sender of choice.
               </div>
             </div>
           )}
