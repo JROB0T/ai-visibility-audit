@@ -274,7 +274,6 @@ export async function sendReportReadyEmail(args: SendReportReadyEmailArgs): Prom
   const ctaUrl = args.signInUrl
     ? args.signInUrl
     : (args.reportUrl.startsWith('http') ? args.reportUrl : appUrl(args.reportUrl));
-  const url = args.reportUrl.startsWith('http') ? args.reportUrl : appUrl(args.reportUrl);
   const publicUrl = args.shareUrl
     ? (args.shareUrl.startsWith('http') ? args.shareUrl : appUrl(args.shareUrl))
     : null;
