@@ -6,6 +6,7 @@ import { createClient } from '@supabase/supabase-js';
 import { scanSite } from '@/lib/scanner';
 import { calculateScores, generateRecommendations, enrichWithCodeSnippets } from '@/lib/scoring';
 import { runDiscoveryTests } from '@/lib/discoveryRunner';
+import { sendReportReadyEmail } from '@/lib/email';
 
 function getAdminSupabase() {
   return createClient(
@@ -203,6 +204,58 @@ export async function GET(request: NextRequest) {
 
       console.log(`Monthly rerun completed for ${site.domain}: score ${scores.overall}/100`);
       succeeded++;
+
+      // ----- Refresh-complete email (with magic-link sign-in) -----
+      // Best-effort: if anything fails here we still record the rerun
+      // succeeded — the email is a notification, not part of the audit.
+      try {
+        const { data: userRow } = await supabase.auth.admin.getUserById(site.user_id);
+        const userEmail = userRow?.user?.email;
+        if (userEmail) {
+          // Look up the latest discovery snapshot for a public share URL.
+          // Optional — if absent the email omits the share-link block.
+          const { data: snap } = await supabase
+            .from('discovery_score_snapshots')
+            .select('share_token')
+            .eq('site_id', site.id)
+            .order('snapshot_date', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          const shareToken = snap?.share_token as string | null | undefined;
+
+          const reportUrl = `/audit/${audit.id}/report`;
+          const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000').replace(/\/+$/, '');
+
+          // Generate a one-click magic-link sign-in URL. Subscribers
+          // may not have signed in for a month — this gets them back
+          // into the report without retyping anything.
+          let signInUrl: string | null = null;
+          try {
+            const { data: linkData } = await supabase.auth.admin.generateLink({
+              type: 'magiclink',
+              email: userEmail,
+              options: { redirectTo: `${baseUrl}${reportUrl}` },
+            });
+            if (linkData?.properties?.action_link) {
+              signInUrl = linkData.properties.action_link as string;
+            }
+          } catch (linkErr) {
+            console.error(`[cron] magic-link generation failed for ${site.domain}:`, linkErr);
+          }
+
+          await sendReportReadyEmail({
+            to: userEmail,
+            tier: 'tier_1',
+            domain: site.domain,
+            reportUrl,
+            shareUrl: shareToken ? `/r/${shareToken}` : null,
+            signInUrl,
+            isMonthlyRerun: true,
+          });
+        }
+      } catch (emailErr) {
+        console.error(`[cron] refresh-complete email failed for ${site.domain}:`, emailErr);
+      }
 
       // Discovery rerun — only if profile exists AND site has at least one active prompt.
       // Wrapped in its own try/catch so a discovery failure doesn't affect the audit result.

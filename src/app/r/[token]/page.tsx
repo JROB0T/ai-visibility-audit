@@ -31,6 +31,42 @@ export default function PublicReportPage(): React.ReactElement {
   const [data, setData] = useState<ShareData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [pdfState, setPdfState] = useState<'idle' | 'loading' | 'error'>('idle');
+
+  // Fetch the PDF as a blob then trigger a download. Previously this
+  // was a bare <a href download> link, which had a nasty failure mode:
+  // when chromium spin-up timed out, the server returned a JSON error
+  // and the browser saved a "pdf.json" file with "Site wasn't available"
+  // — confusing for recipients. Now we control the flow: 200 → real
+  // download, anything else → inline "try again" message.
+  async function handleDownloadPdf(): Promise<void> {
+    if (pdfState === 'loading') return;
+    setPdfState('loading');
+    try {
+      const res = await fetch(`/api/r/${encodeURIComponent(token)}/pdf`);
+      if (!res.ok) {
+        setPdfState('error');
+        setTimeout(() => setPdfState('idle'), 5000);
+        return;
+      }
+      const blob = await res.blob();
+      const cd = res.headers.get('content-disposition') || '';
+      const match = /filename="?([^"]+)"?/.exec(cd);
+      const filename = match?.[1] || `ai-visibility-${token}.pdf`;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      setPdfState('idle');
+    } catch {
+      setPdfState('error');
+      setTimeout(() => setPdfState('idle'), 5000);
+    }
+  }
 
   useEffect(() => {
     if (!token) return;
@@ -110,23 +146,28 @@ export default function PublicReportPage(): React.ReactElement {
               Generated {new Date(data.report_generated_at).toLocaleDateString()}
             </span>
           )}
-          {/* Public PDF download. No auth required — share token is the
-              authorization. /api/r/[token]/pdf streams the binary with a
-              filename header so the browser saves it directly. */}
-          <a
-            href={`/api/r/${encodeURIComponent(token)}/pdf`}
+          {/* Public PDF download — JS-driven so we can surface server
+              failures inline instead of saving a bogus "pdf.json" file
+              when chromium spin-up times out. */}
+          <button
+            type="button"
+            onClick={() => void handleDownloadPdf()}
+            disabled={pdfState === 'loading'}
             className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium transition"
             style={{
-              background: '#1a1a1a',
+              background: pdfState === 'error' ? '#7c2d12' : '#1a1a1a',
               color: '#ffffff',
-              textDecoration: 'none',
+              opacity: pdfState === 'loading' ? 0.7 : 1,
+              cursor: pdfState === 'loading' ? 'wait' : 'pointer',
+              border: 'none',
             }}
-            // download attribute is a hint; the Content-Disposition header
-            // from the server is what authoritatively triggers download.
-            download
           >
-            Download PDF
-          </a>
+            {pdfState === 'loading'
+              ? 'Generating…'
+              : pdfState === 'error'
+              ? 'Try again'
+              : 'Download PDF'}
+          </button>
         </div>
       </header>
 

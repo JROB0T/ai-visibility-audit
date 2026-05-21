@@ -35,6 +35,14 @@ and works on `main` directly. Deploys are continuous via Vercel.
 
 ### Recently shipped (most recent first)
 
+- **Launch-prep round 2 (2026-05-21):** monthly rerun completion email
+  with magic-link sign-in (`/api/cron/monthly-reruns/route.ts` now
+  calls `sendReportReadyEmail` with `isMonthlyRerun: true` after each
+  successful audit); branded `src/app/not-found.tsx` 404 page;
+  public PDF download bug fixed two ways — share page (`/r/[token]`)
+  now uses JS-driven fetch + blob download so chromium failures no
+  longer save the bogus `pdf.json` artifact, and the PDF route has a
+  one-retry on chromium launch to ride out cold-start races.
 - **Launch-prep pass (2026-05-21):** brand swap to AIVA in nav/footer/
   metadata/OpenGraph; new footer with Terms / Privacy / Contact /
   Pricing links; scaffolded `/terms`, `/privacy`, `/contact` pages with
@@ -73,15 +81,11 @@ and works on `main` directly. Deploys are continuous via Vercel.
 
 ### Open / pending
 
-- **Stripe checkout button on `/pricing` is still broken in prod.** Clicking
-  Subscribe does not start checkout. Code is wired correctly
-  (`src/app/api/checkout/tier/route.ts` + `src/app/pricing/_BuyButton.tsx`);
-  almost certainly a missing or mismatched Vercel env var
-  (`STRIPE_SECRET_KEY` or `STRIPE_PRICE_TIER_1_MONTHLY`). **Diagnostic
-  needed before launch:** open `/pricing` in browser with DevTools Console
-  (NOT Issues) tab open, click Subscribe, capture the network call to
-  `/api/checkout/tier` and any console errors. This is the #1 launch
-  blocker.
+- **Stripe checkout button works in sandbox** (resolved 2026-05-21).
+  Was a confusion not a bug — clicking Subscribe lands on Stripe's
+  sandbox/test-mode Checkout page, which is correct. Switch to live
+  mode keys (`sk_live_...`) before taking real money. See "Domain swap"
+  section for the full live-mode cutover.
 - **Migration 015 must be applied via Supabase Dashboard SQL Editor**
   before pushing the Option A code or the new code crashes:
   ```sql
@@ -93,21 +97,11 @@ and works on `main` directly. Deploys are continuous via Vercel.
   Email addresses (support@aivascan.com, privacy@aivascan.com) and
   legal entity name need to be filled in.
 - **Domain swap pending** (see dedicated section below).
-- **PDF download bug** (chip-tracked, not yet picked up). Symptom: browser
-  saves the public PDF as `pdf.json` with "Site wasn't available". Likely
-  Vercel chromium spin-up failing and the JSON error response getting saved.
-  Lives in `/api/r/[token]/pdf/route.ts`.
-
 ### Not yet revisited
 
-- **Phase 5 — monthly subscription cron.** The cron route at
-  `src/app/api/cron/monthly-reruns/route.ts` exists and is registered,
-  but does NOT currently send a "report refreshed" email. The email
-  function `sendReportReadyEmail` supports `isMonthlyRerun: true` —
-  the cron just doesn't call it. Future: wire the cron to send the
-  refresh email so subscribers know their score moved.
 - **Empty-state polish for new users** on `/dashboard`.
-- **Branded 404 page.** Currently using Next.js default.
+- **Real legal content** in `/terms`, `/privacy`, `/contact` — replace
+  `[TODO]` placeholders (Termly/Iubenda or lawyer).
 
 ---
 
