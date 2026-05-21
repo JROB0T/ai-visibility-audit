@@ -35,6 +35,11 @@ and works on `main` directly. Deploys are continuous via Vercel.
 
 ### Recently shipped (most recent first)
 
+- **Payment-status gate on monthly cron (2026-05-21):** customers in
+  `past_due` / `canceled` / `paused` state are now skipped by the
+  monthly rerun cron — no report sent until Stripe reports them
+  `active` again. Sites without a matching `subscriptions` row run as
+  normal (legacy / admin-granted access unaffected).
 - **Launch-prep round 2 (2026-05-21):** monthly rerun completion email
   with magic-link sign-in (`/api/cron/monthly-reruns/route.ts` now
   calls `sendReportReadyEmail` with `isMonthlyRerun: true` after each

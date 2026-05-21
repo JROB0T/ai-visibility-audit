@@ -44,11 +44,39 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ processed: 0, succeeded: 0, failed: 0, message: 'No sites due for rerun' });
   }
 
+  // Bulk-load subscription statuses so we can skip non-active subs.
+  // Per ops decision (2026-05-21): customers in past_due / canceled /
+  // paused state should NOT receive the monthly report until payment
+  // is current. Sites without a matching subscription row (legacy or
+  // admin-granted access) run as normal — only an explicit non-active
+  // status blocks the rerun.
+  const userIds = Array.from(new Set(eligibleSites.map(s => s.user_id as string)));
+  const { data: subRows } = await supabase
+    .from('subscriptions')
+    .select('user_id, domain, status')
+    .in('user_id', userIds);
+  const subStatusByKey = new Map<string, string>();
+  for (const s of (subRows || [])) {
+    const key = `${s.user_id}::${(s.domain as string).toLowerCase()}`;
+    subStatusByKey.set(key, s.status as string);
+  }
+
   let succeeded = 0;
   let failed = 0;
+  let skippedPayment = 0;
 
   for (const site of eligibleSites) {
     try {
+      // Payment-status gate. If we have a subscription row and it's not
+      // active, skip this rerun. Stripe webhooks flip status back to
+      // active when the customer fixes their card, so the next cron
+      // pass will pick them up automatically — no manual intervention.
+      const subStatus = subStatusByKey.get(`${site.user_id}::${(site.domain as string).toLowerCase()}`);
+      if (subStatus && subStatus !== 'active') {
+        console.log(`[cron] Skipping ${site.domain}: subscription status=${subStatus}`);
+        skippedPayment++;
+        continue;
+      }
       const siteUrl = site.url || `https://${site.domain}`;
       const runScope = site.monthly_scope === 'core_premium' ? 'core_plus_premium' : 'core';
 
@@ -300,5 +328,6 @@ export async function GET(request: NextRequest) {
     processed: eligibleSites.length,
     succeeded,
     failed,
+    skipped_payment: skippedPayment,
   });
 }
