@@ -1,6 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
 import { createServerSupabase } from '@/lib/supabase/server';
 import { isAdminAccount } from '@/lib/entitlements';
+
+function getAdminSupabase() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  );
+}
 
 export async function GET(
   request: NextRequest,
@@ -144,22 +152,46 @@ export async function PATCH(
   try {
     const { id } = await params;
     const body = await request.json();
-    const supabase = await createServerSupabase();
 
-    const updateData: Record<string, unknown> = {};
-    if (body.userId) updateData.user_id = body.userId;
-    if ('perceptionData' in body) updateData.perception_data = body.perceptionData;
-    if ('growthData' in body) updateData.growth_data = body.growthData;
-    if ('generatedFixes' in body) updateData.generated_fixes = body.generatedFixes;
-
-    if (Object.keys(updateData).length > 0) {
-      await supabase.from('audits').update(updateData).eq('id', id);
+    // Authorization is derived from the SESSION, never the request body.
+    const cookieClient = await createServerSupabase();
+    const { data: { user } } = await cookieClient.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
 
-    // Also claim the site if userId is being set
-    if (body.userId) {
-      const { data: audit } = await supabase.from('audits').select('site_id').eq('id', id).single();
-      if (audit) { await supabase.from('sites').update({ user_id: body.userId }).eq('id', audit.site_id).is('user_id', null); }
+    const admin = getAdminSupabase();
+    const { data: audit } = await admin
+      .from('audits')
+      .select('id, user_id, site_id')
+      .eq('id', id)
+      .single();
+    if (!audit) {
+      return NextResponse.json({ error: 'Audit not found' }, { status: 404 });
+    }
+
+    const isOwner = audit.user_id === user.id || isAdminAccount(user.email);
+    const isUnclaimed = !audit.user_id;
+
+    // Legitimate claiming: only when the audit (and site) are unclaimed.
+    // The new owner is always the session user — the body's userId is ignored.
+    let claimed = false;
+    if ('userId' in body && isUnclaimed) {
+      await admin.from('audits').update({ user_id: user.id }).eq('id', id).is('user_id', null);
+      await admin.from('sites').update({ user_id: user.id }).eq('id', audit.site_id).is('user_id', null);
+      claimed = true;
+    }
+
+    const dataUpdate: Record<string, unknown> = {};
+    if ('perceptionData' in body) dataUpdate.perception_data = body.perceptionData;
+    if ('growthData' in body) dataUpdate.growth_data = body.growthData;
+    if ('generatedFixes' in body) dataUpdate.generated_fixes = body.generatedFixes;
+
+    if (Object.keys(dataUpdate).length > 0) {
+      if (!isOwner && !claimed) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
+      await admin.from('audits').update(dataUpdate).eq('id', id);
     }
 
     return NextResponse.json({ success: true });
