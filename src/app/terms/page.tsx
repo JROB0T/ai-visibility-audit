@@ -1,12 +1,9 @@
 // ============================================================
 // /terms — Terms of Service
 //
-// PLACEHOLDER. The text below is generic SaaS scaffolding only.
-// Before any real launch:
-//   - Replace placeholder sections marked [TODO]
-//   - Have an attorney review or generate via Termly / Iubenda
-//   - Confirm specifics around AI-generated reports, refunds,
-//     subscription auto-renewal, and data-processing
+// Production copy. Owner must supply the {{FILL: …}} values
+// (legal entity name, business address, refund policy,
+// jurisdiction, support email, effective date) before launch.
 // ============================================================
 
 import type { Metadata } from 'next';
@@ -18,23 +15,18 @@ export const metadata: Metadata = {
 export default function TermsPage(): React.ReactElement {
   return (
     <article className="max-w-3xl mx-auto px-4 py-12 sm:py-16">
-      <div className="mb-8 p-3 rounded-md text-xs" style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.3)', color: '#F59E0B' }}>
-        <strong>Draft / placeholder.</strong> This page contains generic
-        scaffolding text only. Replace before public launch.
-      </div>
-
       <h1 className="text-3xl font-bold mb-2" style={{ color: 'var(--text-primary)' }}>Terms of Service</h1>
       <p className="text-sm mb-8" style={{ color: 'var(--text-tertiary)' }}>
-        Last updated: <em>[TODO: insert date when finalized]</em>
+        Last updated: {'{{FILL: effective date}}'}
       </p>
 
       <div className="prose prose-sm max-w-none" style={{ color: 'var(--text-secondary)' }}>
         <h2>1. Acceptance of Terms</h2>
         <p>
           By accessing or using AIVA (the &ldquo;Service&rdquo;), operated by
-          <em> [TODO: legal entity name and address]</em>, you agree to be
-          bound by these Terms of Service. If you do not agree, do not use
-          the Service.
+          {' '}{'{{FILL: legal entity name}}'} (&ldquo;we,&rdquo; &ldquo;us&rdquo;),
+          located at {'{{FILL: business address}}'}, you agree to be bound by
+          these Terms of Service. If you do not agree, do not use the Service.
         </p>
 
         <h2>2. The Service</h2>
@@ -47,48 +39,49 @@ export default function TermsPage(): React.ReactElement {
 
         <h2>3. Accounts</h2>
         <p>
-          You may need an account to access certain features. You are
-          responsible for safeguarding your sign-in credentials. We use
-          email-based authentication (magic links or passwords) and do
-          not share credentials with third parties.
+          Certain features require an account. We use email-based
+          authentication (magic link or password) and Google sign-in. You
+          are responsible for safeguarding your sign-in credentials and for
+          activity under your account. The Service is not intended for anyone
+          under 16.
         </p>
 
         <h2>4. Subscriptions and Billing</h2>
         <p>
-          Paid subscriptions (Monthly) renew automatically until canceled.
-          You can cancel at any time from your <a href="/dashboard/account">account page</a>.
-          Refund policy: <em>[TODO: define refund window and conditions]</em>.
-          Pricing is shown in USD and may change with notice.
+          Monthly subscriptions renew automatically until canceled from your
+          {' '}<a href="/dashboard/account">Account page</a>. One-time audits
+          are billed once at purchase. Prices are shown in USD at checkout and
+          may change with notice. Refunds: {'{{FILL: refund policy — e.g. "14-day refund on first subscription charge; one-time audits non-refundable once the report is generated"}}'}.
         </p>
 
         <h2>5. Acceptable Use</h2>
         <p>
-          You agree not to: (a) use the Service to scan domains you do not
-          own or have authorization to test, (b) attempt to reverse-engineer
-          or disrupt the Service, (c) use exported data in violation of
-          applicable email-marketing or privacy laws (CAN-SPAM, GDPR,
-          CASL).
+          You agree not to: (a) scan domains you do not own or lack
+          authorization to test; (b) reverse-engineer, disrupt, or overload
+          the Service; (c) use exported data in violation of applicable
+          email-marketing or privacy laws (CAN-SPAM, GDPR, CASL).
         </p>
 
         <h2>6. AI-Generated Content</h2>
         <p>
           Audit content is generated in part by third-party AI assistants
-          and may contain inaccuracies. AIVA makes no warranty that the
-          reports are complete, current, or fit for any particular purpose.
+          and may contain inaccuracies. We make no warranty that reports are
+          complete, current, or fit for any particular purpose.
         </p>
 
         <h2>7. Intellectual Property</h2>
         <p>
           The Service and its content (excluding your inputs) are owned by
-          <em> [TODO: legal entity name]</em>. You retain ownership of any
-          data you provide.
+          {' '}{'{{FILL: legal entity name}}'}. You retain ownership of data
+          you provide.
         </p>
 
         <h2>8. Termination</h2>
         <p>
           We may suspend or terminate access for violations of these terms
-          or for non-payment. You may delete your account at any time by
-          contacting <a href="/contact">support</a>.
+          or for non-payment. You may delete your account at any time from
+          your <a href="/dashboard/account">Account page</a> or by contacting
+          support.
         </p>
 
         <h2>9. Disclaimers</h2>
@@ -108,7 +101,7 @@ export default function TermsPage(): React.ReactElement {
 
         <h2>11. Governing Law</h2>
         <p>
-          These terms are governed by the laws of <em>[TODO: jurisdiction]</em>.
+          These terms are governed by the laws of {'{{FILL: jurisdiction — e.g. "the State of New Jersey, USA"}}'}.
         </p>
 
         <h2>12. Changes to These Terms</h2>
@@ -119,8 +112,8 @@ export default function TermsPage(): React.ReactElement {
 
         <h2>13. Contact</h2>
         <p>
-          Questions? Email <em>[TODO: support@aivascan.com or similar]</em> or
-          visit our <a href="/contact">contact page</a>.
+          Questions? Email {'{{FILL: support email}}'} or visit our
+          {' '}<a href="/contact">contact page</a>.
         </p>
       </div>
     </article>
