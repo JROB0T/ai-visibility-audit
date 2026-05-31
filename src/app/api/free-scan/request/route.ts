@@ -81,10 +81,15 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const emailNormalized = normalizeEmail(rawEmail);
   const domainNormalized = normalizeDomain(rawUrl);
 
-  // ----- Rate limit (per IP) -----
+  // ----- Rate limit (per IP AND per email) -----
+  // Per-IP catches one source hammering many emails/domains; per-email
+  // catches one address cycled across IPs/proxies. Both go through the
+  // same rate_limit_buckets mechanism. The per-email key is namespaced
+  // separately so the two limits don't share a bucket.
   const ip = getClientIp(request.headers);
   try {
     await checkRateLimit(`free-scan:${ip}`, { max: 5, windowSeconds: 3600 });
+    await checkRateLimit(`free-scan:email:${emailNormalized}`, { max: 3, windowSeconds: 3600 });
   } catch (err) {
     if (err instanceof RateLimitError) {
       return NextResponse.json(
