@@ -17,6 +17,7 @@ interface SiteData {
   }>;
   latestFindings: { high: number; medium: number; low: number };
   trendData: Array<{ date: string; overall: number | null; crawlability: number | null; readability: number | null; commercial: number | null; trust: number | null }>;
+  monthlyPrice?: { dollars: number; formatted: string };
 }
 
 function SiteDashboardContent() {
@@ -129,6 +130,9 @@ function SiteDashboardContent() {
   if (error || !data) return (<div className="max-w-5xl mx-auto px-4 py-20 text-center"><AlertTriangle className="w-10 h-10 text-amber-500 mx-auto" /><p className="mt-4" style={{ color: 'var(--text-primary)' }}>{error}</p><a href="/dashboard" style={{ color: '#6366F1' }}>← Back to Dashboard</a></div>);
 
   const { site, audits, latestFindings, trendData } = data;
+  // Single source of truth: prefer the env-driven price from the API.
+  // Fallback string keeps the UI sane if the field is ever absent.
+  const monthlyFormatted = data.monthlyPrice?.formatted ?? '$29.99';
   const latest = audits[0];
   const previous = audits.length > 1 ? audits[1] : null;
   const completedAudits = audits.filter(a => a.status === 'completed');
@@ -166,7 +170,7 @@ function SiteDashboardContent() {
           {!site.has_monthly_monitoring && (
             <button onClick={() => handleCheckout('monthly')} disabled={checkoutLoading}
               className="px-4 py-2.5 text-sm font-medium rounded-lg border inline-flex items-center gap-2 transition-colors" style={{ color: '#10B981', borderColor: 'rgba(16,185,129,0.3)', background: 'rgba(16,185,129,0.05)' }}>
-              <CalendarCheck className="w-4 h-4" />{checkoutLoading ? 'Loading…' : 'Monthly — $25/mo'}
+              <CalendarCheck className="w-4 h-4" />{checkoutLoading ? 'Loading…' : `Monthly — ${monthlyFormatted}/mo`}
             </button>
           )}
         </div>
@@ -199,7 +203,7 @@ function SiteDashboardContent() {
                 className="underline cursor-pointer"
                 style={{ color: 'var(--accent)' }}
               >
-                Subscribe for $25/month
+                Subscribe for {monthlyFormatted}/month
               </button>{' '}
               and re-run anytime.
             </p>
