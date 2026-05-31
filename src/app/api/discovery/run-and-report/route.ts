@@ -17,10 +17,7 @@
 //   doRunAndReport keeps the runtime in flight until the chain
 //   finishes or maxDuration kicks in.
 //
-// DIAGNOSTIC PATCH (temporary):
-//   - Outer try/catch on POST returns the actual error message to
-//     the client (with [DEBUG] prefix). REVERT once root cause is
-//     identified — see docs/diagnostic-cleanup notes.
+// Error logging:
 //   - Every catch logs '[RUN_AND_REPORT_ERROR]' with structured
 //     fields. KEEP these — operational hygiene.
 // ============================================================
@@ -187,13 +184,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       timestamp: new Date().toISOString(),
     });
 
-    // TEMPORARY: return the actual error message so the UI surfaces it.
-    // Revert this branch to a generic message once the bug is identified.
     return NextResponse.json(
-      {
-        error: `[DEBUG] ${errorName}: ${errorMessage}`,
-        _debug: true,
-      },
+      { error: 'Internal server error' },
       { status: 500 },
     );
   }

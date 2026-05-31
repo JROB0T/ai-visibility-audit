@@ -13,15 +13,14 @@ export async function POST(
     const { id } = await params;
     const supabase = await createServerSupabase();
 
-    // Check auth (optional — allows unauthenticated access for testing)
+    // Check auth — fix packages require authentication
     const { data: { user } } = await supabase.auth.getUser();
-    // TODO: Re-enable auth gate for production/paid tier:
-    // if (!user) {
-    //   return NextResponse.json(
-    //     { error: 'Sign in to generate a fix package' },
-    //     { status: 401 }
-    //   );
-    // }
+    if (!user) {
+      return NextResponse.json(
+        { error: 'Sign in to generate a fix package' },
+        { status: 401 }
+      );
+    }
 
     // Check if fix package already exists for this audit
     const { data: existing } = await supabase
