@@ -6,16 +6,18 @@ import { Search, CheckCircle, ArrowRight, Shield, FileText, Sparkles, Eye, BarCh
 import { createClient } from '@/lib/supabase/client';
 
 export default function HomePage() {
-  const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
   const router = useRouter();
 
+  // Logged-in users get bounced to their dashboard. We deliberately do
+  // NOT gate the marketing content behind an auth-loading state: an early
+  // return would leave the hero/value-prop out of the server-rendered HTML
+  // (bad for crawlers/SEO). Instead the full page renders immediately and
+  // an authenticated visitor is redirected client-side a moment later.
   useEffect(() => {
     const supabase = createClient();
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (user) {
         router.push('/dashboard');
-      } else {
-        setIsLoggedIn(false);
       }
     });
   }, [router]);
@@ -36,11 +38,6 @@ export default function HomePage() {
   }, []);
 
   const scoreColor = demoScore >= 70 ? '#10B981' : demoScore >= 50 ? '#F59E0B' : '#EF4444';
-
-  // Show nothing while checking auth (prevents flash)
-  if (isLoggedIn === null) {
-    return <div className="min-h-screen" style={{ background: 'var(--bg)' }} />;
-  }
 
   return (
     <div>

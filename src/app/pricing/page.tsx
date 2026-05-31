@@ -10,10 +10,24 @@
 // AND the matching Stripe product. No code change required.
 // ============================================================
 
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import { CheckCircle2 } from 'lucide-react';
 import { getDisplayPricing, formatDollars } from '@/lib/pricing';
 import BuyButton from './_BuyButton';
+
+export const metadata: Metadata = {
+  title: 'Pricing — AIVA',
+  description:
+    'Simple pricing for AI-visibility audits. Start with a free sample report, or get the full strategic report with a monthly plan that re-scans automatically.',
+  openGraph: {
+    title: 'AIVA Pricing — AI Visibility Audits',
+    description:
+      'Free sample report, or a full strategic report refreshed monthly. See how AI assistants describe your business.',
+    type: 'website',
+    siteName: 'AIVA',
+  },
+};
 
 // Prices are read from env at request time so they stay current
 // without a redeploy. Force dynamic rendering.
