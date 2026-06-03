@@ -36,6 +36,10 @@ export function buildReportHtml(
     '<html lang="en">',
     '<head>',
     '<meta charset="utf-8">',
+    // Without this, mobile browsers render the iframe document at a ~980px
+    // default layout viewport, scaling the 8.5in page down and forcing
+    // sideways scroll — and the responsive @media query never fires.
+    '<meta name="viewport" content="width=device-width, initial-scale=1">',
     `<title>AI Strategy &amp; Positioning Brief — ${esc(payload.meta.business_name || 'Report')} — ${esc(ctx.monthLabel)}</title>`,
     '<link rel="preconnect" href="https://fonts.googleapis.com">',
     '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>',
@@ -1463,6 +1467,21 @@ const FREE_SAMPLE_STYLES = `
     html, body { background: #fff; }
     .page { box-shadow: none; margin: 0 auto; }
   }
+
+  /* Mobile reflow — free sample is opened on phones from share/email links.
+     Screen-only; PDF uses print emulation and keeps the layout above. */
+  @media screen and (max-width: 640px) {
+    .page {
+      width: 100%;
+      min-height: 0;
+      margin: 12px auto;
+      padding: 28px 20px;
+    }
+    .heatmap { grid-template-columns: 1fr; }
+    h1.cover-h1 { font-size: 28px; }
+    .score-block { padding: 0.3in 0.3in; }
+    .score-block .num { font-size: 64px; }
+  }
 `;
 
 interface ClusterHeatStrength {
@@ -1633,6 +1652,7 @@ export function buildFreeSampleHtml(
     '<html lang="en">',
     '<head>',
     '<meta charset="utf-8">',
+    '<meta name="viewport" content="width=device-width, initial-scale=1">',
     `<title>AI Visibility Sample — ${esc(businessName)}</title>`,
     '<link rel="preconnect" href="https://fonts.googleapis.com">',
     '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>',

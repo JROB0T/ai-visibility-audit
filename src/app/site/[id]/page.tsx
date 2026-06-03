@@ -18,6 +18,7 @@ interface SiteData {
   latestFindings: { high: number; medium: number; low: number };
   trendData: Array<{ date: string; overall: number | null; crawlability: number | null; readability: number | null; commercial: number | null; trust: number | null }>;
   monthlyPrice?: { dollars: number; formatted: string };
+  rescanPrice?: { dollars: number; formatted: string };
 }
 
 function SiteDashboardContent() {
@@ -133,6 +134,7 @@ function SiteDashboardContent() {
   // Single source of truth: prefer the env-driven price from the API.
   // Fallback string keeps the UI sane if the field is ever absent.
   const monthlyFormatted = data.monthlyPrice?.formatted ?? '$29.99';
+  const rescanFormatted = data.rescanPrice?.formatted ?? '$35';
   const latest = audits[0];
   const previous = audits.length > 1 ? audits[1] : null;
   const completedAudits = audits.filter(a => a.status === 'completed');
@@ -282,7 +284,7 @@ function SiteDashboardContent() {
             <div className="rounded-xl border p-6 max-w-sm w-full shadow-xl" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
               <h3 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>Rescan This Site</h3>
               <p className="mt-2 text-sm" style={{ color: 'var(--text-secondary)' }}>
-                This is an on-demand rescan and costs $35. Monthly plans include automatic monthly rescans at no extra charge.
+                This is an on-demand rescan and costs {rescanFormatted}. Monthly plans include automatic monthly rescans at no extra charge.
               </p>
               <div className="flex gap-3 mt-6">
                 <button onClick={() => { setShowRescanModal(false); handleCheckout('rescan'); }} disabled={checkoutLoading}

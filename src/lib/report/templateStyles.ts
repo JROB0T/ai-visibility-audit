@@ -1525,4 +1525,47 @@ export const REPORT_STYLES = `  :root {
       break-inside: avoid;
     }
   }
+
+  /* ----------------------------------------------------------------
+     Mobile reflow. Shared links are opened mostly on phones, where the
+     fixed 8.5in page overflowed horizontally (text clipped on the right).
+     This @media screen block only affects on-screen viewing — the PDF is
+     rendered with print-media emulation, so it keeps the @media print
+     layout above, and the desktop design is unchanged at >640px.
+     ---------------------------------------------------------------- */
+  @media screen and (max-width: 640px) {
+    body { padding: 16px 10px; }
+    .page {
+      width: 100%;
+      min-height: 0;
+      margin: 0 auto 16px auto;
+      padding: 26px 18px 34px 18px;
+      box-shadow: 0 8px 28px rgba(0,0,0,0.35);
+    }
+    /* Footer is absolutely pinned to the page bottom on desktop; let it
+       flow inline on narrow screens so it can't overlap content. */
+    .page-footer {
+      position: static;
+      left: auto; right: auto; bottom: auto;
+      margin-top: 26px;
+    }
+    /* Stack multi-column layouts so nothing is clipped at the right edge. */
+    .hero-grid,
+    .takeaway-row,
+    .cluster-hero,
+    .how-strip,
+    .field-duo,
+    .mom-grid {
+      grid-template-columns: 1fr;
+    }
+    /* The radar/visual is sized in fixed px on desktop — go fluid. */
+    .cluster-hero .chart-wrap {
+      width: 100%;
+      max-width: 320px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    /* 6-up small multiples are too cramped on a phone — use 3 columns. */
+    .small-mults { grid-template-columns: repeat(3, 1fr); }
+  }
 `;

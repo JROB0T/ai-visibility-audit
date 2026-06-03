@@ -1,10 +1,15 @@
 'use client';
 
 import { Suspense, useCallback, useEffect, useState } from 'react';
+import dynamic from 'next/dynamic';
 import { useParams, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { scoreToGrade } from '@/components/ScoreRing';
-import LegacyAuditPage from './page.legacy';
+// Legacy dashboard (only reachable via ?legacy=true). Lazy-loaded so the
+// ~190KB page.legacy.tsx and its components/discovery/* dependency tree are
+// code-split into a separate chunk instead of shipping in the default
+// /audit/[id] first-load bundle. The route still works identically.
+const LegacyAuditPage = dynamic(() => import('./page.legacy'), { ssr: false });
 import PersistentHeader from '@/components/dashboard/PersistentHeader';
 import OverviewTab from '@/components/dashboard/tabs/OverviewTab';
 import FindingsTab from '@/components/dashboard/tabs/FindingsTab';
