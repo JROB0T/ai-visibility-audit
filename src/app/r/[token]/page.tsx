@@ -96,13 +96,22 @@ export default function PublicReportPage(): React.ReactElement {
   }, [token]);
 
   if (loading) {
+    // Unlike the authed /audit/[id]/report view, this public endpoint only
+    // ever serves the PERSISTED report_html (a sub-second DB read) — it
+    // never runs a live Claude generation. So we show a quick spinner
+    // rather than a "this takes ~20-30s" message, which would be wrong and
+    // would itself look broken when the report pops in immediately.
     return (
       <div
-        className="min-h-screen flex items-center justify-center"
+        className="min-h-screen flex flex-col items-center justify-center gap-3"
         style={{ background: 'var(--background, #f5f5f5)' }}
       >
+        <div
+          className="w-6 h-6 rounded-full animate-spin"
+          style={{ border: '2px solid var(--border, #ddd)', borderTopColor: 'var(--text-tertiary, #888)' }}
+        />
         <p className="text-sm" style={{ color: 'var(--text-tertiary, #666)' }}>
-          Loading report…
+          Loading your report…
         </p>
       </div>
     );

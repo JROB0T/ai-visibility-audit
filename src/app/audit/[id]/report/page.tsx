@@ -63,6 +63,11 @@ export default function ReportPage() {
   const [meta, setMeta] = useState<ReportMetadata | null>(null);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
+  // A plain load hits the cache and returns near-instantly. If it's still
+  // running after a short beat, we're almost certainly in a live (cache
+  // miss) generation — flip to the progress message so it doesn't look
+  // broken. Cache hits resolve before this fires, so they never show it.
+  const [slowLoad, setSlowLoad] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [snapshotId, setSnapshotId] = useState<string | null>(null);
   const [shareToken, setShareToken] = useState<string | null>(null);
@@ -100,6 +105,11 @@ export default function ReportPage() {
     if (!siteId) return;
     setError(null);
     if (force) setGenerating(true); else setLoading(true);
+    // Show the "Generating…" progress copy if a plain load runs long
+    // (cache miss → live generation). Forced regens always generate, so
+    // they don't need the delay.
+    setSlowLoad(false);
+    const slowTimer = force ? null : setTimeout(() => setSlowLoad(true), 2500);
 
     try {
       // Use POST so force=true is clean; POST always returns JSON
@@ -129,6 +139,8 @@ export default function ReportPage() {
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
+      if (slowTimer) clearTimeout(slowTimer);
+      setSlowLoad(false);
       setLoading(false);
       setGenerating(false);
     }
@@ -422,12 +434,22 @@ export default function ReportPage() {
 
       {(loading || generating) && !error && (
         <div className="max-w-2xl mx-auto mt-24 px-4 text-center">
-          <div className="text-sm text-neutral-400">
-            {generating ? 'Generating report…' : 'Loading report…'}
-          </div>
-          <div className="text-xs text-neutral-600 mt-1">
-            {generating ? 'This takes 15-30 seconds.' : null}
-          </div>
+          {generating || slowLoad ? (
+            <>
+              <div
+                className="inline-block w-6 h-6 mb-4 rounded-full animate-spin"
+                style={{ border: '2px solid #404040', borderTopColor: '#e5e5e5' }}
+              />
+              <div className="text-sm text-neutral-200">
+                Generating your brief — this takes ~20–30s
+              </div>
+              <div className="text-xs text-neutral-500 mt-1">
+                We&apos;re running the analysis now. This page updates automatically when it&apos;s ready.
+              </div>
+            </>
+          ) : (
+            <div className="text-sm text-neutral-400">Loading report…</div>
+          )}
         </div>
       )}
 

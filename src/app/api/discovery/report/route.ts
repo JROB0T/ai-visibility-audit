@@ -112,21 +112,34 @@ async function handleRequest(request: NextRequest, req: RunRequest): Promise<Nex
   }
 
   // ----- Resolve tier (from snapshot; default tier_1 for legacy rows) -----
+  // order+limit instead of a bare .maybeSingle(): see the cache-check note
+  // below — there's no unique constraint on (site_id, run_id), so a bare
+  // single() can error on a duplicate row.
   const { data: snapMeta } = await admin
     .from('discovery_score_snapshots')
     .select('tier')
     .eq('site_id', req.siteId)
     .eq('run_id', runId)
+    .order('snapshot_date', { ascending: false })
+    .limit(1)
     .maybeSingle();
   const tier: AuditTier = (snapMeta?.tier as AuditTier | undefined) ?? 'tier_1';
 
   // ----- Cache check -----
+  // Serve the persisted report instantly when it exists. We order
+  // newest-first + limit(1) rather than a bare .maybeSingle(): there is
+  // NO unique constraint on (site_id, run_id), so a bare single() would
+  // ERROR on any duplicate snapshot row and silently fall through to a
+  // full (~25s) Claude regeneration on EVERY load. order+limit keeps the
+  // read deterministic and genuinely cache-first.
   if (!req.force) {
     const { data: snap } = await admin
       .from('discovery_score_snapshots')
       .select('id, report_html, report_narrative, report_generated_at, report_model, share_token')
       .eq('site_id', req.siteId)
       .eq('run_id', runId)
+      .order('snapshot_date', { ascending: false })
+      .limit(1)
       .maybeSingle();
 
     if (snap?.report_html) {
