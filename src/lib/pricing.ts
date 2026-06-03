@@ -81,6 +81,21 @@ function dollarOrDefault(sku: TierSku): number {
   return Number.isFinite(n) && n > 0 ? n : DEFAULT_DOLLARS[sku];
 }
 
+// On-demand rescan is priced outside the tier matrix (a single add-on
+// purchase, not a tier). Keep its DISPLAY price in the same env-driven
+// source so the /site/[id] modal can't drift from a hardcoded literal.
+// The Stripe charge itself is governed by STRIPE_PRICE_RESCAN — this
+// value only controls what we render, so the operator must keep the two
+// aligned. Default mirrors the webhook's 3500¢ ($35) fallback.
+const DEFAULT_RESCAN_DOLLARS = 35;
+
+export function getRescanPriceDollars(): number {
+  const raw = process.env.PRICE_RESCAN_DOLLARS;
+  if (!raw) return DEFAULT_RESCAN_DOLLARS;
+  const n = parseFloat(raw);
+  return Number.isFinite(n) && n > 0 ? n : DEFAULT_RESCAN_DOLLARS;
+}
+
 /**
  * Resolves a SKU to its Stripe price ID. Returns null when the
  * STRIPE_PRICE_* env var is missing — caller (checkout route) maps

@@ -1,10 +1,15 @@
 'use client';
 
 import { Suspense, useCallback, useEffect, useState } from 'react';
+import dynamic from 'next/dynamic';
 import { useParams, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { scoreToGrade } from '@/components/ScoreRing';
-import LegacyAuditPage from './page.legacy';
+// Legacy dashboard (only reachable via ?legacy=true). Lazy-loaded so the
+// ~190KB page.legacy.tsx and its components/discovery/* dependency tree are
+// code-split into a separate chunk instead of shipping in the default
+// /audit/[id] first-load bundle. The route still works identically.
+const LegacyAuditPage = dynamic(() => import('./page.legacy'), { ssr: false });
 import PersistentHeader from '@/components/dashboard/PersistentHeader';
 import OverviewTab from '@/components/dashboard/tabs/OverviewTab';
 import FindingsTab from '@/components/dashboard/tabs/FindingsTab';
@@ -336,7 +341,7 @@ function AuditPageInner(): React.ReactElement {
           />
         )}
         {safeActiveTab === 'overview' && !snapshot && (
-          <NoSnapshotState />
+          <NoSnapshotState hasPaid={hasPaid} />
         )}
         {safeActiveTab === 'findings' && snapshot && (
           <FindingsTab
@@ -346,7 +351,7 @@ function AuditPageInner(): React.ReactElement {
             onPromptDrilldown={(cluster) => setDrilldown({ kind: 'cluster', cluster })}
           />
         )}
-        {safeActiveTab === 'findings' && !snapshot && <NoSnapshotState />}
+        {safeActiveTab === 'findings' && !snapshot && <NoSnapshotState hasPaid={hasPaid} />}
         {safeActiveTab === 'priorities' && tier === 'tier_2' && (
           <PrioritiesTab
             auditId={audit.id}
@@ -500,12 +505,55 @@ function PageDrilldown({ page }: { page: ShellPage | undefined }): React.ReactEl
   );
 }
 
-function NoSnapshotState(): React.ReactElement {
+function NoSnapshotState({ hasPaid }: { hasPaid: boolean }): React.ReactElement {
+  // Two genuinely different situations previously looked identical here:
+  //   1. A paid user whose first scan is still running server-side (the
+  //      auto-run kicked off but this view hasn't picked up the job yet) —
+  //      results ARE coming.
+  //   2. A genuinely empty report with nothing scheduled.
+  // Distinguish them so a paying customer isn't told their report is empty
+  // while it's actually being generated.
+  if (hasPaid) {
+    return (
+      <div className="max-w-2xl mx-auto px-4 py-16 text-center">
+        <div
+          className="w-8 h-8 border-2 rounded-full mx-auto animate-spin"
+          style={{ borderColor: '#6366F1', borderTopColor: 'transparent' }}
+        />
+        <h3 className="mt-5 text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
+          Your AI Discovery scan is being prepared
+        </h3>
+        <p className="mt-2 text-sm" style={{ color: 'var(--text-secondary)' }}>
+          The first run queries multiple AI assistants and can take up to a
+          minute. This page will update automatically when it&rsquo;s ready.
+        </p>
+        <button
+          onClick={() => window.location.reload()}
+          className="mt-5 text-sm px-4 py-2 rounded-lg border transition"
+          style={{ borderColor: 'var(--border)', color: 'var(--text-secondary)' }}
+        >
+          Refresh now
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-2xl mx-auto px-4 py-16 text-center">
-      <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>
-        AI Discovery hasn&rsquo;t been run for this audit yet.
+      <h3 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
+        No AI Discovery results yet
+      </h3>
+      <p className="mt-2 text-sm" style={{ color: 'var(--text-secondary)' }}>
+        AI Discovery hasn&rsquo;t been run for this audit yet. Unlock a full
+        report to scan how AI assistants describe this business.
       </p>
+      <a
+        href="/pricing"
+        className="inline-block mt-5 text-sm px-4 py-2 rounded-lg font-medium text-white transition"
+        style={{ background: '#6366F1' }}
+      >
+        See plans
+      </a>
     </div>
   );
 }

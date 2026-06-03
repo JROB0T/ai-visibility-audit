@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabase } from '@/lib/supabase/server';
-import { getDisplayPricing, formatDollars } from '@/lib/pricing';
+import { getDisplayPricing, formatDollars, getRescanPriceDollars } from '@/lib/pricing';
 
 export async function GET(
   request: NextRequest,
@@ -62,6 +62,7 @@ export async function GET(
     // hardcoded number that can drift. Server-only env can't be read
     // from the client component, hence plumbing it through the response.
     const monthlyDollars = getDisplayPricing().tier_1.monthly;
+    const rescanDollars = getRescanPriceDollars();
 
     return NextResponse.json({
       site,
@@ -71,6 +72,10 @@ export async function GET(
       monthlyPrice: {
         dollars: monthlyDollars,
         formatted: formatDollars(monthlyDollars),
+      },
+      rescanPrice: {
+        dollars: rescanDollars,
+        formatted: formatDollars(rescanDollars),
       },
     });
   } catch (error) {

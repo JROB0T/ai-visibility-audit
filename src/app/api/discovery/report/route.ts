@@ -209,9 +209,21 @@ async function handleRequest(request: NextRequest, req: RunRequest): Promise<Nex
     : buildReportHtml(payload, narrative);
   const generatedAt = new Date().toISOString();
 
-  // Persist on the snapshot. Select() returns the row so we get
+  // Persist on the snapshot. Select() returns the row(s) so we get
   // snapshot_id (and any pre-existing share_token) without a second fetch.
-  const { data: updatedSnap, error: updateErr } = await admin
+  //
+  // IMPORTANT: do NOT use .maybeSingle()/.single() here. There is no unique
+  // constraint on (site_id, run_id), so when duplicate snapshot rows exist
+  // the singular accept header makes PostgREST return 406 and ROLL BACK the
+  // UPDATE — the report_html never persists. The owner viewer still looks
+  // correct because it renders the in-memory `html` from this response, but
+  // the share view and PDF (which read report_html from the DB by
+  // share_token) keep serving the stale copy. Selecting the full set lets
+  // the UPDATE apply to EVERY row for this (site_id, run_id) — including the
+  // row the share_token lives on — so a regenerate is reflected on the
+  // share surface and its PDF. (Migration adding a UNIQUE (site_id, run_id)
+  // index removes the duplicate rows at the root — see the drafted SQL.)
+  const { data: updatedRows, error: updateErr } = await admin
     .from('discovery_score_snapshots')
     .update({
       report_html: html,
@@ -221,14 +233,19 @@ async function handleRequest(request: NextRequest, req: RunRequest): Promise<Nex
     })
     .eq('site_id', req.siteId)
     .eq('run_id', runId)
-    .select('id, share_token')
-    .maybeSingle();
+    .order('snapshot_date', { ascending: false })
+    .select('id, share_token');
 
   if (updateErr) {
     // Don't fail the request — the report was generated successfully, just
     // couldn't be cached. Log and return uncached.
     console.error('[api/discovery/report] Failed to cache report:', updateErr.message);
   }
+
+  // Prefer the row that already carries a share_token (so the share surface
+  // and the returned snapshot stay in sync); otherwise the newest row.
+  const updatedSnap =
+    updatedRows?.find((r) => r.share_token) ?? updatedRows?.[0] ?? null;
 
   return respond(req.format, {
     html,
