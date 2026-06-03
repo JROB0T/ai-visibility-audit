@@ -48,10 +48,14 @@ export default function TermsPage(): React.ReactElement {
 
         <h2>4. Subscriptions and Billing</h2>
         <p>
-          Monthly subscriptions renew automatically until canceled from your
-          {' '}<a href="/dashboard/account">Account page</a>. One-time audits
-          are billed once at purchase. Prices are shown in USD at checkout and
-          may change with notice. Refunds: {'{{FILL: refund policy — e.g. "14-day refund on first subscription charge; one-time audits non-refundable once the report is generated"}}'}.
+          Monthly subscriptions are billed in advance and automatically renew
+          each month at the then-current price until you cancel. We charge the
+          payment method on file at the start of each billing period. You may
+          cancel at any time from your{' '}
+          <a href="/dashboard/account">Account page</a>; cancellation stops
+          future renewals and takes effect at the end of the current billing
+          period. One-time audits are billed once at purchase. Prices are shown
+          in USD at checkout and may change with notice. Refunds: {'{{FILL: refund policy — e.g. "14-day refund on first subscription charge; one-time audits non-refundable once the report is generated"}}'}.
         </p>
 
         <h2>5. Acceptable Use</h2>
@@ -62,11 +66,18 @@ export default function TermsPage(): React.ReactElement {
           email-marketing or privacy laws (CAN-SPAM, GDPR, CASL).
         </p>
 
-        <h2>6. AI-Generated Content</h2>
+        <h2>6. AI-Generated Content &amp; No Guarantee of Results</h2>
         <p>
-          Audit content is generated in part by third-party AI assistants
-          and may contain inaccuracies. We make no warranty that reports are
-          complete, current, or fit for any particular purpose.
+          Audit content is generated in part by querying third-party AI
+          assistants and reflects their responses at the time of testing. AI
+          responses are non-deterministic, vary between runs, and change over
+          time, and may differ from what end users see in consumer AI products.
+          Scores, grades, and findings are estimates provided for informational
+          purposes only. We do not guarantee that any audit is complete,
+          current, or accurate, or that following any recommendation will
+          improve your AI visibility, search rankings, traffic, conversions, or
+          any other business outcome. You are solely responsible for decisions
+          made based on the reports.
         </p>
 
         <h2>7. Intellectual Property</h2>

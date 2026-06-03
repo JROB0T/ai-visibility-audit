@@ -60,6 +60,7 @@ export function buildReportHtml(
     buildPage5(ctx),
     buildPage6(ctx),
     buildPage7(ctx),
+    buildDisclaimerFooter(ctx),
     '</body>',
     '</html>',
   ].join('\n');
@@ -1149,6 +1150,28 @@ function buildPage6(ctx: Ctx): string {
 </div>`;
 }
 
+// ============================================================
+// Disclaimer footer — baked into the report HTML so the owner
+// view (/audit/[id]/report), the public share view (/r/[token]),
+// and the PDF export all inherit it. Rendered on a light "paper"
+// background because the viewer iframe body is dark (#1e1a12),
+// which would make muted ink text illegible if placed bare.
+// Dynamic version: real prompt count / model / generation date.
+// ============================================================
+function buildDisclaimerFooter(ctx: Ctx): string {
+  const model = 'Claude Haiku with live web search';
+  const text =
+    `This report reflects ${esc(String(ctx.counts.prompt_count))} prompts run against ` +
+    `${esc(model)} on ${esc(ctx.preparedDate)}. AI assistant responses vary and change ` +
+    `over time; scores and grades are estimates for informational purposes only and are ` +
+    `not a guarantee of AI visibility, rankings, traffic, or business results. AIVA is ` +
+    `independent and not affiliated with or endorsed by the AI providers referenced.`;
+  return `
+    <div class="report-disclaimer" style="max-width:760px;margin:0 auto 48px;padding:18px 28px;background:var(--paper);border-radius:8px;border:1px solid var(--ink-dim);">
+      <p style="margin:0;font-family:'Geist',system-ui,sans-serif;font-size:11px;line-height:1.6;color:var(--ink-4);">${text}</p>
+    </div>`;
+}
+
 function buildPage7(ctx: Ctx): string {
   const { n } = ctx;
 
@@ -1646,6 +1669,12 @@ export function buildFreeSampleHtml(
     `    <a class="btn" href="${esc(pricingUrl)}">Upgrade to the full report →</a>`,
     `    <div class="sub">Includes who's being recommended instead of you, every question tested with the actual AI responses, and a 30/60/90 plan.</div>`,
     '  </div>',
+    '</div>',
+
+    // Static disclaimer — free sample omits the dynamic prompt/model/date
+    // line. Body background here is light (#f5f3ee) so muted ink reads fine.
+    '<div style="max-width:8.5in;margin:0 auto 32px;padding:0 0.4in;">',
+    '  <p style="margin:0;font-size:10.5px;line-height:1.6;color:#8a8578;">This report reflects AI assistant responses at the time of generation. AI responses vary and change over time; scores and grades are estimates for informational purposes only and are not a guarantee of any AI-visibility or business outcome. AIVA is independent and not affiliated with or endorsed by the AI providers referenced.</p>',
     '</div>',
 
     '</body>',
