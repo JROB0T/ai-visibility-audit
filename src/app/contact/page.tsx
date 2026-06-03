@@ -24,7 +24,7 @@ export default function ContactPage(): React.ReactElement {
       <div className="card p-6 mb-6">
         <p className="text-xs mb-1" style={{ color: 'var(--text-tertiary)' }}>Support and general inquiries</p>
         <p className="text-base font-medium" style={{ color: 'var(--text-primary)' }}>
-          <em>[TODO: support@aivascan.com]</em>
+          {'{{FILL: support email}}'}
         </p>
       </div>
 

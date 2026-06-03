@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabase } from '@/lib/supabase/server';
+import { getDisplayPricing, formatDollars } from '@/lib/pricing';
 
 export async function GET(
   request: NextRequest,
@@ -55,11 +56,22 @@ export async function GET(
         trust: a.trust_clarity_score,
       }));
 
+    // Single source of truth for the monthly price (env-driven via
+    // src/lib/pricing.ts). Surfaced here as an additive field so the
+    // client renders the same value /pricing shows instead of a
+    // hardcoded number that can drift. Server-only env can't be read
+    // from the client component, hence plumbing it through the response.
+    const monthlyDollars = getDisplayPricing().tier_1.monthly;
+
     return NextResponse.json({
       site,
       audits: audits || [],
       latestFindings,
       trendData,
+      monthlyPrice: {
+        dollars: monthlyDollars,
+        formatted: formatDollars(monthlyDollars),
+      },
     });
   } catch (error) {
     console.error('Site API error:', error);
