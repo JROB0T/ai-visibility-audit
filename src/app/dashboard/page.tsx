@@ -1,9 +1,9 @@
 'use client';
 
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { Search, Globe, Plus, AlertTriangle, ChevronRight, X, CheckCircle } from 'lucide-react';
+import { Search, Plus, AlertTriangle, ChevronRight, X, CheckCircle, Sparkles } from 'lucide-react';
 import { scoreToGrade, getScoreColor } from '@/components/ScoreRing';
 import { getVerticalLabel } from '@/lib/verticals';
 import { getRunTypeLabel } from '@/lib/entitlements';
@@ -32,8 +32,14 @@ function DashboardContent() {
   const [scanning, setScanning] = useState(false);
   const [error, setError] = useState('');
   const [checkoutSuccess, setCheckoutSuccess] = useState(false);
+  const urlInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
   const searchParams = useSearchParams();
+
+  function focusUrlInput() {
+    urlInputRef.current?.focus();
+    urlInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
 
   useEffect(() => {
     if (searchParams.get('checkout') === 'success') setCheckoutSuccess(true);
@@ -139,7 +145,7 @@ function DashboardContent() {
         <div className="flex gap-3">
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--text-tertiary)' }} />
-            <input type="text" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="Enter a website URL to scan…"
+            <input ref={urlInputRef} type="text" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="Enter a website URL to scan…"
               className="w-full pl-10 pr-4 py-2.5 rounded-lg text-sm" style={{ background: 'var(--surface)', color: 'var(--text-primary)', border: '1px solid var(--border)' }} />
           </div>
           <button type="submit" disabled={scanning || !url.trim()} className="btn-primary px-5 py-2.5 text-sm font-medium inline-flex items-center gap-2" style={{ opacity: scanning ? 0.7 : 1 }}>
@@ -150,10 +156,50 @@ function DashboardContent() {
       </form>
 
       {sites.length === 0 ? (
-        <div className="card p-12 text-center">
-          <Globe className="w-12 h-12 mx-auto" style={{ color: 'var(--text-tertiary)' }} />
-          <h2 className="mt-4 text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>No sites yet</h2>
-          <p className="mt-2 text-sm" style={{ color: 'var(--text-secondary)' }}>Enter a URL above to run your first AI visibility audit.</p>
+        <div className="card p-10 sm:p-12 text-center">
+          <div
+            className="w-14 h-14 rounded-2xl mx-auto flex items-center justify-center"
+            style={{ background: 'rgba(99,102,241,0.1)' }}
+          >
+            <Sparkles className="w-7 h-7" style={{ color: '#6366F1' }} />
+          </div>
+          <h2 className="mt-5 text-xl font-bold" style={{ color: 'var(--text-primary)' }}>
+            Run your first AI visibility audit
+          </h2>
+          <p className="mt-2 text-sm max-w-md mx-auto" style={{ color: 'var(--text-secondary)' }}>
+            See how ChatGPT, Claude, Perplexity, and Gemini describe a business
+            when buyers ask for recommendations — and where you&rsquo;re missing.
+          </p>
+
+          <div className="mt-7 grid gap-3 sm:grid-cols-3 max-w-xl mx-auto text-left">
+            {[
+              { n: '1', t: 'Enter a URL', d: 'Any business website you want to check.' },
+              { n: '2', t: 'We scan AI answers', d: 'Across the major AI assistants.' },
+              { n: '3', t: 'Get your grade', d: 'Plus where competitors win instead.' },
+            ].map((step) => (
+              <div
+                key={step.n}
+                className="rounded-lg border p-3"
+                style={{ borderColor: 'var(--border)', background: 'var(--bg-tertiary)' }}
+              >
+                <span
+                  className="inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold"
+                  style={{ background: 'rgba(99,102,241,0.12)', color: '#6366F1' }}
+                >
+                  {step.n}
+                </span>
+                <p className="mt-2 text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{step.t}</p>
+                <p className="mt-0.5 text-xs" style={{ color: 'var(--text-tertiary)' }}>{step.d}</p>
+              </div>
+            ))}
+          </div>
+
+          <button
+            onClick={focusUrlInput}
+            className="btn-primary mt-7 px-5 py-2.5 text-sm font-medium inline-flex items-center gap-2"
+          >
+            <Plus className="w-4 h-4" />Scan your first site
+          </button>
         </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
