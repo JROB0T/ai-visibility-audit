@@ -96,6 +96,13 @@ export function ThemeWrapper({ children }: { children: React.ReactNode }) {
               <a href="/contact" className="hover:underline">Contact</a>
             </nav>
           </div>
+          {/* Independence / non-affiliation disclosure. */}
+          <p className="mt-6 text-xs leading-relaxed text-center sm:text-left" style={{ color: 'var(--text-tertiary)' }}>
+            AIVA is an independent service and is not affiliated with, sponsored
+            by, or endorsed by any of the AI providers it queries or the
+            websites and brands it audits. All product names and trademarks are
+            the property of their respective owners.
+          </p>
         </div>
       </footer>
     </ThemeProvider>

@@ -99,6 +99,14 @@ export default function PricingPage(): React.ReactElement {
             ]}
           >
             <BuyButton sku="tier_1_monthly" label="Subscribe" variant="primary" />
+            {/* Auto-renewal disclosure — must be visible at the point of
+                subscribe (auto-renewal laws), not only in Terms. Price comes
+                from the env-driven pricing source, never a literal. */}
+            <p className="mt-3 text-xs leading-relaxed" style={{ color: 'var(--text-tertiary, #888)' }}>
+              By subscribing you authorize AIVA to charge your card{' '}
+              {formatDollars(pricing.tier_1.monthly)}/month automatically until
+              you cancel. Cancel anytime from your Account page.
+            </p>
           </PlanCard>
 
           {/* The one-time tier was retired on 2026-05-21. Stripe products

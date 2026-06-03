@@ -163,15 +163,23 @@ function SiteDashboardContent() {
             <span className="text-sm" style={{ color: 'var(--text-tertiary)' }}>{completedAudits.length} scan{completedAudits.length !== 1 ? 's' : ''} · Added {new Date(site.created_at).toLocaleDateString()}</span>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-start gap-2">
           <button onClick={() => setShowRescanModal(true)} className="btn-primary px-5 py-2.5 text-sm font-medium inline-flex items-center gap-2">
             <RefreshCw className="w-4 h-4" />Rescan
           </button>
           {!site.has_monthly_monitoring && (
-            <button onClick={() => handleCheckout('monthly')} disabled={checkoutLoading}
-              className="px-4 py-2.5 text-sm font-medium rounded-lg border inline-flex items-center gap-2 transition-colors" style={{ color: '#10B981', borderColor: 'rgba(16,185,129,0.3)', background: 'rgba(16,185,129,0.05)' }}>
-              <CalendarCheck className="w-4 h-4" />{checkoutLoading ? 'Loading…' : `Monthly — ${monthlyFormatted}/mo`}
-            </button>
+            <div className="flex flex-col items-end gap-1">
+              <button onClick={() => handleCheckout('monthly')} disabled={checkoutLoading}
+                className="px-4 py-2.5 text-sm font-medium rounded-lg border inline-flex items-center gap-2 transition-colors" style={{ color: '#10B981', borderColor: 'rgba(16,185,129,0.3)', background: 'rgba(16,185,129,0.05)' }}>
+                <CalendarCheck className="w-4 h-4" />{checkoutLoading ? 'Loading…' : `Monthly — ${monthlyFormatted}/mo`}
+              </button>
+              {/* Auto-renewal disclosure — visible at the point of subscribe,
+                  not only in Terms. Price comes from the single pricing source
+                  (monthlyFormatted), never a literal. */}
+              <p className="text-xs text-right max-w-[16rem] leading-relaxed" style={{ color: 'var(--text-tertiary)' }}>
+                By subscribing you authorize AIVA to charge your card {monthlyFormatted}/month automatically until you cancel. Cancel anytime from your Account page.
+              </p>
+            </div>
           )}
         </div>
       </div>
