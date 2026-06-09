@@ -17,6 +17,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Search, CheckCircle, ArrowRight, Shield, FileText, Sparkles, Eye, BarChart3, RefreshCw, TrendingDown, MessageSquare, MousePointerClick } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import RevenueAtRiskCalculator from '@/components/RevenueAtRiskCalculator';
 
 // FAQ content lives in one place so the visible section and the
 // FAQPage JSON-LD can never drift apart.
@@ -209,6 +210,9 @@ export default function HomePage() {
           <p className="mt-6 text-center text-xs" style={{ color: 'var(--text-tertiary)' }}>
             Sources: Eight Oh Two consumer search survey (2026) · Gartner search volume forecast · 2026 studies of click-through where AI-generated answers appear in results
           </p>
+          <div className="mt-12 max-w-4xl mx-auto">
+            <RevenueAtRiskCalculator />
+          </div>
         </div>
       </section>
 
