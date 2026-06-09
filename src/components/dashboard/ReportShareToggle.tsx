@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Check, Copy, Link as LinkIcon, Lock } from 'lucide-react';
+import { BadgeCheck, Check, Copy, Link as LinkIcon, Lock } from 'lucide-react';
 
 interface ReportShareToggleProps {
   snapshotId: string;
@@ -18,10 +18,26 @@ export default function ReportShareToggle({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [justCopied, setJustCopied] = useState(false);
+  const [badgeCopied, setBadgeCopied] = useState(false);
 
   const isShared = !!token;
   const shareUrl =
     token && typeof window !== 'undefined' ? `${window.location.origin}/r/${token}` : null;
+  const badgeEmbedCode =
+    token && typeof window !== 'undefined'
+      ? `<a href="${window.location.origin}/r/${token}" target="_blank" rel="noopener">\n  <img src="${window.location.origin}/api/badge/${token}" alt="AI Visibility Score — verified by AIVA" width="220" height="48" />\n</a>`
+      : '';
+
+  async function copyBadgeCode(): Promise<void> {
+    if (!badgeEmbedCode) return;
+    try {
+      await navigator.clipboard.writeText(badgeEmbedCode);
+      setBadgeCopied(true);
+      setTimeout(() => setBadgeCopied(false), 2000);
+    } catch {
+      setError('Could not copy. Select the code manually.');
+    }
+  }
 
   async function setEnabled(enable: boolean): Promise<void> {
     setBusy(true);
@@ -118,6 +134,54 @@ export default function ReportShareToggle({
       )}
 
       {error && <p className="text-xs" style={{ color: '#EF4444' }}>{error}</p>}
+
+      {isShared && token && (
+        <details className="mt-1">
+          <summary
+            className="cursor-pointer text-xs inline-flex items-center gap-1.5 select-none"
+            style={{ color: 'var(--accent)' }}
+          >
+            <BadgeCheck className="w-3.5 h-3.5" />
+            Embed a live score badge on your website
+          </summary>
+          <div className="mt-3 space-y-2">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={`/api/badge/${token}`}
+              alt="Live AI Visibility Score badge preview"
+              width={220}
+              height={48}
+            />
+            <textarea
+              readOnly
+              rows={3}
+              onClick={(e) => (e.target as HTMLTextAreaElement).select()}
+              value={badgeEmbedCode}
+              className="w-full px-2 py-1.5 rounded border text-[11px] leading-relaxed resize-none"
+              style={{
+                background: 'var(--background)',
+                borderColor: 'var(--border)',
+                color: 'var(--text-secondary)',
+                fontFamily: 'var(--font-mono)',
+              }}
+            />
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-[11px]" style={{ color: 'var(--text-tertiary)' }}>
+                Updates automatically after every monthly rescan. Links back to this report.
+              </p>
+              <button
+                type="button"
+                onClick={copyBadgeCode}
+                className="text-xs px-2.5 py-1 rounded border inline-flex items-center gap-1 transition shrink-0"
+                style={{ borderColor: 'var(--border)', color: 'var(--text-secondary)' }}
+              >
+                {badgeCopied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                {badgeCopied ? 'Copied' : 'Copy code'}
+              </button>
+            </div>
+          </div>
+        </details>
+      )}
 
       <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
         {isShared

@@ -6,7 +6,7 @@
 > architectural decision, or surfaced a pending item). Treat the file as
 > living — out-of-date entries are worse than missing ones.
 
-Last updated: 2026-06-09 (AEO positioning + dogfooding pass)
+Last updated: 2026-06-09 (AEO positioning + growth features pass)
 
 ---
 
@@ -34,6 +34,34 @@ and works on `main` directly. Deploys are continuous via Vercel.
 ## Active work and recent history
 
 ### Recently shipped (most recent first)
+
+- **Growth features pass (2026-06-09, branch `aeo-and-growth` —
+  cumulative with the AEO pass):** three conversion/virality features,
+  all no-migration, no new dependencies:
+  (1) **Live embeddable score badge** — `GET /api/badge/[token]`
+  returns an SVG (compact 220×48 pill by default, `?style=card` for
+  260×120) rendering the snapshot's overall score by share token.
+  Score colors match the app tiers. Cache: 1h + 1d SWR so monthly
+  reruns propagate. Invalid token → 404; DB failure → 503 no-store.
+  Embed UI added to `ReportShareToggle` (collapsible block with live
+  preview + copyable `<a><img></a>` snippet) — every embedded badge
+  links back to the report. Read-only on `discovery_score_snapshots`;
+  revoking sharing kills the report link AND the badge (by design).
+  (2) **Dynamic OG share cards** — `/r/[token]/opengraph-image.tsx`
+  (next/og ImageResponse, 1200×630) renders a branded score-ring card
+  when share links unfurl in Slack/LinkedIn/iMessage; falls back to a
+  generic AIVA card if the lookup fails. New `/r/[token]/layout.tsx`
+  adds per-report `generateMetadata` (title = domain, score in
+  description, noindex) since the page itself is a client component.
+  Avoid `→` and other non-Inter glyphs in the OG file (missing from
+  next/og's bundled font — they render as tofu).
+  (3) **Revenue-at-risk calculator** — `RevenueAtRiskCalculator`
+  client component on the homepage (under the stat band): avg sale ×
+  monthly customers × adjustable AI-research share (default 37%) →
+  monthly/yearly revenue influenced by AI answers, math shown and
+  labeled an estimate. CTA → /free-scan.
+  Untested-in-prod branch: the with-score OG card (local env has no
+  DB); verify by pasting a live share link into a Slack DM after merge.
 
 - **AEO positioning + dogfooding pass (2026-06-09, branch `aeo-positioning`):**
   (1) AIVA now passes its own audit — added `src/app/robots.ts`
