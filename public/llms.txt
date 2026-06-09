@@ -1,0 +1,42 @@
+# AIVA — AI Visibility Audit
+
+> AIVA scores how well a business shows up when buyers ask AI assistants
+> (ChatGPT, Claude, Perplexity, Gemini) for recommendations — and tells the
+> business exactly what to fix. Think of it as the AI-search counterpart to
+> an SEO audit: SEO gets you ranked, AIVA tells you whether you get
+> *recommended*.
+
+AIVA is a self-serve SaaS for small and medium businesses, marketing leads,
+and agencies. It runs real buyer-intent prompts against AI assistants,
+records how each one answers, and produces two scores:
+
+- **AI Visibility Score** — whether AI assistants surface and recommend the
+  business when buyers ask the questions that lead to a purchase.
+- **Site Readiness Score** — whether the business's website is technically
+  legible to AI crawlers (robots.txt access, structured data, llms.txt,
+  content clarity).
+
+Each paid report includes a competitor comparison, a plain-English
+"AI Positioning Brief," and a prioritized 30/60/90-day fix plan with
+copy-paste code snippets. Reports refresh monthly so businesses can track
+movement over time.
+
+## Pages
+
+- [Home](/): What AIVA does and how the two-score model works
+- [Free scan](/free-scan): A free 6-prompt sample report — requires only an
+  email address, no account and no credit card
+- [Pricing](/pricing): Free sample and monthly subscription tiers
+- [AI visibility vs SEO](/ai-visibility-vs-seo): How AI-assistant visibility
+  differs from (and complements) traditional search engine optimization
+- [Contact](/contact): How to reach the team
+
+## Facts
+
+- Product name: AIVA (AI Visibility Audit)
+- Category: AI visibility / answer-engine optimization (AEO) auditing
+- Audience: small and medium businesses, marketing teams, agencies
+- Free tier: one free sample per email and per website
+- Paid tier: monthly subscription with full report, competitor analysis,
+  and monthly automated rescans
+- Assistants tested: ChatGPT, Claude, Perplexity, Gemini
