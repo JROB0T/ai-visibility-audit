@@ -670,31 +670,43 @@ async function scanPage(url: string, pageType: PageType): Promise<PageScanResult
   schemaScripts.each((_, el) => {
     try {
       const json = JSON.parse($(el).html() || '');
-      const t = json['@type'];
-      if (t) {
-        const typeStr = Array.isArray(t) ? t.join(', ') : t;
+      // A JSON-LD script can be (a) a single node, (b) a top-level
+      // array of nodes, or (c) a wrapper with an @graph array (the
+      // pattern Google recommends and Yoast/WordPress emit by
+      // default). Flatten all three to a node list — only reading
+      // the top-level @type falsely penalizes very common markup.
+      const nodes: Array<Record<string, unknown>> = Array.isArray(json)
+        ? json
+        : Array.isArray((json as Record<string, unknown>)['@graph'])
+          ? ((json as Record<string, unknown>)['@graph'] as Array<Record<string, unknown>>)
+          : [json];
+      for (const node of nodes) {
+        if (!node || typeof node !== 'object') continue;
+        const t = node['@type'];
+        if (!t) continue;
+        const typeStr = Array.isArray(t) ? t.join(', ') : String(t);
         schemaTypes.push(typeStr);
         if (typeStr.includes('FAQ')) hasFaqSchema = true;
         if (typeStr.includes('Offer') || typeStr.includes('Price')) hasPricingSchema = true;
         // Schema field validation
         const typeLower = typeStr.toLowerCase();
-        if (!json.name) schemaMissingFields.push('name');
-        if (!json.description) schemaMissingFields.push('description');
-        if (!json.url) schemaMissingFields.push('url');
+        if (!node.name) schemaMissingFields.push('name');
+        if (!node.description) schemaMissingFields.push('description');
+        if (!node.url) schemaMissingFields.push('url');
         if (typeLower.includes('organization')) {
-          if (!json.logo) schemaMissingFields.push('logo');
-          if (!json.sameAs) schemaMissingFields.push('sameAs');
+          if (!node.logo) schemaMissingFields.push('logo');
+          if (!node.sameAs) schemaMissingFields.push('sameAs');
         }
         if (typeLower.includes('localbusiness') || typeLower.includes('restaurant')) {
-          if (!json.address) schemaMissingFields.push('address');
-          if (!json.telephone) schemaMissingFields.push('telephone');
+          if (!node.address) schemaMissingFields.push('address');
+          if (!node.telephone) schemaMissingFields.push('telephone');
         }
         if (typeLower.includes('product') || typeLower.includes('softwareapplication')) {
-          if (!json.offers) schemaMissingFields.push('offers');
+          if (!node.offers) schemaMissingFields.push('offers');
         }
         if (typeLower.includes('article') || typeLower.includes('blogposting')) {
-          if (!json.author) schemaMissingFields.push('author');
-          if (!json.datePublished) schemaMissingFields.push('datePublished');
+          if (!node.author) schemaMissingFields.push('author');
+          if (!node.datePublished) schemaMissingFields.push('datePublished');
         }
       }
     } catch { /* ignore */ }

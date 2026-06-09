@@ -6,7 +6,7 @@
 > architectural decision, or surfaced a pending item). Treat the file as
 > living — out-of-date entries are worse than missing ones.
 
-Last updated: 2026-05-21 (launch-prep pass)
+Last updated: 2026-06-09 (AEO positioning + dogfooding pass)
 
 ---
 
@@ -34,6 +34,63 @@ and works on `main` directly. Deploys are continuous via Vercel.
 ## Active work and recent history
 
 ### Recently shipped (most recent first)
+
+- **AEO positioning + dogfooding pass (2026-06-09, branch `aeo-positioning`):**
+  (1) AIVA now passes its own audit — added `src/app/robots.ts`
+  (explicitly allowing GPTBot/ClaudeBot/PerplexityBot etc., disallowing
+  /api /dashboard /auth /audit /site /r /checkout), `src/app/sitemap.ts`,
+  `public/llms.txt`, and Organization/WebSite/SoftwareApplication JSON-LD
+  in the root layout; middleware matcher now skips robots.txt /
+  sitemap.xml / llms.txt so crawlers bypass the Supabase session
+  roundtrip. Self-scan via the product's own scanner: 83/100 locally
+  (machine-readability 100; the HTTPS issue is a localhost artifact).
+  (2) **Scanner accuracy bugfix** in `src/lib/scanner.ts`: the JSON-LD
+  parser only read top-level `@type` and ignored `@graph` wrappers and
+  top-level arrays — the exact format Google recommends and
+  Yoast/WordPress emit by default — so those customers were falsely
+  scored as having no structured data. Parser now flattens all three
+  shapes. Existing stored scores predate the fix; rescans will correct.
+  (3) Homepage repositioned around "SEO gets you ranked, AIVA gets you
+  recommended": new hero headline with inline domain input → 
+  /free-scan?url=..., sourced why-now stat band (37% AI-first searches /
+  Gartner −25% search volume / −58% CTR under AI answers — stats dated
+  2026, revisit quarterly), SEO-vs-AIVA comparison section, FAQ section
+  with FAQPage JSON-LD. Funnel fix: hero/bottom CTAs now go to
+  /free-scan (no-account flow) instead of /auth/signup.
+  (4) New static guide page `/ai-visibility-vs-seo` with Article schema,
+  linked from homepage, sitemap, and llms.txt.
+  (5) `/free-scan` pre-fills the website field from `?url=`.
+  Known leftovers the self-scan still flags (owner-content decisions,
+  not fabricatable): about page, social links, testimonials/social
+  proof, review platform links.
+
+- **Final cleanup pass (2026-06-09, shipped to prod):** (1) fixed a
+  share/PDF bug where regenerating a pre-existing report did NOT update
+  the public `/r/[token]` view or its PDF — the force-regenerate UPDATE
+  used a singular `.maybeSingle()` accept header, which 406s and rolls
+  back when duplicate `(site_id, run_id)` rows exist, so `report_html`
+  never persisted; the owner view only looked correct because it renders
+  the in-memory response. Fix: the UPDATE now applies across all matching
+  rows. (2) Report template made mobile-responsive (viewport meta +
+  `@media screen` reflow); screen-only so PDF/desktop unchanged.
+  (3) Lazy-loaded `page.legacy.tsx` via `next/dynamic` — `/audit/[id]`
+  first-load 231kB → 178kB; `?legacy=true` still works. (4) Rescan
+  display price moved to env-driven `PRICE_RESCAN_DOLLARS` (default $35).
+  (5) Onboarding `/dashboard` empty state; `NoSnapshotState` now
+  distinguishes a paid mid-first-run from a genuinely empty report.
+  Drafted (NOT applied) migration `017_unique_snapshot_site_run.sql`:
+  dedupe + UNIQUE INDEX on `(site_id, run_id)` — the root cause behind
+  the cache + share bugs. **Owner must apply 017 by hand** (preview STEP
+  1 first).
+- **Legal disclaimers pass (2026-06-09, shipped to prod):** Terms §4
+  (auto-renewal) and §6 (no-guarantee-of-results) strengthened;
+  conspicuous at-checkout auto-renewal line beneath the Subscribe CTA on
+  `/pricing` and `/site/[id]` (price from the env-driven pricing source);
+  non-affiliation/independence line in the global footer; disclaimer
+  footer baked into the report template so the owner view, `/r/[token]`,
+  and the PDF all inherit it (dynamic for full reports, static for the
+  free sample). Note: already-cached reports show it only after a
+  regenerate. `{{FILL: …}}` tokens in `/terms` remain owner-supplied.
 
 - **Payment-status gate on monthly cron (2026-05-21):** customers in
   `past_due` / `canceled` / `paused` state are now skipped by the

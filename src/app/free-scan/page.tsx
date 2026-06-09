@@ -37,6 +37,14 @@ export default function FreeScanPage(): React.ReactElement {
   const [honeypot, setHoneypot] = useState(''); // bots fill this; humans don't see it
   const [state, setState] = useState<FormState>({ kind: 'idle' });
 
+  // Pre-fill the website field from ?url= (set by the homepage hero
+  // input). Read via window.location instead of useSearchParams so we
+  // don't need a Suspense boundary for a one-time read.
+  useEffect(() => {
+    const prefill = new URLSearchParams(window.location.search).get('url');
+    if (prefill) setUrl(prefill);
+  }, []);
+
   // Cycling progress copy during submitting state.
   const [progressIdx, setProgressIdx] = useState(0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
