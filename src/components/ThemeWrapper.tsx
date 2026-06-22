@@ -57,7 +57,7 @@ export function ThemeWrapper({ children }: { children: React.ReactNode }) {
                 <circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" />
               </svg>
             </div>
-            <span className="text-sm font-semibold tracking-tight" style={{ color: 'var(--text-primary)' }}>AIVA</span>
+            <span className="text-sm font-semibold tracking-tight" style={{ color: 'var(--text-primary)' }}>Aivascan</span>
           </a>
           <div className="flex items-center gap-2">
             {userEmail ? (
@@ -87,7 +87,7 @@ export function ThemeWrapper({ children }: { children: React.ReactNode }) {
               <div className="w-5 h-5 rounded-md bg-gradient-to-br from-indigo-500 to-indigo-600 flex items-center justify-center">
                 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></svg>
               </div>
-              <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>AIVA · © {new Date().getFullYear()}</span>
+              <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Aivascan · © {new Date().getFullYear()}</span>
             </div>
             <nav className="flex items-center gap-4 text-xs" style={{ color: 'var(--text-tertiary)' }}>
               <a href="/pricing" className="hover:underline">Pricing</a>
@@ -98,7 +98,7 @@ export function ThemeWrapper({ children }: { children: React.ReactNode }) {
           </div>
           {/* Independence / non-affiliation disclosure. */}
           <p className="mt-6 text-xs leading-relaxed text-center sm:text-left" style={{ color: 'var(--text-tertiary)' }}>
-            AIVA is an independent service and is not affiliated with, sponsored
+            Aivascan is an independent service and is not affiliated with, sponsored
             by, or endorsed by any of the AI providers it queries or the
             websites and brands it audits. All product names and trademarks are
             the property of their respective owners.

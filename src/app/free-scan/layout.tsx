@@ -11,15 +11,15 @@
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Free AI Visibility Sample — AIVA',
+  title: 'Free AI Visibility Sample — Aivascan',
   description:
     'Get a free sample report showing how AI assistants (ChatGPT, Claude, Perplexity, Gemini) describe your business — and what to fix first.',
   openGraph: {
-    title: 'Free AI Visibility Sample — AIVA',
+    title: 'Free AI Visibility Sample — Aivascan',
     description:
       'See how AI assistants answer buyer-intent questions about your business. Free 2-page sample report.',
     type: 'website',
-    siteName: 'AIVA',
+    siteName: 'Aivascan',
   },
 };
 

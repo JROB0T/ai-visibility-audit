@@ -7,11 +7,11 @@ const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://aivascan.com';
 export const metadata: Metadata = {
   metadataBase: new URL(BASE_URL),
   title: {
-    default: 'AIVA — See how AI describes your business',
-    template: '%s · AIVA',
+    default: 'Aivascan — See how AI describes your business',
+    template: '%s · Aivascan',
   },
   description:
-    'AIVA scans how AI assistants (ChatGPT, Claude, Perplexity, Gemini) answer buyer-intent questions about your business — and tells you what to fix.',
+    'Aivascan scans how AI assistants (ChatGPT, Claude, Perplexity, Gemini) answer buyer-intent questions about your business — and tells you what to fix.',
   keywords: [
     'AI visibility',
     'AI search optimization',
@@ -24,23 +24,23 @@ export const metadata: Metadata = {
   ],
   alternates: { canonical: '/' },
   openGraph: {
-    title: 'AIVA — AI Visibility Audit',
+    title: 'Aivascan — AI Visibility Audit',
     description: 'See how AI assistants describe your business — and what to fix first.',
     type: 'website',
-    siteName: 'AIVA',
+    siteName: 'Aivascan',
     url: BASE_URL,
   },
   twitter: {
     card: 'summary',
-    title: 'AIVA — AI Visibility Audit',
+    title: 'Aivascan — AI Visibility Audit',
     description: 'See how AI assistants describe your business — and what to fix first.',
   },
   robots: { index: true, follow: true },
 };
 
 // ------------------------------------------------------------
-// Site-wide structured data. AIVA tells customers to add JSON-LD
-// so AI systems can understand who they are — so AIVA does too.
+// Site-wide structured data. Aivascan tells customers to add JSON-LD
+// so AI systems can understand who they are — so Aivascan does too.
 // Organization + WebSite + SoftwareApplication, rendered once in
 // the root layout (server component → present in initial HTML).
 // ------------------------------------------------------------
@@ -50,21 +50,21 @@ const STRUCTURED_DATA = {
     {
       '@type': 'Organization',
       '@id': `${BASE_URL}/#organization`,
-      name: 'AIVA',
+      name: 'Aivascan',
       url: BASE_URL,
       description:
-        'AIVA (AI Visibility Audit) scores how well businesses appear in AI-assistant search results and provides prioritized fix plans.',
+        'Aivascan (AI Visibility Audit) scores how well businesses appear in AI-assistant search results and provides prioritized fix plans.',
     },
     {
       '@type': 'WebSite',
       '@id': `${BASE_URL}/#website`,
-      name: 'AIVA — AI Visibility Audit',
+      name: 'Aivascan — AI Visibility Audit',
       url: BASE_URL,
       publisher: { '@id': `${BASE_URL}/#organization` },
     },
     {
       '@type': 'SoftwareApplication',
-      name: 'AIVA',
+      name: 'Aivascan',
       applicationCategory: 'BusinessApplication',
       operatingSystem: 'Web',
       url: BASE_URL,

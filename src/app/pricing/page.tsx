@@ -17,15 +17,15 @@ import { getDisplayPricing, formatDollars } from '@/lib/pricing';
 import BuyButton from './_BuyButton';
 
 export const metadata: Metadata = {
-  title: 'Pricing — AIVA',
+  title: 'Pricing — Aivascan',
   description:
     'Simple pricing for AI-visibility audits. Start with a free sample report, or get the full strategic report with a monthly plan that re-scans automatically.',
   openGraph: {
-    title: 'AIVA Pricing — AI Visibility Audits',
+    title: 'Aivascan Pricing — AI Visibility Audits',
     description:
       'Free sample report, or a full strategic report refreshed monthly. See how AI assistants describe your business.',
     type: 'website',
-    siteName: 'AIVA',
+    siteName: 'Aivascan',
   },
 };
 
@@ -103,7 +103,7 @@ export default function PricingPage(): React.ReactElement {
                 subscribe (auto-renewal laws), not only in Terms. Price comes
                 from the env-driven pricing source, never a literal. */}
             <p className="mt-3 text-xs leading-relaxed" style={{ color: 'var(--text-tertiary, #888)' }}>
-              By subscribing you authorize AIVA to charge your card{' '}
+              By subscribing you authorize Aivascan to charge your card{' '}
               {formatDollars(pricing.tier_1.monthly)}/month automatically until
               you cancel. Cancel anytime from your Account page.
             </p>

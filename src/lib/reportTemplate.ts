@@ -1168,7 +1168,7 @@ function buildDisclaimerFooter(ctx: Ctx): string {
     `This report reflects ${esc(String(ctx.counts.prompt_count))} prompts run against ` +
     `${esc(model)} on ${esc(ctx.preparedDate)}. AI assistant responses vary and change ` +
     `over time; scores and grades are estimates for informational purposes only and are ` +
-    `not a guarantee of AI visibility, rankings, traffic, or business results. AIVA is ` +
+    `not a guarantee of AI visibility, rankings, traffic, or business results. Aivascan is ` +
     `independent and not affiliated with or endorsed by the AI providers referenced.`;
   return `
     <div class="report-disclaimer" style="max-width:760px;margin:0 auto 48px;padding:18px 28px;background:var(--paper);border-radius:8px;border:1px solid var(--ink-dim);">
@@ -1694,7 +1694,7 @@ export function buildFreeSampleHtml(
     // Static disclaimer — free sample omits the dynamic prompt/model/date
     // line. Body background here is light (#f5f3ee) so muted ink reads fine.
     '<div style="max-width:8.5in;margin:0 auto 32px;padding:0 0.4in;">',
-    '  <p style="margin:0;font-size:10.5px;line-height:1.6;color:#8a8578;">This report reflects AI assistant responses at the time of generation. AI responses vary and change over time; scores and grades are estimates for informational purposes only and are not a guarantee of any AI-visibility or business outcome. AIVA is independent and not affiliated with or endorsed by the AI providers referenced.</p>',
+    '  <p style="margin:0;font-size:10.5px;line-height:1.6;color:#8a8578;">This report reflects AI assistant responses at the time of generation. AI responses vary and change over time; scores and grades are estimates for informational purposes only and are not a guarantee of any AI-visibility or business outcome. Aivascan is independent and not affiliated with or endorsed by the AI providers referenced.</p>',
     '</div>',
 
     '</body>',

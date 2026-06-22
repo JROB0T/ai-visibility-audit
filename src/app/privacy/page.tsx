@@ -9,7 +9,7 @@
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Privacy Policy — AIVA',
+  title: 'Privacy Policy — Aivascan',
 };
 
 export default function PrivacyPage(): React.ReactElement {
@@ -23,7 +23,7 @@ export default function PrivacyPage(): React.ReactElement {
       <div className="prose prose-sm max-w-none" style={{ color: 'var(--text-secondary)' }}>
         <h2>1. Overview</h2>
         <p>
-          AIVA (&ldquo;we,&rdquo; &ldquo;us&rdquo;) provides AI-visibility
+          Aivascan (&ldquo;we,&rdquo; &ldquo;us&rdquo;) provides AI-visibility
           audits. This policy explains what we collect, why, and your choices.
         </p>
 

@@ -6,7 +6,7 @@
 //
 // Built with next/og ImageResponse (bundled with Next, no new
 // dependency, default Inter font). If the snapshot lookup fails
-// for any reason we render a generic AIVA brand card rather than
+// for any reason we render a generic Aivascan brand card rather than
 // erroring — a link preview should never 500.
 // ============================================================
 
@@ -14,7 +14,7 @@ import { ImageResponse } from 'next/og';
 import { createClient } from '@supabase/supabase-js';
 import { looksLikeShareToken } from '@/lib/shareTokens';
 
-export const alt = 'AI Visibility Report — AIVA';
+export const alt = 'AI Visibility Report — Aivascan';
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
 
@@ -102,7 +102,7 @@ export default async function OgImage({ params }: { params: Promise<{ token: str
         {/* Copy block */}
         <div style={{ display: 'flex', flexDirection: 'column', marginLeft: 80, flex: 1 }}>
           <div style={{ display: 'flex', alignItems: 'center', fontSize: 26, fontWeight: 700, color: '#818CF8', letterSpacing: 2 }}>
-            AIVA · AI VISIBILITY REPORT
+            Aivascan · AI VISIBILITY REPORT
           </div>
           <div
             style={{

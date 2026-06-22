@@ -6,7 +6,7 @@
 //
 //   <a href="{APP}/r/TOKEN"><img src="{APP}/api/badge/TOKEN" /></a>
 //
-// Growth loop: every embedded badge is an AIVA ad with a link back
+// Growth loop: every embedded badge is an Aivascan ad with a link back
 // to a live report. The badge always reflects the snapshot's
 // current stored score, so monthly reruns keep it fresh without
 // the customer touching their site.
@@ -59,7 +59,7 @@ function compactBadge(score: number, domain: string): string {
   <text x="24" y="28" text-anchor="middle" font-family="system-ui,-apple-system,Segoe UI,sans-serif" font-size="11" font-weight="700" fill="#FFFFFF">${score}</text>
   <text x="46" y="20" font-family="system-ui,-apple-system,Segoe UI,sans-serif" font-size="10" font-weight="600" fill="#94A3B8" letter-spacing="0.4">AI VISIBILITY SCORE</text>
   <text x="46" y="35" font-family="system-ui,-apple-system,Segoe UI,sans-serif" font-size="11" fill="#E2E8F0">${esc(label)}</text>
-  <text x="212" y="35" text-anchor="end" font-family="system-ui,-apple-system,Segoe UI,sans-serif" font-size="9" font-weight="700" fill="#6366F1">AIVA</text>
+  <text x="212" y="35" text-anchor="end" font-family="system-ui,-apple-system,Segoe UI,sans-serif" font-size="9" font-weight="700" fill="#6366F1">Aivascan</text>
 </svg>`;
 }
 
@@ -77,7 +77,7 @@ function cardBadge(score: number, domain: string, dateLabel: string): string {
   <text x="110" y="40" font-family="system-ui,-apple-system,Segoe UI,sans-serif" font-size="10" font-weight="600" fill="#94A3B8" letter-spacing="0.5">AI VISIBILITY SCORE</text>
   <text x="110" y="60" font-family="system-ui,-apple-system,Segoe UI,sans-serif" font-size="13" font-weight="600" fill="#FFFFFF">${esc(label)}</text>
   <text x="110" y="78" font-family="system-ui,-apple-system,Segoe UI,sans-serif" font-size="9" fill="#64748B">${esc(dateLabel)}</text>
-  <text x="110" y="100" font-family="system-ui,-apple-system,Segoe UI,sans-serif" font-size="10" font-weight="700" fill="#6366F1">Verified by AIVA</text>
+  <text x="110" y="100" font-family="system-ui,-apple-system,Segoe UI,sans-serif" font-size="10" font-weight="700" fill="#6366F1">Verified by Aivascan</text>
 </svg>`;
 }
 
