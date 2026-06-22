@@ -9,7 +9,7 @@
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Terms of Service — AIVA',
+  title: 'Terms of Service — Aivascan',
 };
 
 export default function TermsPage(): React.ReactElement {
@@ -23,7 +23,7 @@ export default function TermsPage(): React.ReactElement {
       <div className="prose prose-sm max-w-none" style={{ color: 'var(--text-secondary)' }}>
         <h2>1. Acceptance of Terms</h2>
         <p>
-          By accessing or using AIVA (the &ldquo;Service&rdquo;), operated by
+          By accessing or using Aivascan (the &ldquo;Service&rdquo;), operated by
           {' '}{'{{FILL: legal entity name}}'} (&ldquo;we,&rdquo; &ldquo;us&rdquo;),
           located at {'{{FILL: business address}}'}, you agree to be bound by
           these Terms of Service. If you do not agree, do not use the Service.
@@ -31,7 +31,7 @@ export default function TermsPage(): React.ReactElement {
 
         <h2>2. The Service</h2>
         <p>
-          AIVA generates AI-visibility audits for websites by querying
+          Aivascan generates AI-visibility audits for websites by querying
           third-party AI assistants and scoring the responses. Reports are
           informational only and do not constitute marketing, SEO, legal,
           or business advice.
@@ -104,7 +104,7 @@ export default function TermsPage(): React.ReactElement {
 
         <h2>10. Limitation of Liability</h2>
         <p>
-          TO THE MAXIMUM EXTENT PERMITTED BY LAW, AIVA AND ITS OPERATORS
+          TO THE MAXIMUM EXTENT PERMITTED BY LAW, Aivascan AND ITS OPERATORS
           ARE NOT LIABLE FOR INDIRECT, INCIDENTAL, OR CONSEQUENTIAL DAMAGES.
           OUR AGGREGATE LIABILITY IS LIMITED TO THE AMOUNTS PAID BY YOU
           IN THE 12 MONTHS PRECEDING THE CLAIM.

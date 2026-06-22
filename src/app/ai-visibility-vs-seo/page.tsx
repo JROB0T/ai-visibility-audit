@@ -3,7 +3,7 @@
 //
 // Purpose: make the explicit case that AI visibility (AEO/GEO)
 // is a discipline businesses should manage *alongside* SEO, and
-// that AIVA is the tool for the AI side. Server component —
+// that Aivascan is the tool for the AI side. Server component —
 // fully static, crawlable, with Article JSON-LD. Linked from the
 // homepage positioning section, sitemap, and llms.txt.
 // ============================================================
@@ -32,8 +32,8 @@ const ARTICLE_JSONLD = {
   headline: 'AI Visibility vs SEO: what\u2019s the difference, and why you need both',
   description:
     'How visibility in AI assistants (ChatGPT, Claude, Perplexity, Gemini) differs from traditional search engine rankings, and how businesses should manage both.',
-  author: { '@type': 'Organization', name: 'AIVA' },
-  publisher: { '@type': 'Organization', name: 'AIVA', url: BASE_URL },
+  author: { '@type': 'Organization', name: 'Aivascan' },
+  publisher: { '@type': 'Organization', name: 'Aivascan', url: BASE_URL },
   mainEntityOfPage: `${BASE_URL}/ai-visibility-vs-seo`,
 };
 
@@ -181,7 +181,7 @@ export default function AiVisibilityVsSeoPage() {
           <div className="card-glow p-8 text-center" style={{ boxShadow: '0 0 40px -10px rgba(99,102,241,0.1)' }}>
             <h2 className="text-2xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>Start with your baseline</h2>
             <p className="mt-3 text-sm leading-relaxed max-w-md mx-auto" style={{ color: 'var(--text-secondary)' }}>
-              AIVA runs the measurement step for you: real buyer-intent prompts against AI assistants, scored, with a prioritized fix plan. The sample is free — no account, no card.
+              Aivascan runs the measurement step for you: real buyer-intent prompts against AI assistants, scored, with a prioritized fix plan. The sample is free — no account, no card.
             </p>
             <a href="/free-scan" className="mt-6 inline-flex px-6 py-3.5 btn-primary items-center justify-center gap-2 text-sm font-medium">
               Get my free scan <ArrowRight className="w-4 h-4" />

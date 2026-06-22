@@ -4,7 +4,7 @@
 // Route-segment error boundary — Next.js App Router error.tsx convention.
 //
 // Catches unhandled render/runtime errors thrown by any page or nested
-// segment under the root layout (so it keeps the AIVA nav + footer).
+// segment under the root layout (so it keeps the Aivascan nav + footer).
 // Without this, such an error shows Next's default unstyled screen and
 // — more importantly — goes uncaptured.
 //

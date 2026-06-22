@@ -1,12 +1,12 @@
-# AIVA — AI Visibility Audit
+# Aivascan — AI Visibility Audit
 
-> AIVA scores how well a business shows up when buyers ask AI assistants
+> Aivascan scores how well a business shows up when buyers ask AI assistants
 > (ChatGPT, Claude, Perplexity, Gemini) for recommendations — and tells the
 > business exactly what to fix. Think of it as the AI-search counterpart to
-> an SEO audit: SEO gets you ranked, AIVA tells you whether you get
+> an SEO audit: SEO gets you ranked, Aivascan tells you whether you get
 > *recommended*.
 
-AIVA is a self-serve SaaS for small and medium businesses, marketing leads,
+Aivascan is a self-serve SaaS for small and medium businesses, marketing leads,
 and agencies. It runs real buyer-intent prompts against AI assistants,
 records how each one answers, and produces two scores:
 
@@ -23,7 +23,7 @@ movement over time.
 
 ## Pages
 
-- [Home](/): What AIVA does and how the two-score model works
+- [Home](/): What Aivascan does and how the two-score model works
 - [Free scan](/free-scan): A free 6-prompt sample report — requires only an
   email address, no account and no credit card
 - [Pricing](/pricing): Free sample and monthly subscription tiers
@@ -33,7 +33,7 @@ movement over time.
 
 ## Facts
 
-- Product name: AIVA (AI Visibility Audit)
+- Product name: Aivascan (AI Visibility Audit)
 - Category: AI visibility / answer-engine optimization (AEO) auditing
 - Audience: small and medium businesses, marketing teams, agencies
 - Free tier: one free sample per email and per website

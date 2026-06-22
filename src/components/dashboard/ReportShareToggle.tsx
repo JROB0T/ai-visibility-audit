@@ -25,7 +25,7 @@ export default function ReportShareToggle({
     token && typeof window !== 'undefined' ? `${window.location.origin}/r/${token}` : null;
   const badgeEmbedCode =
     token && typeof window !== 'undefined'
-      ? `<a href="${window.location.origin}/r/${token}" target="_blank" rel="noopener">\n  <img src="${window.location.origin}/api/badge/${token}" alt="AI Visibility Score — verified by AIVA" width="220" height="48" />\n</a>`
+      ? `<a href="${window.location.origin}/r/${token}" target="_blank" rel="noopener">\n  <img src="${window.location.origin}/api/badge/${token}" alt="AI Visibility Score — verified by Aivascan" width="220" height="48" />\n</a>`
       : '';
 
   async function copyBadgeCode(): Promise<void> {

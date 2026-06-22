@@ -2,7 +2,7 @@
 
 // ============================================================
 // Homepage — positioning: AI visibility as the counterpart to
-// SEO ("SEO gets you ranked. AIVA gets you recommended.").
+// SEO ("SEO gets you ranked. Aivascan gets you recommended.").
 //
 // Funnel note: the primary CTA goes to /free-scan (email-only,
 // no account, no card) — NOT /auth/signup. The free sample is
@@ -28,10 +28,10 @@ const FAQS: Array<{ q: string; a: string }> = [
   },
   {
     q: 'Is this the same as SEO?',
-    a: 'No — it\u2019s the counterpart to it. SEO optimizes your position in a list of links on a search results page. AI assistants don\u2019t show a list; they give an answer and name a few businesses. AIVA measures whether you\u2019re one of the names, and what to change so you are. Strong SEO helps but doesn\u2019t guarantee AI visibility — the two should be managed side by side.',
+    a: 'No — it\u2019s the counterpart to it. SEO optimizes your position in a list of links on a search results page. AI assistants don\u2019t show a list; they give an answer and name a few businesses. Aivascan measures whether you\u2019re one of the names, and what to change so you are. Strong SEO helps but doesn\u2019t guarantee AI visibility — the two should be managed side by side.',
   },
   {
-    q: 'How does AIVA measure my AI visibility?',
+    q: 'How does Aivascan measure my AI visibility?',
     a: 'We run real buyer-intent prompts (the questions your customers actually ask) against AI assistants, record how each one answers, and score the results. You get an AI Visibility Score for how you show up in answers, plus a Site Readiness Score for whether your website is technically legible to AI crawlers — robots.txt access, structured data, llms.txt, and content clarity.',
   },
   {
@@ -43,7 +43,7 @@ const FAQS: Array<{ q: string; a: string }> = [
     a: 'Yes. The free sample runs a 6-prompt scan and produces a 2-page summary report. It needs only your email — no account, no credit card. One free sample per email and per website.',
   },
   {
-    q: 'Who is AIVA for?',
+    q: 'Who is Aivascan for?',
     a: 'Small and medium businesses, marketing leads, and agencies — anyone whose customers might ask an AI assistant "who should I use for X near me" or "what\u2019s the best tool for Y." If buyers research your category, AI is already answering for you or against you.',
   },
 ];
@@ -115,14 +115,14 @@ export default function HomePage() {
             <div className="flex-1 text-center lg:text-left">
               <div className="inline-flex items-center gap-2 text-xs font-medium px-3 py-1.5 rounded-full mb-6 border" style={{ color: '#818CF8', borderColor: 'rgba(99,102,241,0.2)', background: 'rgba(99,102,241,0.08)' }}>
                 <Sparkles className="w-3 h-3" />
-                AIVA · AI Visibility Audit
+                Aivascan · AI Visibility Audit
               </div>
               <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-white leading-[1.1] tracking-tight">
                 When buyers ask AI,{' '}
                 <span className="text-gradient">does it say your name?</span>
               </h1>
               <p className="mt-5 text-base sm:text-lg max-w-lg leading-relaxed" style={{ color: '#94A3B8' }}>
-                More buying research now starts in ChatGPT, Perplexity, and Claude than ever lands on page two of Google. AIVA shows you exactly what AI says about your business — and what to fix so it recommends you.
+                More buying research now starts in ChatGPT, Perplexity, and Claude than ever lands on page two of Google. Aivascan shows you exactly what AI says about your business — and what to fix so it recommends you.
               </p>
               <form onSubmit={goToFreeScan} className="mt-8 max-w-md mx-auto lg:mx-0 flex flex-col sm:flex-row gap-3">
                 <input
@@ -216,16 +216,16 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ===== SEO vs AIVA — positioning ===== */}
+      {/* ===== SEO vs Aivascan — positioning ===== */}
       <section className="py-20 sm:py-28" style={{ background: 'var(--bg)' }}>
         <div className="max-w-5xl mx-auto px-4 sm:px-6">
           <div className="text-center mb-14">
             <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: '#6366F1' }}>Alongside Your SEO</span>
             <h2 className="mt-3 text-3xl sm:text-4xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>
-              SEO gets you ranked.<br className="sm:hidden" /> AIVA gets you recommended.
+              SEO gets you ranked.<br className="sm:hidden" /> Aivascan gets you recommended.
             </h2>
             <p className="mt-4 max-w-2xl mx-auto" style={{ color: 'var(--text-secondary)' }}>
-              They answer different questions about the same customer. You already manage one — AIVA is how you manage the other.
+              They answer different questions about the same customer. You already manage one — Aivascan is how you manage the other.
             </p>
           </div>
           <div className="grid sm:grid-cols-2 gap-5 max-w-3xl mx-auto">
@@ -246,7 +246,7 @@ export default function HomePage() {
               </ul>
             </div>
             <div className="card-glow p-6" style={{ borderColor: 'rgba(99,102,241,0.3)' }}>
-              <p className="text-xs font-semibold uppercase tracking-widest mb-4" style={{ color: '#6366F1' }}>AIVA asks</p>
+              <p className="text-xs font-semibold uppercase tracking-widest mb-4" style={{ color: '#6366F1' }}>Aivascan asks</p>
               <ul className="space-y-3.5">
                 {[
                   'When a buyer asks AI, am I in the answer?',

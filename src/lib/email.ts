@@ -157,7 +157,7 @@ function emailShell(args: { preheader: string; bodyHtml: string }): string {
         </td></tr>
       </table>
       <p style="font-size:11px;color:#888;margin:16px 0 0 0;">
-        AIVA · See how AI assistants describe your business.
+        Aivascan · See how AI assistants describe your business.
       </p>
     </td></tr>
   </table>
@@ -269,8 +269,8 @@ export async function sendReportReadyEmail(args: SendReportReadyEmailArgs): Prom
   // pricing/feature gating server-side; this is purely a copy choice.
   void args.tier;
   const subject = args.isMonthlyRerun
-    ? `Your AIVA report has been refreshed for ${args.domain}`
-    : `Your AIVA report is ready for ${args.domain}`;
+    ? `Your Aivascan report has been refreshed for ${args.domain}`
+    : `Your Aivascan report is ready for ${args.domain}`;
   // Prefer the magic-link sign-in URL when available — it's a one-click
   // path that signs the recipient in and lands them on the report. Fall
   // back to the bare report URL if magic-link generation failed upstream.
@@ -282,8 +282,8 @@ export async function sendReportReadyEmail(args: SendReportReadyEmailArgs): Prom
     : null;
 
   const lede = args.isMonthlyRerun
-    ? `Your monthly AIVA refresh for <strong>${esc(args.domain)}</strong> just completed. Open it to see what moved versus last month.`
-    : `Your AIVA report for <strong>${esc(args.domain)}</strong> is ready to view.`;
+    ? `Your monthly Aivascan refresh for <strong>${esc(args.domain)}</strong> just completed. Open it to see what moved versus last month.`
+    : `Your Aivascan report for <strong>${esc(args.domain)}</strong> is ready to view.`;
 
   // Share-block: only renders when a public token is provided. Gives the
   // owner a one-click way to grab the link for outreach without opening
@@ -314,11 +314,11 @@ export async function sendReportReadyEmail(args: SendReportReadyEmailArgs): Prom
   `;
 
   const text = [
-    args.isMonthlyRerun ? `Refresh complete.` : `Your AIVA report is ready.`,
+    args.isMonthlyRerun ? `Refresh complete.` : `Your Aivascan report is ready.`,
     ``,
     args.isMonthlyRerun
-      ? `Your monthly AIVA refresh for ${args.domain} just completed.`
-      : `Your AIVA report for ${args.domain} is ready to view.`,
+      ? `Your monthly Aivascan refresh for ${args.domain} just completed.`
+      : `Your Aivascan report for ${args.domain} is ready to view.`,
     ``,
     `Open it: ${ctaUrl}`,
     ...(publicUrl ? ['', `Shareable link (no sign-in required): ${publicUrl}`] : []),
@@ -330,8 +330,8 @@ export async function sendReportReadyEmail(args: SendReportReadyEmailArgs): Prom
       subject,
       html: emailShell({
         preheader: args.isMonthlyRerun
-          ? `Your monthly AIVA refresh for ${args.domain} just completed.`
-          : `Your AIVA report for ${args.domain} is ready.`,
+          ? `Your monthly Aivascan refresh for ${args.domain} just completed.`
+          : `Your Aivascan report for ${args.domain} is ready.`,
         bodyHtml,
       }),
       text,
@@ -351,7 +351,7 @@ export interface SendPastDueEmailArgs {
 }
 
 export async function sendPastDueEmail(args: SendPastDueEmailArgs): Promise<EmailSendResult> {
-  const subject = `Action needed: your AIVA subscription`;
+  const subject = `Action needed: your Aivascan subscription`;
   const url = args.billingPortalUrl.startsWith('http')
     ? args.billingPortalUrl
     : appUrl(args.billingPortalUrl);

@@ -2,14 +2,14 @@
 // Global 404 — Next.js App Router not-found.tsx convention.
 // Rendered whenever a route handler calls notFound() OR a path
 // doesn't match any route. Wrapped by the root layout, so it
-// inherits the AIVA nav and footer chrome.
+// inherits the Aivascan nav and footer chrome.
 // ============================================================
 
 import Link from 'next/link';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Page not found — AIVA',
+  title: 'Page not found — Aivascan',
 };
 
 export default function NotFound(): React.ReactElement {

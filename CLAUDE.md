@@ -6,20 +6,24 @@
 > architectural decision, or surfaced a pending item). Treat the file as
 > living — out-of-date entries are worse than missing ones.
 
-Last updated: 2026-06-09 (AEO positioning + growth features pass)
+Last updated: 2026-06-22 (Aivascan rebrand + Mike entitlement grant)
 
 ---
 
 ## TL;DR for new chats
 
-**Product:** AIVA — a web app that scores how well businesses appear in
+**Product:** Aivascan — a web app that scores how well businesses appear in
 AI-assistant search results (ChatGPT, Claude, Perplexity, Gemini). Jon
 uses it both as a self-serve SaaS and as a lead-gen engine — he generates
 free sample reports for prospects, cold-emails them a share link, and
-the recipients self-serve upgrade via Stripe.
+the recipients self-serve upgrade via Stripe. (Brand was "AIVA" through
+2026-06-09; renamed to **Aivascan** to match the domain on 2026-06-22.
+In-app strings are all updated; external-service names — Google OAuth
+consent screen, Resend `EMAIL_FROM` — are dashboard config, see Domain
+swap.)
 
-**Real domain:** aivascan.com (target — see "Domain swap" below for what's
-needed before the cutover)
+**Real domain:** aivascan.com — **owned** (registered on Squarespace);
+DNS cutover to Vercel still pending — see "Domain swap" below.
 **Current Vercel URL:** https://ai-visibility-audit-bvdd.vercel.app
 **Repo:** github.com/JROB0T/ai-visibility-audit
 **Stack:** Next.js 15 App Router · Supabase (Postgres + Auth) · Stripe ·
@@ -34,6 +38,27 @@ and works on `main` directly. Deploys are continuous via Vercel.
 ## Active work and recent history
 
 ### Recently shipped (most recent first)
+
+- **Aivascan rebrand (2026-06-22, branch `rebrand-aivascan`):** renamed
+  the product wordmark "AIVA" → "Aivascan" across every user-facing
+  surface (nav/footer, page metadata + titles, OG + JSON-LD, report
+  template + PDF, transactional emails, share badge compact+card, OG
+  share image, error/404, pricing/site, legal-page product refs). 77
+  string replacements, 20 files. Left the `aiva-theme` localStorage key
+  alone (not a brand string). **Still dashboard-only** (not in repo):
+  Google OAuth consent-screen App name, Resend `EMAIL_FROM` sender name —
+  see Domain swap. Casing chosen: "Aivascan".
+
+- **Admin entitlement grant for Mike (2026-06-22):** added reusable
+  `scripts/grant-entitlements.ts` (looks up a user by email, upserts a
+  full-access `entitlements` row per site, idempotent). Mike
+  (`mikedaman@sawyer.com`) was granted on all sites via the SQL
+  equivalent in the Supabase editor. NOTE: the discovery API gate
+  (`requireFullDiscoveryAccess` → `resolveAccess`) checks site
+  **ownership before entitlements** and only `ADMIN_EMAILS` bypass it, so
+  the grant only materially helps on sites Mike owns; true cross-account
+  view needs his email added to `ADMIN_EMAILS` in
+  `src/lib/entitlements.ts` (not done).
 
 - **Growth features pass (2026-06-09, branch `aeo-and-growth` —
   cumulative with the AEO pass):** three conversion/virality features,
@@ -289,20 +314,27 @@ Files: `src/app/terms/page.tsx`, `src/app/privacy/page.tsx`,
 
 ## Domain swap to aivascan.com — manual checklist
 
-The code references `aivascan.com` in metadata + footer + Terms/Privacy
-text. The actual DNS / hosting / env wiring still needs Jon to do these
+Brand is **Aivascan** (the code rebrand from "AIVA" shipped 2026-06-22 —
+all in-app wordmarks, metadata, OG, emails, report/PDF now say Aivascan).
+The domain `aivascan.com` is **owned (registered via Squarespace)**. The
+DNS / hosting / env / external-service wiring still needs Jon to do these
 steps in order. Anything Claude can prep is noted; the rest is dashboard
 clicks.
 
-1. **Buy the domain** (if not already owned) and have DNS access.
+1. **Domain owned** — `aivascan.com` registered on Squarespace. DNS is
+   managed in **Squarespace → Settings → Domains → aivascan.com → DNS
+   Settings**.
 2. **Vercel → Project Settings → Domains.** Add `aivascan.com` and
-   `www.aivascan.com`. Vercel will show DNS records to add at the
-   registrar (typically an `A` record to `76.76.21.21` and a `CNAME` for
-   `www` to `cname.vercel-dns.com`). Add them at the registrar.
+   `www.aivascan.com`; set `aivascan.com` as **Primary Domain**. Vercel
+   shows the records to create. Then in **Squarespace DNS Settings** add:
+   - `A` record: host `@` → `76.76.21.21`
+   - `CNAME`: host `www` → `cname.vercel-dns.com`
+   Remove any existing `@`/`www` records pointing at Squarespace's parking
+   page so they don't conflict. Vercel auto-issues SSL once DNS resolves.
 3. **Vercel → Project Settings → Environment Variables.** Update:
-   - `NEXT_PUBLIC_APP_URL` → `https://aivascan.com`
-   (No code change needed — the magic-link generation and email helpers
-   read this at request time.)
+   - `NEXT_PUBLIC_APP_URL` → `https://aivascan.com` (then redeploy)
+   (No code change needed — magic-link generation, email helpers, sitemap,
+   robots, and OG cards all read this at request time.)
 4. **Stripe → Developers → Webhooks.** Update the webhook endpoint URL
    from the old Vercel default to `https://aivascan.com/api/webhooks/stripe`.
    Confirm `STRIPE_WEBHOOK_SECRET` matches the new endpoint's signing
@@ -312,12 +344,17 @@ clicks.
    - Redirect URLs: add `https://aivascan.com/auth/callback`
    - (Keep the old Vercel URL as a redirect during the cutover so
      in-flight magic links don't break.)
-6. **Google OAuth** (in Google Cloud Console → OAuth client) — add
-   `https://aivascan.com/auth/callback` to authorized redirect URIs.
+6. **Google OAuth** (Google Cloud Console):
+   - **Credentials → OAuth client** — add
+     `https://aivascan.com/auth/callback` to Authorized redirect URIs.
+   - **OAuth consent screen → App name → "Aivascan"** — this is the name
+     shown on the Google sign-in page. It lives ONLY here, not in the
+     repo, so the code rebrand does not change it.
 7. **Resend → Domains.** Add and verify `aivascan.com` for sending. Update
-   `EMAIL_FROM` env var in Vercel to e.g. `AIVA <hello@aivascan.com>`.
+   `EMAIL_FROM` env var in Vercel to e.g. `Aivascan <hello@aivascan.com>`.
    This is critical for deliverability — without a verified sender, all
-   transactional emails go to spam or fail.
+   transactional emails go to spam or fail. (Email body copy already says
+   Aivascan; this env var is the sender display name.)
 8. **Replace placeholders in legal pages** at `src/app/terms/page.tsx`,
    `src/app/privacy/page.tsx`, `src/app/contact/page.tsx` (all
    `[TODO: ...]` strings — legal entity name, jurisdiction, support

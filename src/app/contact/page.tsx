@@ -10,7 +10,7 @@
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Contact — AIVA',
+  title: 'Contact — Aivascan',
 };
 
 export default function ContactPage(): React.ReactElement {

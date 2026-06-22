@@ -179,7 +179,7 @@ function SiteDashboardContent() {
                   not only in Terms. Price comes from the single pricing source
                   (monthlyFormatted), never a literal. */}
               <p className="text-xs text-right max-w-[16rem] leading-relaxed" style={{ color: 'var(--text-tertiary)' }}>
-                By subscribing you authorize AIVA to charge your card {monthlyFormatted}/month automatically until you cancel. Cancel anytime from your Account page.
+                By subscribing you authorize Aivascan to charge your card {monthlyFormatted}/month automatically until you cancel. Cancel anytime from your Account page.
               </p>
             </div>
           )}
