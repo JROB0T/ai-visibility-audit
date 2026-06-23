@@ -10,38 +10,45 @@
 
 /* eslint-disable */
 export const REPORT_STYLES = `  :root {
-    --ink: #15171c;
-    --ink-2: #2b2e37;
-    --ink-3: #4d525e;
-    --ink-4: #7a8090;
-    --ink-5: #a8aebd;
-    --paper: #f5f1e8;
-    --paper-2: #ede7d8;
-    --paper-3: #e2dbc8;
-    --rule: #d4ccb7;
-    --rule-2: #e8e1cc;
+    /* Mapped onto the app's design tokens (globals.css) so the report
+       reads as the same product as the rest of the site. "ink" = slate
+       text scale, "paper" = light surfaces, brand accent = indigo. */
+    --ink: #0F172A;        /* text-primary  */
+    --ink-2: #1E293B;      /* strong heading */
+    --ink-3: #475569;      /* text-secondary */
+    --ink-4: #64748B;      /* muted label */
+    --ink-5: #94A3B8;      /* text-tertiary / hairline */
+    --paper: #FFFFFF;      /* page surface */
+    --paper-2: #F8FAFC;    /* subtle fill */
+    --paper-3: #F1F5F9;    /* tertiary fill */
+    --rule: #E2E8F0;       /* border */
+    --rule-2: #EFF2F6;     /* faint border */
 
-    --red: #c8322d;
-    --red-dim: rgba(200,50,45,0.08);
-    --amber: #b8851c;
-    --amber-dim: rgba(184,133,28,0.1);
-    --green: #3d6b4a;
-    --green-dim: rgba(61,107,74,0.08);
-    --ink-dim: rgba(21,23,28,0.06);
+    /* Brand accent — indigo, matching the site's --accent. The editorial
+       template used brick-red here; it now carries the brand. */
+    --red: #6366F1;
+    --red-dim: rgba(99,102,241,0.08);
+    /* Score / direction semantics (kept distinct from the brand accent). */
+    --neg: #EF4444;        /* negative, declining, risk */
+    --neg-dim: rgba(239,68,68,0.08);
+    --amber: #F59E0B;
+    --amber-dim: rgba(245,158,11,0.1);
+    --green: #10B981;
+    --green-dim: rgba(16,185,129,0.1);
+    --ink-dim: rgba(15,23,42,0.06);
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  html { background: #1e1a12; }
+  html { background: #F1F5F9; }
 
   body {
-    font-family: 'Geist', -apple-system, sans-serif;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
     color: var(--ink);
-    background: #1e1a12;
+    background: #F1F5F9;
     font-size: 13px;
     line-height: 1.55;
     -webkit-font-smoothing: antialiased;
     padding: 48px 20px;
-    font-feature-settings: "ss01", "cv11";
   }
 
   .page {
@@ -51,31 +58,30 @@ export const REPORT_STYLES = `  :root {
     margin: 0 auto 40px auto;
     padding: 0.75in 0.85in 1.1in 0.85in;
     position: relative;
-    box-shadow: 0 30px 80px rgba(0,0,0,0.4), 0 2px 12px rgba(0,0,0,0.25);
+    border: 1px solid var(--rule);
+    border-radius: 16px;
+    box-shadow: 0 1px 2px rgba(15,23,42,0.04), 0 12px 32px rgba(15,23,42,0.06);
     overflow: hidden;
   }
 
-  /* subtle paper texture */
+  /* texture removed — the app surfaces are flat. Keep the rule so the
+     z-index stacking that page content relies on is preserved. */
   .page::before {
     content: "";
     position: absolute;
     inset: 0;
-    opacity: 0.6;
-    background-image:
-      radial-gradient(circle at 15% 25%, rgba(184,133,28,0.03) 0%, transparent 40%),
-      radial-gradient(circle at 85% 75%, rgba(200,50,45,0.02) 0%, transparent 40%);
     pointer-events: none;
     z-index: 0;
   }
   .page > * { position: relative; z-index: 1; }
 
   /* ---------- shared typography ---------- */
-  .serif { font-family: 'Fraunces', Georgia, serif; font-variation-settings: 'opsz' 144; }
-  .serif-italic { font-family: 'Instrument Serif', Georgia, serif; font-style: italic; }
-  .mono { font-family: 'Geist Mono', monospace; }
+  .serif { font-family: 'Inter', Georgia, serif; font-variation-settings: 'opsz' 144; }
+  .serif-italic { font-family: 'Inter', Georgia, serif; font-style: italic; }
+  .mono { font-family: 'JetBrains Mono', monospace; }
 
   .kicker {
-    font-family: 'Geist Mono', monospace;
+    font-family: 'JetBrains Mono', monospace;
     font-size: 10px;
     letter-spacing: 0.18em;
     text-transform: uppercase;
@@ -84,7 +90,7 @@ export const REPORT_STYLES = `  :root {
   }
 
   .label {
-    font-family: 'Geist Mono', monospace;
+    font-family: 'JetBrains Mono', monospace;
     font-size: 9.5px;
     letter-spacing: 0.15em;
     text-transform: uppercase;
@@ -92,7 +98,7 @@ export const REPORT_STYLES = `  :root {
     font-weight: 500;
   }
 
-  h1, h2, h3, h4 { font-family: 'Fraunces', Georgia, serif; font-variation-settings: 'opsz' 144; font-weight: 400; letter-spacing: -0.015em; }
+  h1, h2, h3, h4 { font-family: 'Inter', Georgia, serif; font-variation-settings: 'opsz' 144; font-weight: 400; letter-spacing: -0.015em; }
 
   /* ---------- shared masthead ---------- */
   .masthead {
@@ -102,7 +108,7 @@ export const REPORT_STYLES = `  :root {
     padding-bottom: 14px;
     border-bottom: 1px solid var(--rule);
     margin-bottom: 40px;
-    font-family: 'Geist Mono', monospace;
+    font-family: 'JetBrains Mono', monospace;
     font-size: 10px;
     letter-spacing: 0.12em;
     text-transform: uppercase;
@@ -156,7 +162,7 @@ export const REPORT_STYLES = `  :root {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    font-family: 'Geist Mono', monospace;
+    font-family: 'JetBrains Mono', monospace;
     font-size: 9px;
     letter-spacing: 0.12em;
     text-transform: uppercase;
@@ -166,7 +172,7 @@ export const REPORT_STYLES = `  :root {
     z-index: 2;
   }
   .page-footer .num {
-    font-family: 'Fraunces', Georgia, serif;
+    font-family: 'Inter', Georgia, serif;
     font-size: 14px;
     letter-spacing: 0;
     text-transform: none;
@@ -195,7 +201,7 @@ export const REPORT_STYLES = `  :root {
     margin-bottom: 28px;
   }
   .cover .period {
-    font-family: 'Geist Mono', monospace;
+    font-family: 'JetBrains Mono', monospace;
     font-size: 10px;
     letter-spacing: 0.2em;
     text-transform: uppercase;
@@ -203,7 +209,7 @@ export const REPORT_STYLES = `  :root {
     font-weight: 600;
   }
   .cover .issue-tag {
-    font-family: 'Geist Mono', monospace;
+    font-family: 'JetBrains Mono', monospace;
     font-size: 10px;
     color: var(--ink-4);
     letter-spacing: 0.1em;
@@ -217,7 +223,7 @@ export const REPORT_STYLES = `  :root {
     letter-spacing: -0.025em;
   }
   .cover h1 .emph {
-    font-family: 'Instrument Serif', serif;
+    font-family: 'Inter', serif;
     font-style: italic;
     font-weight: 400;
     color: var(--red);
@@ -237,7 +243,7 @@ export const REPORT_STYLES = `  :root {
     gap: 56px;
     align-items: start;
     padding: 32px 0 32px;
-    border-top: 1px solid var(--ink);
+    border-top: 1px solid var(--rule);
     border-bottom: 1px solid var(--rule);
     margin-bottom: 36px;
   }
@@ -250,7 +256,7 @@ export const REPORT_STYLES = `  :root {
     margin-bottom: 14px;
   }
   .score-hero .num {
-    font-family: 'Fraunces', Georgia, serif;
+    font-family: 'Inter', Georgia, serif;
     font-weight: 300;
     font-size: 128px;
     line-height: 0.85;
@@ -268,7 +274,7 @@ export const REPORT_STYLES = `  :root {
     background: var(--green);
     color: var(--paper);
     border-radius: 2px;
-    font-family: 'Geist Mono', monospace;
+    font-family: 'JetBrains Mono', monospace;
     font-size: 11px;
     font-weight: 500;
     letter-spacing: 0.08em;
@@ -282,14 +288,14 @@ export const REPORT_STYLES = `  :root {
     margin-bottom: 6px;
   }
   .score-hero .posture .p-lab {
-    font-family: 'Geist Mono', monospace;
+    font-family: 'JetBrains Mono', monospace;
     font-size: 9px;
     letter-spacing: 0.15em;
     text-transform: uppercase;
     color: var(--ink-5);
   }
   .score-hero .posture .p-val {
-    font-family: 'Instrument Serif', serif;
+    font-family: 'Inter', serif;
     font-style: italic;
     font-size: 22px;
     color: var(--red);
@@ -304,7 +310,7 @@ export const REPORT_STYLES = `  :root {
   }
   .score-hero .delta-strip .cell .dlab {
     display: block;
-    font-family: 'Geist Mono', monospace;
+    font-family: 'JetBrains Mono', monospace;
     font-size: 9px;
     letter-spacing: 0.15em;
     text-transform: uppercase;
@@ -312,14 +318,14 @@ export const REPORT_STYLES = `  :root {
     margin-bottom: 6px;
   }
   .score-hero .delta-strip .cell .dval {
-    font-family: 'Fraunces', serif;
+    font-family: 'Inter', serif;
     font-weight: 500;
     font-size: 18px;
     color: var(--ink);
     letter-spacing: -0.005em;
   }
   .score-hero .delta-strip .cell .dval .sub {
-    font-family: 'Geist Mono', monospace;
+    font-family: 'JetBrains Mono', monospace;
     font-size: 10px;
     color: var(--ink-5);
     margin-left: 6px;
@@ -331,7 +337,7 @@ export const REPORT_STYLES = `  :root {
   }
   .score-lede .label { margin-bottom: 18px; }
   .score-lede .lede {
-    font-family: 'Fraunces', Georgia, serif;
+    font-family: 'Inter', Georgia, serif;
     font-variation-settings: 'opsz' 72;
     font-size: 21px;
     line-height: 1.32;
@@ -340,7 +346,7 @@ export const REPORT_STYLES = `  :root {
     letter-spacing: -0.005em;
   }
   .score-lede .lede em {
-    font-family: 'Instrument Serif', serif;
+    font-family: 'Inter', serif;
     font-style: italic;
     color: var(--red);
     font-weight: 400;
@@ -356,11 +362,11 @@ export const REPORT_STYLES = `  :root {
   }
   .take-card {
     padding-top: 16px;
-    border-top: 1px solid var(--ink);
+    border-top: 1px solid var(--rule);
     position: relative;
   }
   .take-card .tag-num {
-    font-family: 'Fraunces', Georgia, serif;
+    font-family: 'Inter', Georgia, serif;
     font-size: 10px;
     font-weight: 500;
     letter-spacing: 0.2em;
@@ -369,7 +375,7 @@ export const REPORT_STYLES = `  :root {
     margin-bottom: 8px;
   }
   .take-card .big {
-    font-family: 'Fraunces', Georgia, serif;
+    font-family: 'Inter', Georgia, serif;
     font-weight: 400;
     font-size: 34px;
     line-height: 1;
@@ -417,7 +423,7 @@ export const REPORT_STYLES = `  :root {
     text-align: center;
   }
   .cluster-hero .chart-center .big-num {
-    font-family: 'Fraunces', serif;
+    font-family: 'Inter', serif;
     font-weight: 400;
     font-size: 38px;
     line-height: 1;
@@ -425,7 +431,7 @@ export const REPORT_STYLES = `  :root {
     letter-spacing: -0.02em;
   }
   .cluster-hero .chart-center .sub {
-    font-family: 'Geist Mono', monospace;
+    font-family: 'JetBrains Mono', monospace;
     font-size: 9px;
     letter-spacing: 0.15em;
     text-transform: uppercase;
@@ -456,7 +462,7 @@ export const REPORT_STYLES = `  :root {
   }
   .how-strip .cell .label { margin-bottom: 6px; }
   .how-strip .cell .val {
-    font-family: 'Geist Mono', monospace;
+    font-family: 'JetBrains Mono', monospace;
     font-size: 11px;
     color: var(--ink-2);
     letter-spacing: 0.02em;
@@ -467,7 +473,7 @@ export const REPORT_STYLES = `  :root {
   /* PAGE 2 — THE VERDICT (deep read)                                    */
   /* =================================================================== */
   .verdict-page .huge-statement {
-    font-family: 'Fraunces', serif;
+    font-family: 'Inter', serif;
     font-weight: 300;
     font-size: 44px;
     line-height: 1.12;
@@ -477,7 +483,7 @@ export const REPORT_STYLES = `  :root {
     max-width: 680px;
   }
   .verdict-page .huge-statement .em-red {
-    font-family: 'Instrument Serif', serif;
+    font-family: 'Inter', serif;
     font-style: italic;
     color: var(--red);
     font-weight: 400;
@@ -496,10 +502,10 @@ export const REPORT_STYLES = `  :root {
     border-bottom: 1px solid var(--rule-2);
     align-items: start;
   }
-  .insight:first-child { border-top: 1px solid var(--ink); padding-top: 24px; }
-  .insight:last-child { border-bottom: 1px solid var(--ink); }
+  .insight:first-child { border-top: 1px solid var(--rule); padding-top: 24px; }
+  .insight:last-child { border-bottom: 1px solid var(--rule); }
   .insight .i-num {
-    font-family: 'Fraunces', serif;
+    font-family: 'Inter', serif;
     font-weight: 400;
     font-size: 22px;
     color: var(--red);
@@ -507,7 +513,7 @@ export const REPORT_STYLES = `  :root {
     padding-top: 2px;
   }
   .insight .i-body h3 {
-    font-family: 'Fraunces', serif;
+    font-family: 'Inter', serif;
     font-weight: 500;
     font-size: 17px;
     color: var(--ink);
@@ -521,7 +527,7 @@ export const REPORT_STYLES = `  :root {
   }
   .insight .i-body p strong { color: var(--ink); font-weight: 600; }
   .insight .i-body p em {
-    font-family: 'Instrument Serif', serif;
+    font-family: 'Inter', serif;
     font-style: italic;
     color: var(--red);
     font-weight: 400;
@@ -533,7 +539,7 @@ export const REPORT_STYLES = `  :root {
     padding-top: 2px;
   }
   .insight .i-proof .p-lab {
-    font-family: 'Geist Mono', monospace;
+    font-family: 'JetBrains Mono', monospace;
     font-size: 9px;
     letter-spacing: 0.15em;
     text-transform: uppercase;
@@ -541,7 +547,7 @@ export const REPORT_STYLES = `  :root {
     margin-bottom: 4px;
   }
   .insight .i-proof .p-val {
-    font-family: 'Fraunces', serif;
+    font-family: 'Inter', serif;
     font-weight: 400;
     font-size: 30px;
     color: var(--ink);
@@ -549,7 +555,7 @@ export const REPORT_STYLES = `  :root {
     letter-spacing: -0.02em;
   }
   .insight .i-proof .p-cap {
-    font-family: 'Geist Mono', monospace;
+    font-family: 'JetBrains Mono', monospace;
     font-size: 9px;
     letter-spacing: 0.08em;
     color: var(--ink-4);
@@ -570,7 +576,7 @@ export const REPORT_STYLES = `  :root {
     margin-bottom: 14px;
   }
   .state-grid p:first-child::first-letter {
-    font-family: 'Fraunces', serif;
+    font-family: 'Inter', serif;
     font-weight: 400;
     float: left;
     font-size: 64px;
@@ -598,7 +604,7 @@ export const REPORT_STYLES = `  :root {
     justify-content: flex-start;
     padding: 0 14px;
     color: var(--paper);
-    font-family: 'Geist Mono', monospace;
+    font-family: 'JetBrains Mono', monospace;
     font-size: 11px;
     letter-spacing: 0.05em;
     font-weight: 500;
@@ -606,7 +612,7 @@ export const REPORT_STYLES = `  :root {
     overflow: hidden;
   }
   .distribution-bar .seg .n {
-    font-family: 'Fraunces', serif;
+    font-family: 'Inter', serif;
     font-size: 20px;
     font-weight: 400;
     margin-right: 8px;
@@ -627,7 +633,7 @@ export const REPORT_STYLES = `  :root {
   .dist-legend {
     display: flex;
     justify-content: space-between;
-    font-family: 'Geist Mono', monospace;
+    font-family: 'JetBrains Mono', monospace;
     font-size: 9px;
     letter-spacing: 0.15em;
     text-transform: uppercase;
@@ -654,7 +660,7 @@ export const REPORT_STYLES = `  :root {
     background: var(--red);
   }
   .money-quote .src {
-    font-family: 'Geist Mono', monospace;
+    font-family: 'JetBrains Mono', monospace;
     font-size: 9.5px;
     letter-spacing: 0.12em;
     text-transform: uppercase;
@@ -663,7 +669,7 @@ export const REPORT_STYLES = `  :root {
     font-weight: 500;
   }
   .money-quote blockquote {
-    font-family: 'Instrument Serif', serif;
+    font-family: 'Inter', serif;
     font-style: italic;
     font-size: 17px;
     line-height: 1.5;
@@ -672,11 +678,11 @@ export const REPORT_STYLES = `  :root {
   }
   .money-quote blockquote .nm {
     font-style: normal;
-    font-family: 'Fraunces', serif;
+    font-family: 'Inter', serif;
     font-weight: 600;
   }
   .money-quote .cite {
-    font-family: 'Geist Mono', monospace;
+    font-family: 'JetBrains Mono', monospace;
     font-size: 9.5px;
     color: var(--ink-5);
     margin-top: 14px;
@@ -690,13 +696,13 @@ export const REPORT_STYLES = `  :root {
   }
   table.prompts th {
     text-align: left;
-    font-family: 'Geist Mono', monospace;
+    font-family: 'JetBrains Mono', monospace;
     font-size: 9px;
     letter-spacing: 0.15em;
     text-transform: uppercase;
     color: var(--ink-4);
     padding: 0 10px 10px 0;
-    border-bottom: 1px solid var(--ink);
+    border-bottom: 1px solid var(--rule);
     font-weight: 500;
   }
   table.prompts td {
@@ -706,7 +712,7 @@ export const REPORT_STYLES = `  :root {
     color: var(--ink-2);
   }
   table.prompts td.q {
-    font-family: 'Fraunces', serif;
+    font-family: 'Inter', serif;
     font-weight: 400;
     font-size: 13.5px;
     color: var(--ink);
@@ -714,7 +720,7 @@ export const REPORT_STYLES = `  :root {
     line-height: 1.35;
   }
   table.prompts td.type {
-    font-family: 'Geist Mono', monospace;
+    font-family: 'JetBrains Mono', monospace;
     font-size: 9px;
     letter-spacing: 0.1em;
     text-transform: uppercase;
@@ -748,13 +754,13 @@ export const REPORT_STYLES = `  :root {
     line-height: 1.4;
     max-width: 220px;
   }
-  table.prompts .who em { font-style: normal; color: var(--red); font-weight: 500; }
+  table.prompts .who em { font-style: normal; color: var(--neg); font-weight: 500; }
 
   .prompt-footnote {
     margin-top: 20px;
     padding-top: 14px;
     border-top: 1px solid var(--rule-2);
-    font-family: 'Geist Mono', monospace;
+    font-family: 'JetBrains Mono', monospace;
     font-size: 9.5px;
     color: var(--ink-5);
     line-height: 1.7;
@@ -765,7 +771,7 @@ export const REPORT_STYLES = `  :root {
   /* PAGE 4 — FIELD                                                      */
   /* =================================================================== */
   .page-intro {
-    font-family: 'Fraunces', serif;
+    font-family: 'Inter', serif;
     font-weight: 400;
     font-size: 22px;
     line-height: 1.4;
@@ -775,7 +781,7 @@ export const REPORT_STYLES = `  :root {
     letter-spacing: -0.01em;
   }
   .page-intro em {
-    font-family: 'Instrument Serif', serif;
+    font-family: 'Inter', serif;
     font-style: italic;
     color: var(--red);
     font-weight: 400;
@@ -795,7 +801,7 @@ export const REPORT_STYLES = `  :root {
   }
   .field-stat .label { margin-bottom: 16px; }
   .field-stat .big {
-    font-family: 'Fraunces', serif;
+    font-family: 'Inter', serif;
     font-weight: 300;
     font-size: 72px;
     line-height: 0.9;
@@ -803,9 +809,9 @@ export const REPORT_STYLES = `  :root {
     letter-spacing: -0.04em;
     margin-bottom: 12px;
   }
-  .field-stat .big.red { color: var(--red); }
+  .field-stat .big.red { color: var(--neg); }
   .field-stat .caption {
-    font-family: 'Geist Mono', monospace;
+    font-family: 'JetBrains Mono', monospace;
     font-size: 9.5px;
     letter-spacing: 0.12em;
     text-transform: uppercase;
@@ -836,11 +842,12 @@ export const REPORT_STYLES = `  :root {
 
   /* Rival hero — elevated competitor finding */
   .rival-hero {
-    border: 1px solid var(--ink);
-    border-left: 4px solid var(--red);
+    border: 1px solid var(--rule);
+    border-left: 4px solid var(--neg);
     padding: 26px 28px;
     margin-bottom: 32px;
     background: var(--paper-2);
+    border-radius: 10px;
   }
   .rival-top {
     display: grid;
@@ -853,7 +860,7 @@ export const REPORT_STYLES = `  :root {
   }
   .rival-head .label { margin-bottom: 6px; font-weight: 600; }
   .rival-name {
-    font-family: 'Fraunces', serif;
+    font-family: 'Inter', serif;
     font-weight: 500;
     font-size: 26px;
     color: var(--ink);
@@ -861,7 +868,7 @@ export const REPORT_STYLES = `  :root {
     margin: 2px 0 10px;
   }
   .rival-meta {
-    font-family: 'Geist Mono', monospace;
+    font-family: 'JetBrains Mono', monospace;
     font-size: 10px;
     color: var(--ink-3);
     letter-spacing: 0.03em;
@@ -881,7 +888,7 @@ export const REPORT_STYLES = `  :root {
     padding-left: 20px;
   }
   .rival-score .rs-num {
-    font-family: 'Fraunces', serif;
+    font-family: 'Inter', serif;
     font-weight: 400;
     font-size: 44px;
     color: var(--red);
@@ -889,7 +896,7 @@ export const REPORT_STYLES = `  :root {
     letter-spacing: -0.02em;
   }
   .rival-score .rs-lab {
-    font-family: 'Geist Mono', monospace;
+    font-family: 'JetBrains Mono', monospace;
     font-size: 9px;
     color: var(--ink-4);
     letter-spacing: 0.1em;
@@ -903,7 +910,7 @@ export const REPORT_STYLES = `  :root {
     margin-bottom: 18px;
   }
   .rival-excerpt .exc-lab {
-    font-family: 'Geist Mono', monospace;
+    font-family: 'JetBrains Mono', monospace;
     font-size: 9px;
     letter-spacing: 0.15em;
     text-transform: uppercase;
@@ -912,7 +919,7 @@ export const REPORT_STYLES = `  :root {
     margin-bottom: 10px;
   }
   .rival-excerpt blockquote {
-    font-family: 'Instrument Serif', serif;
+    font-family: 'Inter', serif;
     font-style: italic;
     font-size: 15px;
     line-height: 1.5;
@@ -920,14 +927,15 @@ export const REPORT_STYLES = `  :root {
   }
   .rival-excerpt blockquote .hl-rival {
     font-style: normal;
-    font-family: 'Fraunces', serif;
+    font-family: 'Inter', sans-serif;
     font-weight: 600;
-    color: var(--red);
-    background: rgba(200,50,45,0.12);
+    color: var(--neg);
+    background: rgba(239,68,68,0.12);
     padding: 0 4px;
+    border-radius: 3px;
   }
   .rival-implication .imp-lab {
-    font-family: 'Geist Mono', monospace;
+    font-family: 'JetBrains Mono', monospace;
     font-size: 9px;
     letter-spacing: 0.15em;
     text-transform: uppercase;
@@ -947,14 +955,14 @@ export const REPORT_STYLES = `  :root {
   }
   .vuln-head {
     padding-bottom: 12px;
-    border-bottom: 1px solid var(--ink);
+    border-bottom: 1px solid var(--rule);
     margin-bottom: 14px;
   }
   .vuln-head .vuln-sub {
     font-size: 12px;
     color: var(--ink-3);
     margin-top: 4px;
-    font-family: 'Geist', sans-serif;
+    font-family: 'Inter', sans-serif;
     letter-spacing: 0;
     text-transform: none;
   }
@@ -965,7 +973,7 @@ export const REPORT_STYLES = `  :root {
   }
   .vuln-table th {
     text-align: left;
-    font-family: 'Geist Mono', monospace;
+    font-family: 'JetBrains Mono', monospace;
     font-size: 9px;
     letter-spacing: 0.15em;
     text-transform: uppercase;
@@ -981,24 +989,24 @@ export const REPORT_STYLES = `  :root {
     color: var(--ink-2);
   }
   .vuln-table tr.risk-high {
-    background: rgba(200,50,45,0.04);
+    background: rgba(239,68,68,0.05);
   }
   .vuln-table tr.risk-high td.p-q { font-weight: 500; }
   .vuln-table td.p-q {
-    font-family: 'Fraunces', serif;
+    font-family: 'Inter', serif;
     font-size: 13px;
     color: var(--ink);
     letter-spacing: -0.005em;
   }
   .vuln-table td.p-c, .vuln-table td.p-p {
-    font-family: 'Geist Mono', monospace;
+    font-family: 'JetBrains Mono', monospace;
     font-size: 9px;
     letter-spacing: 0.08em;
     text-transform: uppercase;
     color: var(--ink-4);
   }
   .vuln-table td.p-s {
-    font-family: 'Geist Mono', monospace;
+    font-family: 'JetBrains Mono', monospace;
     font-size: 11px;
     font-weight: 500;
     color: var(--ink);
@@ -1034,7 +1042,7 @@ export const REPORT_STYLES = `  :root {
     position: relative;
     top: -1px;
   }
-  .r-dot.high { background: var(--red); }
+  .r-dot.high { background: var(--neg); }
   .r-dot.med { background: var(--amber); }
   .r-dot.low { background: var(--ink-4); }
   .vuln-foot {
@@ -1043,7 +1051,7 @@ export const REPORT_STYLES = `  :root {
     margin-top: 14px;
     padding-top: 10px;
     border-top: 1px solid var(--rule-2);
-    font-family: 'Geist Mono', monospace;
+    font-family: 'JetBrains Mono', monospace;
     font-size: 9.5px;
     letter-spacing: 0.05em;
     color: var(--ink-4);
@@ -1067,7 +1075,7 @@ export const REPORT_STYLES = `  :root {
     font-size: 12.5px;
   }
   .cluster-bar .nm {
-    font-family: 'Fraunces', serif;
+    font-family: 'Inter', serif;
     font-weight: 500;
     color: var(--ink);
   }
@@ -1095,7 +1103,7 @@ export const REPORT_STYLES = `  :root {
     background: rgba(21,23,28,0.15);
   }
   .cluster-bar .val {
-    font-family: 'Fraunces', serif;
+    font-family: 'Inter', serif;
     font-size: 18px;
     font-weight: 500;
     color: var(--ink);
@@ -1103,13 +1111,13 @@ export const REPORT_STYLES = `  :root {
     letter-spacing: -0.01em;
   }
   .cluster-bar .dt {
-    font-family: 'Geist Mono', monospace;
+    font-family: 'JetBrains Mono', monospace;
     font-size: 10px;
     color: var(--ink-4);
     text-align: right;
   }
   .cluster-bar .dt.up { color: var(--green); }
-  .cluster-bar .dt.down { color: var(--red); }
+  .cluster-bar .dt.down { color: var(--neg); }
 
   /* =================================================================== */
   /* PAGE 5 — WHAT MOVED                                                 */
@@ -1135,7 +1143,7 @@ export const REPORT_STYLES = `  :root {
   .trend-head .deltas {
     display: flex;
     gap: 20px;
-    font-family: 'Geist Mono', monospace;
+    font-family: 'JetBrains Mono', monospace;
     font-size: 10px;
     color: var(--ink-3);
     letter-spacing: 0.04em;
@@ -1164,7 +1172,7 @@ export const REPORT_STYLES = `  :root {
     text-align: center;
   }
   .small-mult .nm {
-    font-family: 'Geist Mono', monospace;
+    font-family: 'JetBrains Mono', monospace;
     font-size: 8.5px;
     text-transform: uppercase;
     letter-spacing: 0.1em;
@@ -1173,7 +1181,7 @@ export const REPORT_STYLES = `  :root {
   }
   .small-mult svg { width: 100%; height: 30px; display: block; margin-bottom: 4px; }
   .small-mult .v {
-    font-family: 'Fraunces', serif;
+    font-family: 'Inter', serif;
     font-weight: 500;
     font-size: 15px;
     color: var(--ink);
@@ -1209,10 +1217,10 @@ export const REPORT_STYLES = `  :root {
     border-radius: 3px;
   }
   .mom-card.mom-up { border-top-color: var(--green); }
-  .mom-card.mom-down { border-top-color: var(--red); }
+  .mom-card.mom-down { border-top-color: var(--neg); }
   .mom-card.mom-new { border-top-color: var(--amber); }
   .mom-card .mom-lab {
-    font-family: 'Geist Mono', monospace;
+    font-family: 'JetBrains Mono', monospace;
     font-size: 9px;
     letter-spacing: 0.15em;
     text-transform: uppercase;
@@ -1221,7 +1229,7 @@ export const REPORT_STYLES = `  :root {
     margin-bottom: 8px;
   }
   .mom-card .mom-count {
-    font-family: 'Fraunces', serif;
+    font-family: 'Inter', serif;
     font-weight: 400;
     font-size: 34px;
     line-height: 1;
@@ -1230,10 +1238,10 @@ export const REPORT_STYLES = `  :root {
     margin-bottom: 12px;
   }
   .mom-card.mom-up .mom-count { color: var(--green); }
-  .mom-card.mom-down .mom-count { color: var(--red); }
+  .mom-card.mom-down .mom-count { color: var(--neg); }
   .mom-card.mom-new .mom-count { color: var(--amber); }
   .mom-item .mi-title {
-    font-family: 'Fraunces', serif;
+    font-family: 'Inter', serif;
     font-weight: 500;
     font-size: 13px;
     line-height: 1.3;
@@ -1261,7 +1269,7 @@ export const REPORT_STYLES = `  :root {
     align-items: baseline;
     padding-bottom: 10px;
     margin-bottom: 18px;
-    border-bottom: 1px solid var(--ink);
+    border-bottom: 1px solid var(--rule);
   }
   .press-group .group-head h3 {
     font-size: 22px;
@@ -1270,13 +1278,13 @@ export const REPORT_STYLES = `  :root {
     color: var(--ink);
   }
   .press-group .group-head h3 .em {
-    font-family: 'Instrument Serif', serif;
+    font-family: 'Inter', serif;
     font-style: italic;
     color: var(--red);
     font-weight: 400;
   }
   .press-group .group-head .count {
-    font-family: 'Geist Mono', monospace;
+    font-family: 'JetBrains Mono', monospace;
     font-size: 10px;
     letter-spacing: 0.12em;
     text-transform: uppercase;
@@ -1293,7 +1301,7 @@ export const REPORT_STYLES = `  :root {
   }
   .move:last-child { border-bottom: none; }
   .move .idx {
-    font-family: 'Fraunces', serif;
+    font-family: 'Inter', serif;
     font-size: 22px;
     color: var(--red);
     font-weight: 400;
@@ -1301,7 +1309,7 @@ export const REPORT_STYLES = `  :root {
     padding-top: 2px;
   }
   .move .body h4 {
-    font-family: 'Fraunces', serif;
+    font-family: 'Inter', serif;
     font-weight: 500;
     font-size: 16px;
     color: var(--ink);
@@ -1314,7 +1322,7 @@ export const REPORT_STYLES = `  :root {
     color: var(--ink-3);
   }
   .move .body .evidence {
-    font-family: 'Geist Mono', monospace;
+    font-family: 'JetBrains Mono', monospace;
     font-size: 9.5px;
     color: var(--ink-5);
     margin-top: 8px;
@@ -1332,7 +1340,7 @@ export const REPORT_STYLES = `  :root {
     flex-wrap: wrap;
   }
   .move .body .outcome .o-lab {
-    font-family: 'Geist Mono', monospace;
+    font-family: 'JetBrains Mono', monospace;
     font-size: 9px;
     letter-spacing: 0.12em;
     text-transform: uppercase;
@@ -1359,7 +1367,7 @@ export const REPORT_STYLES = `  :root {
     display: flex;
     justify-content: space-between;
     gap: 12px;
-    font-family: 'Geist Mono', monospace;
+    font-family: 'JetBrains Mono', monospace;
     font-size: 9px;
     letter-spacing: 0.08em;
     text-transform: uppercase;
@@ -1369,7 +1377,7 @@ export const REPORT_STYLES = `  :root {
      visually distinct from the left-column label. */
   .meta-row .k { color: var(--ink-5); flex-shrink: 0; }
   .meta-row .v { color: var(--ink-2); font-weight: 500; text-align: right; }
-  .meta-row .v.red { color: var(--red); }
+  .meta-row .v.red { color: var(--neg); }
   .meta-row .v.amber { color: var(--amber); }
 
   /* =================================================================== */
@@ -1413,7 +1421,7 @@ export const REPORT_STYLES = `  :root {
     text-align: right;
   }
   .phase .tag .n {
-    font-family: 'Fraunces', serif;
+    font-family: 'Inter', serif;
     font-weight: 400;
     font-size: 42px;
     color: var(--ink);
@@ -1421,7 +1429,7 @@ export const REPORT_STYLES = `  :root {
     letter-spacing: -0.035em;
   }
   .phase .tag .d {
-    font-family: 'Geist Mono', monospace;
+    font-family: 'JetBrains Mono', monospace;
     font-size: 9px;
     letter-spacing: 0.15em;
     color: var(--ink-4);
@@ -1436,7 +1444,7 @@ export const REPORT_STYLES = `  :root {
   }
   .phase .items .item:last-child { margin-bottom: 0; padding-bottom: 0; border-bottom: none; }
   .phase .items h4 {
-    font-family: 'Fraunces', serif;
+    font-family: 'Inter', serif;
     font-weight: 500;
     font-size: 15px;
     color: var(--ink);
@@ -1449,7 +1457,7 @@ export const REPORT_STYLES = `  :root {
     color: var(--ink-3);
   }
   .phase .items .tagline {
-    font-family: 'Geist Mono', monospace;
+    font-family: 'JetBrains Mono', monospace;
     font-size: 9px;
     letter-spacing: 0.1em;
     text-transform: uppercase;
@@ -1466,7 +1474,7 @@ export const REPORT_STYLES = `  :root {
     gap: 32px;
   }
   .colophon h4 {
-    font-family: 'Geist Mono', monospace;
+    font-family: 'JetBrains Mono', monospace;
     font-size: 10px;
     letter-spacing: 0.15em;
     text-transform: uppercase;
