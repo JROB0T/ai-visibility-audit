@@ -43,7 +43,7 @@ export function buildReportHtml(
     `<title>AI Strategy &amp; Positioning Brief — ${esc(payload.meta.business_name || 'Report')} — ${esc(ctx.monthLabel)}</title>`,
     '<link rel="preconnect" href="https://fonts.googleapis.com">',
     '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>',
-    '<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500;9..144,600;9..144,700&family=Instrument+Serif:ital@0;1&family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">',
+    '<link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400;1,500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">',
     '<style>',
     REPORT_STYLES,
     '</style>',
@@ -52,7 +52,7 @@ export function buildReportHtml(
     '<style>',
     '  .score-hero .grade-chip.grade-green { background: var(--green); }',
     '  .score-hero .grade-chip.grade-amber { background: var(--amber); }',
-    '  .score-hero .grade-chip.grade-red   { background: var(--red); }',
+    '  .score-hero .grade-chip.grade-red   { background: var(--neg); }',
     '  .score-hero .grade-chip.grade-ink   { background: var(--ink-2); }',
     '</style>',
     '</head>',
@@ -499,7 +499,7 @@ function buildRadarSvg(values: Record<ClusterKey, number>): string {
   const dots = axes.map(a => {
     const pt = pointAt(a.angle, values[a.key]);
     const score = values[a.key];
-    const fill = score >= 85 ? '#c8322d' : score >= 70 ? '#b8851c' : '#7a8090';
+    const fill = score >= 85 ? '#6366F1' : score >= 70 ? '#F59E0B' : '#94A3B8';
     return `<circle cx="${pt.x}" cy="${pt.y}" r="3" fill="${fill}"/>`;
   }).join('\n        ');
 
@@ -513,7 +513,7 @@ function buildRadarSvg(values: Record<ClusterKey, number>): string {
     let y = lp.y;
     if (a.angle === 0) y -= 4;
     if (a.angle === 180) y += 10;
-    return `<text x="${lp.x}" y="${y.toFixed(1)}" font-family="Geist Mono" font-size="9" letter-spacing="1" fill="#4d525e" text-anchor="${anchor}">${a.label}</text>`;
+    return `<text x="${lp.x}" y="${y.toFixed(1)}" font-family="JetBrains Mono" font-size="9" letter-spacing="1" fill="#475569" text-anchor="${anchor}">${a.label}</text>`;
   }).join('\n        ');
 
   // Average for center
@@ -524,13 +524,13 @@ function buildRadarSvg(values: Record<ClusterKey, number>): string {
 
   return `
     <svg viewBox="-30 -10 300 270">
-      <g fill="none" stroke="#d4ccb7" stroke-width="0.75">
+      <g fill="none" stroke="#E2E8F0" stroke-width="0.75">
         ${rings}
       </g>
-      <g stroke="#d4ccb7" stroke-width="0.5" opacity="0.5">
+      <g stroke="#E2E8F0" stroke-width="0.5" opacity="0.5">
         ${axisLines}
       </g>
-      <polygon points="${dataPts}" fill="#c8322d" fill-opacity="0.14" stroke="#c8322d" stroke-width="1.5"/>
+      <polygon points="${dataPts}" fill="#6366F1" fill-opacity="0.14" stroke="#6366F1" stroke-width="1.5"/>
       ${dots}
       ${labels}
     </svg>
@@ -580,8 +580,8 @@ function buildTrendSvg(history: Ctx['trendHistory']): string {
   for (let v = yMax; v >= yMin; v -= gridStep) gridValues.push(v);
   const grid = gridValues.map(y => {
     const yy = yFor(y);
-    return `<line x1="${leftPad}" y1="${yy.toFixed(1)}" x2="${vbW - rightPad}" y2="${yy.toFixed(1)}" stroke="#d4ccb7" stroke-width="0.5" stroke-dasharray="2 3"/>
-    <text x="${leftPad - 8}" y="${(yy + 4).toFixed(1)}" font-family="Geist Mono" font-size="9" fill="#a8aebd" text-anchor="end">${y}</text>`;
+    return `<line x1="${leftPad}" y1="${yy.toFixed(1)}" x2="${vbW - rightPad}" y2="${yy.toFixed(1)}" stroke="#E2E8F0" stroke-width="0.5" stroke-dasharray="2 3"/>
+    <text x="${leftPad - 8}" y="${(yy + 4).toFixed(1)}" font-family="JetBrains Mono" font-size="9" fill="#94A3B8" text-anchor="end">${y}</text>`;
   }).join('\n    ');
 
   // Area polygon + polyline
@@ -590,7 +590,7 @@ function buildTrendSvg(history: Ctx['trendHistory']): string {
     ? `<polygon points="${pts.join(' ')} ${xFor(n-1).toFixed(1)},${(vbH - bottomPad).toFixed(1)} ${xFor(0).toFixed(1)},${(vbH - bottomPad).toFixed(1)}" fill="url(#areaGrad)"/>`
     : '';
   const line = n >= 2
-    ? `<polyline points="${pts.join(' ')}" fill="none" stroke="#15171c" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>`
+    ? `<polyline points="${pts.join(' ')}" fill="none" stroke="#0F172A" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>`
     : '';
 
   // Circles
@@ -598,35 +598,35 @@ function buildTrendSvg(history: Ctx['trendHistory']): string {
     const cx = xFor(i).toFixed(1);
     const cy = yFor(h.score).toFixed(1);
     if (h.isCurrent) {
-      return `<circle cx="${cx}" cy="${cy}" r="7" fill="#c8322d" stroke="#c8322d" stroke-width="1.5"/>`;
+      return `<circle cx="${cx}" cy="${cy}" r="7" fill="#6366F1" stroke="#6366F1" stroke-width="1.5"/>`;
     }
-    return `<circle cx="${cx}" cy="${cy}" r="5" fill="#f5f1e8" stroke="#15171c" stroke-width="1.5"/>`;
+    return `<circle cx="${cx}" cy="${cy}" r="5" fill="#FFFFFF" stroke="#0F172A" stroke-width="1.5"/>`;
   }).join('\n    ');
 
   // Score labels (above points)
   const scoreLabels = history.map((h, i) => {
     const x = xFor(i).toFixed(1);
     const y = (yFor(h.score) - 12).toFixed(1);
-    const color = h.isCurrent ? '#c8322d' : '#15171c';
+    const color = h.isCurrent ? '#6366F1' : '#0F172A';
     const size = h.isCurrent ? 17 : 14;
     const weight = h.isCurrent ? 600 : 500;
-    return `<text x="${x}" y="${y}" font-family="Fraunces" font-size="${size}" fill="${color}" text-anchor="middle" font-weight="${weight}">${h.score}</text>`;
+    return `<text x="${x}" y="${y}" font-family="Inter" font-size="${size}" fill="${color}" text-anchor="middle" font-weight="${weight}">${h.score}</text>`;
   }).join('\n    ');
 
   // X-axis labels
   const xLabels = history.map((h, i) => {
     const x = xFor(i).toFixed(1);
-    const color = h.isCurrent ? '#c8322d' : '#7a8090';
+    const color = h.isCurrent ? '#6366F1' : '#94A3B8';
     const weight = h.isCurrent ? 600 : 400;
-    return `<text x="${x}" y="${vbH - 7}" font-family="Geist Mono" font-size="8" fill="${color}" text-anchor="middle" letter-spacing="1" font-weight="${weight}">${esc(h.label)}</text>`;
+    return `<text x="${x}" y="${vbH - 7}" font-family="JetBrains Mono" font-size="8" fill="${color}" text-anchor="middle" letter-spacing="1" font-weight="${weight}">${esc(h.label)}</text>`;
   }).join('\n    ');
 
   return `
   <svg viewBox="0 0 ${vbW} ${vbH}" xmlns="http://www.w3.org/2000/svg">
     <defs>
       <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stop-color="#c8322d" stop-opacity="0.18"/>
-        <stop offset="100%" stop-color="#c8322d" stop-opacity="0"/>
+        <stop offset="0%" stop-color="#6366F1" stop-opacity="0.18"/>
+        <stop offset="100%" stop-color="#6366F1" stop-opacity="0"/>
       </linearGradient>
     </defs>
     ${grid}
@@ -937,7 +937,7 @@ function buildPage4(ctx: Ctx): string {
   <div class="rival-hero">
     <div class="rival-top">
       <div class="rival-head">
-        <div class="label" style="color:var(--red);">Named Rival · ${esc(ctx.monthLabel)}</div>
+        <div class="label" style="color:var(--neg);">Named Rival · ${esc(ctx.monthLabel)}</div>
         <h3 class="rival-name">${esc(ctx.rival.name)}</h3>
         <div class="rival-meta">
           ${ctx.rival.queryPrompt ? `<span><strong>Query:</strong> "${esc(ctx.rival.queryPrompt)}"</span><span class="sep-dot"></span>` : ''}
@@ -1043,7 +1043,7 @@ function buildPage5(ctx: Ctx): string {
       <h3>Overall score · ${ctx.p.trend.snapshots_count} snapshot${ctx.p.trend.snapshots_count === 1 ? '' : 's'}</h3>
       <div class="deltas">
         <span><span class="lab">vs. last</span><strong style="color:var(--ink);">${formatDelta(deltaVs)}</strong></span>
-        <span><span class="lab">from base</span><strong style="color:${deltaBase !== null && deltaBase < 0 ? 'var(--red)' : 'var(--ink)'};">${formatDelta(deltaBase)}</strong></span>
+        <span><span class="lab">from base</span><strong style="color:${deltaBase !== null && deltaBase < 0 ? 'var(--neg)' : 'var(--ink)'};">${formatDelta(deltaBase)}</strong></span>
         <span><span class="lab">range</span><strong style="color:var(--ink);">${esc(ctx.trendRange)}</strong></span>
       </div>
     </div>
@@ -1172,7 +1172,7 @@ function buildDisclaimerFooter(ctx: Ctx): string {
     `independent and not affiliated with or endorsed by the AI providers referenced.`;
   return `
     <div class="report-disclaimer" style="max-width:760px;margin:0 auto 48px;padding:18px 28px;background:var(--paper);border-radius:8px;border:1px solid var(--ink-dim);">
-      <p style="margin:0;font-family:'Geist',system-ui,sans-serif;font-size:11px;line-height:1.6;color:var(--ink-4);">${text}</p>
+      <p style="margin:0;font-family:'Inter',system-ui,sans-serif;font-size:11px;line-height:1.6;color:var(--ink-4);">${text}</p>
     </div>`;
 }
 
@@ -1333,80 +1333,84 @@ const FREE_SAMPLE_STYLES = `
   *, *::before, *::after { box-sizing: border-box; }
   html, body {
     margin: 0; padding: 0;
-    font-family: 'Geist', -apple-system, BlinkMacSystemFont, sans-serif;
-    color: #1a1a1a;
-    background: #f5f3ee;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    color: #0F172A;
+    background: #F1F5F9;
     line-height: 1.55;
     -webkit-font-smoothing: antialiased;
   }
   .page {
     width: 8.5in; min-height: 11in;
     margin: 0.5in auto;
-    background: #ffffff;
-    box-shadow: 0 6px 20px rgba(0,0,0,0.08);
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 16px;
+    box-shadow: 0 1px 2px rgba(15,23,42,0.04), 0 12px 32px rgba(15,23,42,0.06);
     padding: 0.75in 0.85in;
     page-break-after: always;
   }
   .page:last-child { page-break-after: auto; }
   .domain-line {
     font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase;
-    color: #888; margin-bottom: 0.4in;
+    color: #64748B; margin-bottom: 0.4in;
   }
-  .domain-line strong { color: #1a1a1a; font-weight: 600; }
+  .domain-line strong { color: #0F172A; font-weight: 600; }
   h1.cover-h1 {
-    font-family: 'Fraunces', Georgia, serif;
-    font-weight: 400; font-size: 36px; line-height: 1.15;
-    margin: 0 0 0.35in 0; color: #1a1a1a;
+    font-family: 'Inter', -apple-system, sans-serif;
+    font-weight: 700; font-size: 36px; line-height: 1.15; letter-spacing: -0.02em;
+    margin: 0 0 0.35in 0; color: #0F172A;
   }
-  h1.cover-h1 em { font-style: italic; color: #b03030; }
+  h1.cover-h1 em { font-style: normal; color: #6366F1; }
   .score-block {
-    border: 1px solid #e2e0d8;
-    background: #fdfcf8;
+    border: 1px solid #E2E8F0;
+    background: #F8FAFC;
+    border-radius: 12px;
     padding: 0.4in 0.45in;
     margin-bottom: 0.4in;
   }
   .score-block .label {
     font-size: 11px; letter-spacing: 0.10em; text-transform: uppercase;
-    color: #888; margin-bottom: 0.1in;
+    color: #64748B; margin-bottom: 0.1in;
   }
   .score-block .num {
-    font-family: 'Fraunces', Georgia, serif;
-    font-weight: 500; font-size: 92px; line-height: 1;
-    color: #1a1a1a;
+    font-family: 'Inter', -apple-system, sans-serif;
+    font-weight: 800; font-size: 92px; line-height: 1; letter-spacing: -0.03em;
+    color: #0F172A;
   }
-  .score-block .num-denom { font-size: 28px; color: #999; }
+  .score-block .num-denom { font-size: 28px; color: #94A3B8; font-weight: 600; }
   .score-block .interp {
-    font-size: 16px; color: #444;
+    font-size: 16px; color: #475569;
     margin-top: 0.2in; max-width: 5in;
   }
   .framing {
-    font-size: 14px; color: #444;
+    font-size: 14px; color: #475569;
     max-width: 5.5in;
   }
   .framing p { margin: 0 0 0.18in 0; }
   .framing p:last-child { margin-bottom: 0; }
   .footer-meta {
-    margin-top: 0.5in; font-size: 11px; color: #999;
+    margin-top: 0.5in; font-size: 11px; color: #94A3B8;
   }
 
   /* Page 2 */
   h2.section-h {
-    font-family: 'Fraunces', Georgia, serif;
-    font-weight: 400; font-size: 26px; line-height: 1.2;
-    margin: 0 0 0.3in 0; color: #1a1a1a;
+    font-family: 'Inter', -apple-system, sans-serif;
+    font-weight: 700; font-size: 26px; line-height: 1.2; letter-spacing: -0.02em;
+    margin: 0 0 0.3in 0; color: #0F172A;
   }
   .heatmap {
     display: grid; grid-template-columns: repeat(3, 1fr);
     gap: 12px; margin-bottom: 0.4in;
   }
   .heat-cell {
-    border: 1px solid #e2e0d8;
+    border: 1px solid #E2E8F0;
     padding: 14px 16px;
-    background: #fff;
+    background: #FFFFFF;
+    border-radius: 10px;
   }
   .heat-cell .lab {
     font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase;
-    color: #888; margin-bottom: 6px;
+    color: #64748B; margin-bottom: 6px;
   }
   .heat-cell .row {
     display: flex; align-items: center; gap: 10px;
@@ -1414,58 +1418,59 @@ const FREE_SAMPLE_STYLES = `
   .heat-cell .dot {
     width: 14px; height: 14px; border-radius: 3px; flex-shrink: 0;
   }
-  .heat-cell .dot.strong { background: #2f8a4f; }
-  .heat-cell .dot.medium { background: #d4a82a; }
-  .heat-cell .dot.weak   { background: #c64a3e; }
-  .heat-cell .dot.none   { background: #d6d3cb; }
-  .heat-cell .desc { font-size: 13px; color: #333; }
+  .heat-cell .dot.strong { background: #10B981; }
+  .heat-cell .dot.medium { background: #F59E0B; }
+  .heat-cell .dot.weak   { background: #EF4444; }
+  .heat-cell .dot.none   { background: #CBD5E1; }
+  .heat-cell .desc { font-size: 13px; color: #475569; }
 
   .example {
-    border-left: 3px solid #b03030;
+    border-left: 3px solid #6366F1;
     padding: 0.15in 0.25in;
-    background: #fbf6f5;
+    background: rgba(99,102,241,0.05);
+    border-radius: 0 8px 8px 0;
     margin-bottom: 0.3in;
   }
   .example .ask {
     font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase;
-    color: #888; margin-bottom: 4px;
+    color: #64748B; margin-bottom: 4px;
   }
   .example .q {
-    font-family: 'Fraunces', Georgia, serif; font-style: italic;
-    font-size: 17px; color: #1a1a1a; margin-bottom: 0.18in;
+    font-family: 'Inter', -apple-system, sans-serif; font-style: italic;
+    font-size: 17px; color: #0F172A; margin-bottom: 0.18in;
   }
   .example .ai-lab {
     font-size: 11px; letter-spacing: 0.10em; text-transform: uppercase;
-    color: #888; margin-bottom: 4px;
+    color: #64748B; margin-bottom: 4px;
   }
   .example .ai-text {
-    font-size: 13.5px; color: #333; line-height: 1.55;
+    font-size: 13.5px; color: #475569; line-height: 1.55;
   }
   .why {
-    font-size: 14px; color: #444; max-width: 5.5in;
+    font-size: 14px; color: #475569; max-width: 5.5in;
     margin-bottom: 0.45in;
   }
   .cta-row {
-    border-top: 1px solid #e2e0d8;
+    border-top: 1px solid #E2E8F0;
     padding-top: 0.3in;
   }
   .cta-row .lead {
-    font-family: 'Fraunces', Georgia, serif;
-    font-size: 20px; color: #1a1a1a; margin-bottom: 0.18in;
+    font-family: 'Inter', -apple-system, sans-serif; font-weight: 600;
+    font-size: 20px; color: #0F172A; margin-bottom: 0.18in;
   }
   .cta-row .btn {
     display: inline-block;
-    background: #1a1a1a; color: #fff;
-    padding: 12px 22px; font-size: 14px; font-weight: 500;
-    text-decoration: none; border-radius: 2px;
+    background: #6366F1; color: #fff;
+    padding: 12px 22px; font-size: 14px; font-weight: 600;
+    text-decoration: none; border-radius: 8px;
   }
   .cta-row .sub {
-    font-size: 12px; color: #888; margin-top: 0.15in;
+    font-size: 12px; color: #64748B; margin-top: 0.15in;
   }
 
   @media print {
     html, body { background: #fff; }
-    .page { box-shadow: none; margin: 0 auto; }
+    .page { box-shadow: none; margin: 0 auto; border: none; }
   }
 
   /* Mobile reflow — free sample is opened on phones from share/email links.
@@ -1656,7 +1661,7 @@ export function buildFreeSampleHtml(
     `<title>AI Visibility Sample — ${esc(businessName)}</title>`,
     '<link rel="preconnect" href="https://fonts.googleapis.com">',
     '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>',
-    '<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,500;1,400&family=Geist:wght@400;500;600&display=swap" rel="stylesheet">',
+    '<link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400;1,500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">',
     '<style>',
     FREE_SAMPLE_STYLES,
     '</style>',
@@ -1692,9 +1697,9 @@ export function buildFreeSampleHtml(
     '</div>',
 
     // Static disclaimer — free sample omits the dynamic prompt/model/date
-    // line. Body background here is light (#f5f3ee) so muted ink reads fine.
+    // line. Body background here is light (#F1F5F9) so muted ink reads fine.
     '<div style="max-width:8.5in;margin:0 auto 32px;padding:0 0.4in;">',
-    '  <p style="margin:0;font-size:10.5px;line-height:1.6;color:#8a8578;">This report reflects AI assistant responses at the time of generation. AI responses vary and change over time; scores and grades are estimates for informational purposes only and are not a guarantee of any AI-visibility or business outcome. Aivascan is independent and not affiliated with or endorsed by the AI providers referenced.</p>',
+    '  <p style="margin:0;font-size:10.5px;line-height:1.6;color:#94A3B8;">This report reflects AI assistant responses at the time of generation. AI responses vary and change over time; scores and grades are estimates for informational purposes only and are not a guarantee of any AI-visibility or business outcome. Aivascan is independent and not affiliated with or endorsed by the AI providers referenced.</p>',
     '</div>',
 
     '</body>',
