@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="AIVA">
+  
+  <rect width="512" height="512" rx="115" ry="115" fill="#0F172A"/>
+  <circle cx="256" cy="264" r="188"
+          fill="none" stroke="white" stroke-width="18"
+          stroke-linecap="round" opacity="0.62"
+          stroke-dasharray="897.7 285.5"
+          transform="rotate(-90 256 264)"/>
+  <path d="M 178 372 L 256 152 L 334 372"
+        fill="none" stroke="white" stroke-width="38"
+        stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 216.1 304 L 295.9 304"
+        fill="none" stroke="white" stroke-width="38"
+        stroke-linecap="round"/>
+</svg>

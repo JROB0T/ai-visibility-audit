@@ -59,6 +59,12 @@ function compactBadge(score: number, domain: string): string {
   <text x="24" y="28" text-anchor="middle" font-family="system-ui,-apple-system,Segoe UI,sans-serif" font-size="11" font-weight="700" fill="#FFFFFF">${score}</text>
   <text x="46" y="20" font-family="system-ui,-apple-system,Segoe UI,sans-serif" font-size="10" font-weight="600" fill="#94A3B8" letter-spacing="0.4">AI VISIBILITY SCORE</text>
   <text x="46" y="35" font-family="system-ui,-apple-system,Segoe UI,sans-serif" font-size="11" fill="#E2E8F0">${esc(label)}</text>
+  <!-- AIVA mark, scaled to 14px from its 512×512 viewBox (factor 14/512 ≈ 0.02734) -->
+  <g transform="translate(174 17) scale(0.02734)" opacity="0.95">
+    <path d="M 178 372 L 256 152 L 334 372" fill="none" stroke="#6366F1" stroke-width="60" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M 219.6 304 L 292.4 304" fill="none" stroke="#6366F1" stroke-width="60" stroke-linecap="round"/>
+    <circle cx="256" cy="264" r="188" fill="none" stroke="#6366F1" stroke-width="28" stroke-linecap="round" opacity="0.55" stroke-dasharray="897.7 285.7" transform="rotate(-90 256 264)"/>
+  </g>
   <text x="212" y="35" text-anchor="end" font-family="system-ui,-apple-system,Segoe UI,sans-serif" font-size="9" font-weight="700" fill="#6366F1">Aivascan</text>
 </svg>`;
 }
@@ -77,7 +83,13 @@ function cardBadge(score: number, domain: string, dateLabel: string): string {
   <text x="110" y="40" font-family="system-ui,-apple-system,Segoe UI,sans-serif" font-size="10" font-weight="600" fill="#94A3B8" letter-spacing="0.5">AI VISIBILITY SCORE</text>
   <text x="110" y="60" font-family="system-ui,-apple-system,Segoe UI,sans-serif" font-size="13" font-weight="600" fill="#FFFFFF">${esc(label)}</text>
   <text x="110" y="78" font-family="system-ui,-apple-system,Segoe UI,sans-serif" font-size="9" fill="#64748B">${esc(dateLabel)}</text>
-  <text x="110" y="100" font-family="system-ui,-apple-system,Segoe UI,sans-serif" font-size="10" font-weight="700" fill="#6366F1">Verified by Aivascan</text>
+  <!-- AIVA mark, 14px next to the verified line -->
+  <g transform="translate(110 90) scale(0.02734)" opacity="0.95">
+    <path d="M 178 372 L 256 152 L 334 372" fill="none" stroke="#6366F1" stroke-width="60" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M 219.6 304 L 292.4 304" fill="none" stroke="#6366F1" stroke-width="60" stroke-linecap="round"/>
+    <circle cx="256" cy="264" r="188" fill="none" stroke="#6366F1" stroke-width="28" stroke-linecap="round" opacity="0.55" stroke-dasharray="897.7 285.7" transform="rotate(-90 256 264)"/>
+  </g>
+  <text x="128" y="100" font-family="system-ui,-apple-system,Segoe UI,sans-serif" font-size="10" font-weight="700" fill="#6366F1">Verified by Aivascan</text>
 </svg>`;
 }
 

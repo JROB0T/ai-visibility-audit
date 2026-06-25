@@ -84,7 +84,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <head>
-        <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔍</text></svg>" />
+        {/* Favicons handled by Next.js conventions:
+            src/app/icon.svg, src/app/apple-icon.png, src/app/favicon.ico
+            are detected automatically — no <link> tags needed here. */}
         <script
           type="application/ld+json"
           // eslint-disable-next-line react/no-danger
