@@ -50,12 +50,16 @@ export default function BuyButton({ sku, label, variant = 'secondary' }: BuyButt
     }
   }
 
-  // primary = dark button on a light/highlighted card
-  // secondary = light button on a dark card
-  const buttonStyle =
+  // primary = indigo brand button (used on the highlighted plan card)
+  // secondary = subtle outlined button (used on the free / non-highlight card)
+  const className =
     variant === 'primary'
-      ? { background: '#0a0a0a', color: '#ffffff' }
-      : { background: '#ffffff', color: '#0a0a0a' };
+      ? 'btn-primary w-full py-2.5 rounded-lg text-sm font-medium transition disabled:opacity-50 disabled:cursor-not-allowed'
+      : 'w-full py-2.5 rounded-lg text-sm font-medium transition disabled:opacity-50 disabled:cursor-not-allowed';
+  const inlineStyle =
+    variant === 'secondary'
+      ? { background: 'transparent', color: 'var(--text-primary)', border: '1px solid var(--border)' }
+      : undefined;
 
   return (
     <div>
@@ -63,12 +67,12 @@ export default function BuyButton({ sku, label, variant = 'secondary' }: BuyButt
         type="button"
         onClick={handleClick}
         disabled={busy}
-        className="w-full py-2.5 rounded-md text-sm font-medium transition disabled:opacity-50 disabled:cursor-not-allowed"
-        style={buttonStyle}
+        className={className}
+        style={inlineStyle}
       >
         {busy ? 'Starting checkout…' : label}
       </button>
-      {err && <p className="text-xs mt-2 text-red-400">{err}</p>}
+      {err && <p className="text-xs mt-2" style={{ color: '#B91C1C' }}>{err}</p>}
     </div>
   );
 }

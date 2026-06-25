@@ -37,92 +37,78 @@ export default function PricingPage(): React.ReactElement {
   const pricing = getDisplayPricing();
 
   return (
-    <div
-      className="min-h-screen px-4 py-12 sm:py-20"
-      style={{ background: 'var(--background, #0a0a0a)', color: 'var(--text-primary, #fff)' }}
-    >
-      <div className="max-w-5xl mx-auto">
-        {/* ===== Hero ===== */}
-        <header className="text-center mb-12 sm:mb-16">
-          <h1
-            className="text-3xl sm:text-4xl font-semibold mb-4"
-            style={{ fontFamily: 'Georgia, serif', fontWeight: 400 }}
+    <div className="max-w-5xl mx-auto px-4 py-12 sm:py-20">
+      {/* ===== Hero ===== */}
+      <header className="text-center mb-12 sm:mb-16">
+        <h1 className="text-3xl sm:text-4xl font-bold mb-4 tracking-tight" style={{ color: 'var(--text-primary)' }}>
+          See how AI describes your business — and what to do about it.
+        </h1>
+        <p className="text-base max-w-2xl mx-auto" style={{ color: 'var(--text-secondary)' }}>
+          Start with a free 2-page sample. Upgrade for the full strategic report and a 30/60/90 plan.
+        </p>
+      </header>
+
+      {/* ===== Cards ===== */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5 max-w-3xl mx-auto">
+        {/* Free */}
+        <PlanCard
+          name="Free Sample"
+          priceLine="$0"
+          priceSub="One free per email + per site"
+          features={[
+            '6-prompt AI visibility scan',
+            '2-page summary report',
+            'Cluster heatmap',
+            'One example weak prompt',
+          ]}
+        >
+          <Link
+            href="/free-scan"
+            className="block w-full py-2.5 rounded-lg text-sm font-medium text-center transition"
+            style={{
+              background: 'transparent',
+              color: 'var(--text-primary)',
+              border: '1px solid var(--border)',
+            }}
           >
-            See how AI describes your business — and what to do about it.
-          </h1>
-          <p className="text-base max-w-2xl mx-auto" style={{ color: 'var(--text-secondary, #aaa)' }}>
-            Start with a free 2-page sample. Upgrade for the full strategic report and a 30/60/90 plan.
+            Get free sample
+          </Link>
+        </PlanCard>
+
+        {/* Tier 1 monthly — highlighted as recommended */}
+        <PlanCard
+          name="Monthly"
+          badge="Most popular"
+          highlight
+          priceLine={formatDollars(pricing.tier_1.monthly)}
+          priceSub="per month"
+          features={[
+            '18-prompt AI visibility scan',
+            'Full strategic report',
+            'Competitor analysis',
+            '30/60/90 plan',
+            'Refreshed monthly',
+            'Cancel anytime',
+          ]}
+        >
+          <BuyButton sku="tier_1_monthly" label="Subscribe" variant="primary" />
+          {/* Auto-renewal disclosure — must be visible at the point of
+              subscribe (auto-renewal laws), not only in Terms. Price comes
+              from the env-driven pricing source, never a literal. */}
+          <p className="mt-3 text-xs leading-relaxed" style={{ color: 'var(--text-tertiary)' }}>
+            By subscribing you authorize Aivascan to charge your card{' '}
+            {formatDollars(pricing.tier_1.monthly)}/month automatically until
+            you cancel. Cancel anytime from your Account page.
           </p>
-        </header>
+        </PlanCard>
+      </div>
 
-        {/* ===== Cards ===== */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 max-w-3xl mx-auto">
-          {/* Free */}
-          <PlanCard
-            name="Free Sample"
-            priceLine="$0"
-            priceSub="One free per email + per site"
-            features={[
-              '6-prompt AI visibility scan',
-              '2-page summary report',
-              'Cluster heatmap',
-              'One example weak prompt',
-            ]}
-          >
-            <Link
-              href="/free-scan"
-              className="block w-full py-2.5 rounded-md text-sm font-medium text-center transition"
-              style={{
-                background: 'transparent',
-                color: 'var(--text-primary, #fff)',
-                border: '1px solid var(--border, #2a2a2a)',
-              }}
-            >
-              Get free sample
-            </Link>
-          </PlanCard>
-
-          {/* Tier 1 monthly — highlighted as recommended */}
-          <PlanCard
-            name="Monthly"
-            badge="Most popular"
-            highlight
-            priceLine={formatDollars(pricing.tier_1.monthly)}
-            priceSub="per month"
-            features={[
-              '18-prompt AI visibility scan',
-              'Full strategic report',
-              'Competitor analysis',
-              '30/60/90 plan',
-              'Refreshed monthly',
-              'Cancel anytime',
-            ]}
-          >
-            <BuyButton sku="tier_1_monthly" label="Subscribe" variant="primary" />
-            {/* Auto-renewal disclosure — must be visible at the point of
-                subscribe (auto-renewal laws), not only in Terms. Price comes
-                from the env-driven pricing source, never a literal. */}
-            <p className="mt-3 text-xs leading-relaxed" style={{ color: 'var(--text-tertiary, #888)' }}>
-              By subscribing you authorize Aivascan to charge your card{' '}
-              {formatDollars(pricing.tier_1.monthly)}/month automatically until
-              you cancel. Cancel anytime from your Account page.
-            </p>
-          </PlanCard>
-
-          {/* The one-time tier was retired on 2026-05-21. Stripe products
-              for `tier_1_one_time` still exist in env so existing
-              one-time customers continue to webhook through cleanly,
-              and the SKU stays valid in /api/checkout/tier — but the
-              UI no longer offers it for new purchase. */}
-        </div>
-
-        {/* ===== Footnotes ===== */}
-        <div className="text-center mt-12 text-xs" style={{ color: 'var(--text-tertiary, #888)' }}>
-          <p className="mb-2">
-            All payments run through Stripe. Reports run on Claude AI with live web search.
-          </p>
-          <p>Questions? Reply to your free-sample email or write to us directly.</p>
-        </div>
+      {/* ===== Footnotes ===== */}
+      <div className="text-center mt-12 text-xs" style={{ color: 'var(--text-tertiary)' }}>
+        <p className="mb-2">
+          All payments run through Stripe. Reports run on Claude AI with live web search.
+        </p>
+        <p>Questions? Reply to your free-sample email or write to us directly.</p>
       </div>
     </div>
   );
@@ -143,25 +129,30 @@ interface PlanCardProps {
 }
 
 function PlanCard(props: PlanCardProps): React.ReactElement {
+  // Highlighted card uses the indigo brand accent as a glow + border
+  // tint; the body itself stays on `--surface` so it reads correctly
+  // in both light and dark mode. (Previously this card forced white
+  // background which inverted in dark mode and clashed in light mode.)
   return (
     <div
-      className="rounded-xl p-6 sm:p-7 flex flex-col"
-      style={{
-        background: props.highlight ? '#ffffff' : 'var(--bg-secondary, #111)',
-        color: props.highlight ? '#0a0a0a' : 'inherit',
-        border: '1px solid',
-        borderColor: props.highlight ? '#ffffff' : 'var(--border, #2a2a2a)',
-        boxShadow: props.highlight ? '0 8px 32px rgba(255,255,255,0.08)' : 'none',
-      }}
+      className="card p-6 sm:p-7 flex flex-col"
+      style={
+        props.highlight
+          ? {
+              borderColor: 'var(--accent)',
+              boxShadow: '0 0 0 1px var(--accent-glow), 0 8px 32px var(--accent-glow)',
+            }
+          : undefined
+      }
     >
       <div className="flex items-center justify-between mb-1">
-        <h2 className="text-lg font-semibold">{props.name}</h2>
+        <h2 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>{props.name}</h2>
         {props.badge && (
           <span
-            className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full"
+            className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full font-semibold"
             style={{
-              background: props.highlight ? '#0a0a0a' : 'rgba(255,255,255,0.08)',
-              color: props.highlight ? '#fff' : 'var(--text-secondary, #aaa)',
+              background: props.highlight ? 'var(--accent)' : 'var(--bg-tertiary)',
+              color: props.highlight ? '#fff' : 'var(--text-secondary)',
             }}
           >
             {props.badge}
@@ -170,17 +161,11 @@ function PlanCard(props: PlanCardProps): React.ReactElement {
       </div>
 
       <div className="mt-4 mb-1">
-        <span
-          className="text-3xl sm:text-4xl font-semibold"
-          style={{ fontFamily: 'Georgia, serif', fontWeight: 500 }}
-        >
+        <span className="text-3xl sm:text-4xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>
           {props.priceLine}
         </span>
       </div>
-      <p
-        className="text-xs mb-6"
-        style={{ color: props.highlight ? '#555' : 'var(--text-tertiary, #888)' }}
-      >
+      <p className="text-xs mb-6" style={{ color: 'var(--text-tertiary)' }}>
         {props.priceSub}
       </p>
 
@@ -189,9 +174,9 @@ function PlanCard(props: PlanCardProps): React.ReactElement {
           <li key={f} className="flex items-start gap-2 text-sm">
             <CheckCircle2
               className="w-4 h-4 mt-0.5 shrink-0"
-              style={{ color: props.highlight ? '#0a0a0a' : '#10b981' }}
+              style={{ color: props.highlight ? 'var(--accent)' : '#10B981' }}
             />
-            <span style={{ color: props.highlight ? '#1a1a1a' : 'var(--text-secondary, #ccc)' }}>{f}</span>
+            <span style={{ color: 'var(--text-secondary)' }}>{f}</span>
           </li>
         ))}
       </ul>
