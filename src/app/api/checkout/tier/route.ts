@@ -87,6 +87,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       line_items: [{ price: priceId, quantity: 1 }],
       success_url: successUrl,
       cancel_url: cancelUrl,
+      // Show the "Add promotion code" input on the Checkout page so
+      // buyers can apply a Stripe Promotion Code (e.g. FREESCAN, LAUNCH25)
+      // we've published against a Coupon. Without this, the input is
+      // hidden by default and even valid promo codes can't be redeemed.
+      allow_promotion_codes: true,
       // Stripe collects the buyer's email natively. The webhook reads
       // it back via session.customer_details.email when provisioning
       // the auth user.

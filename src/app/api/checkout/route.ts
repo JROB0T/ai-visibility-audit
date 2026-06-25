@@ -66,6 +66,9 @@ export async function POST(request: NextRequest) {
         line_items: [{ price: priceId, quantity: 1 }],
         success_url: successUrl,
         cancel_url: cancelUrl,
+        // Show the promo-code input — matches the tier checkout route
+        // so both checkout entry points honor the same promotion codes.
+        allow_promotion_codes: true,
         client_reference_id: user.id,
         customer_email: user.email,
         metadata: {
