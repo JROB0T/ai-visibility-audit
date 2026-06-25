@@ -102,6 +102,13 @@ export default async function OgImage({ params }: { params: Promise<{ token: str
         {/* Copy block */}
         <div style={{ display: 'flex', flexDirection: 'column', marginLeft: 80, flex: 1 }}>
           <div style={{ display: 'flex', alignItems: 'center', fontSize: 26, fontWeight: 700, color: '#818CF8', letterSpacing: 2 }}>
+            {/* AIVA mark, 36px tall, white on dark.
+                Inline SVG paths only — next/og can't <use> external files. */}
+            <svg width="36" height="36" viewBox="0 0 512 512" style={{ marginRight: 16 }}>
+              <circle cx="256" cy="264" r="188" fill="none" stroke="#818CF8" strokeWidth="18" strokeLinecap="round" opacity="0.55" strokeDasharray="897.7 285.7" transform="rotate(-90 256 264)"/>
+              <path d="M 178 372 L 256 152 L 334 372" fill="none" stroke="#818CF8" strokeWidth="38" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M 219.6 304 L 292.4 304" fill="none" stroke="#818CF8" strokeWidth="38" strokeLinecap="round"/>
+            </svg>
             Aivascan · AI VISIBILITY REPORT
           </div>
           <div
