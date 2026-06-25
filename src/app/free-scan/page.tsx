@@ -120,24 +120,15 @@ export default function FreeScanPage(): React.ReactElement {
   }
 
   return (
-    <div
-      className="min-h-screen flex items-center justify-center px-4 py-12"
-      style={{ background: 'var(--background, #0a0a0a)', color: 'var(--text-primary, #fff)' }}
-    >
-      <div
-        className="w-full max-w-lg rounded-xl border p-8"
-        style={{
-          background: 'var(--bg-secondary, #111)',
-          borderColor: 'var(--border, #2a2a2a)',
-        }}
-      >
+    <div className="max-w-lg mx-auto px-4 py-12 sm:py-16">
+      <div className="card p-7 sm:p-8">
         <h1
-          className="text-2xl font-semibold mb-2"
-          style={{ color: 'var(--text-primary, #fff)', fontFamily: 'serif' }}
+          className="text-2xl font-bold mb-2 tracking-tight"
+          style={{ color: 'var(--text-primary)' }}
         >
-          See how AI sees your business.
+          See how AI sees your business
         </h1>
-        <p className="text-sm mb-6" style={{ color: 'var(--text-secondary, #999)' }}>
+        <p className="text-sm mb-7" style={{ color: 'var(--text-secondary)' }}>
           We&rsquo;ll run a 6-prompt sample and email you a 2-page summary showing where you appear, where you don&rsquo;t, and who&rsquo;s being recommended in your place.
         </p>
 
@@ -147,7 +138,7 @@ export default function FreeScanPage(): React.ReactElement {
           <form onSubmit={handleSubmit} noValidate>
             <fieldset disabled={submitting} className="space-y-4">
               <div>
-                <label className="block text-xs mb-1.5" style={{ color: 'var(--text-secondary, #aaa)' }}>
+                <label className="block text-xs mb-1.5 font-medium" style={{ color: 'var(--text-secondary)' }}>
                   Your email
                 </label>
                 <input
@@ -157,16 +148,16 @@ export default function FreeScanPage(): React.ReactElement {
                   placeholder="you@company.com"
                   required
                   autoComplete="email"
-                  className="w-full px-3 py-2 rounded-md text-sm border outline-none"
+                  className="w-full px-3 py-2.5 rounded-lg text-sm outline-none focus:ring-2"
                   style={{
-                    background: 'var(--bg-tertiary, #0a0a0a)',
-                    borderColor: 'var(--border, #2a2a2a)',
-                    color: 'var(--text-primary, #fff)',
+                    background: 'var(--surface)',
+                    border: '1px solid var(--border)',
+                    color: 'var(--text-primary)',
                   }}
                 />
               </div>
               <div>
-                <label className="block text-xs mb-1.5" style={{ color: 'var(--text-secondary, #aaa)' }}>
+                <label className="block text-xs mb-1.5 font-medium" style={{ color: 'var(--text-secondary)' }}>
                   Your website
                 </label>
                 <input
@@ -176,11 +167,11 @@ export default function FreeScanPage(): React.ReactElement {
                   placeholder="example.com"
                   required
                   autoComplete="url"
-                  className="w-full px-3 py-2 rounded-md text-sm border outline-none"
+                  className="w-full px-3 py-2.5 rounded-lg text-sm outline-none focus:ring-2"
                   style={{
-                    background: 'var(--bg-tertiary, #0a0a0a)',
-                    borderColor: 'var(--border, #2a2a2a)',
-                    color: 'var(--text-primary, #fff)',
+                    background: 'var(--surface)',
+                    border: '1px solid var(--border)',
+                    color: 'var(--text-primary)',
                   }}
                 />
               </div>
@@ -213,14 +204,13 @@ export default function FreeScanPage(): React.ReactElement {
 
               <button
                 type="submit"
-                className="w-full py-2.5 rounded-md text-sm font-medium transition disabled:opacity-50 disabled:cursor-not-allowed"
-                style={{ background: '#fff', color: '#0a0a0a' }}
+                className="btn-primary w-full py-2.5 rounded-lg text-sm font-medium transition disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 {submitting ? 'Running your scan…' : 'Get my free sample'}
               </button>
 
               {submitting && (
-                <p className="text-xs text-center" style={{ color: 'var(--text-tertiary, #888)' }}>
+                <p className="text-xs text-center" style={{ color: 'var(--text-tertiary)' }}>
                   {PROGRESS_MESSAGES[progressIdx]} (about a minute total)
                 </p>
               )}
@@ -228,18 +218,18 @@ export default function FreeScanPage(): React.ReactElement {
 
             {state.kind === 'conflict' && (
               <div
-                className="mt-4 rounded-md p-3 text-sm"
+                className="mt-4 rounded-lg p-3 text-sm"
                 style={{
-                  background: 'rgba(245, 158, 11, 0.1)',
+                  background: 'rgba(245, 158, 11, 0.08)',
                   border: '1px solid rgba(245, 158, 11, 0.3)',
-                  color: '#f5b042',
+                  color: '#92400E',
                 }}
               >
                 <p className="mb-2">{state.message}</p>
                 <Link
                   href={state.upgradeUrl}
                   className="text-xs font-medium underline"
-                  style={{ color: '#fbbf24' }}
+                  style={{ color: '#B45309' }}
                 >
                   See pricing →
                 </Link>
@@ -247,11 +237,11 @@ export default function FreeScanPage(): React.ReactElement {
             )}
             {state.kind === 'error' && (
               <div
-                className="mt-4 rounded-md p-3 text-sm"
+                className="mt-4 rounded-lg p-3 text-sm"
                 style={{
-                  background: 'rgba(239, 68, 68, 0.1)',
+                  background: 'rgba(239, 68, 68, 0.08)',
                   border: '1px solid rgba(239, 68, 68, 0.3)',
-                  color: '#f87171',
+                  color: '#B91C1C',
                 }}
               >
                 {state.message}
@@ -260,7 +250,7 @@ export default function FreeScanPage(): React.ReactElement {
           </form>
         )}
 
-        <p className="text-xs mt-6" style={{ color: 'var(--text-tertiary, #666)' }}>
+        <p className="text-xs mt-6" style={{ color: 'var(--text-tertiary)' }}>
           One free sample per email and per website. No credit card required. No account created.
         </p>
       </div>
@@ -272,24 +262,23 @@ function SuccessView({ shareUrl }: { shareUrl: string }): React.ReactElement {
   return (
     <div className="space-y-4">
       <div
-        className="rounded-md p-4"
+        className="rounded-lg p-4"
         style={{
-          background: 'rgba(16, 185, 129, 0.1)',
+          background: 'rgba(16, 185, 129, 0.08)',
           border: '1px solid rgba(16, 185, 129, 0.3)',
         }}
       >
-        <p className="text-sm font-medium mb-1" style={{ color: '#34d399' }}>
+        <p className="text-sm font-semibold mb-1" style={{ color: '#047857' }}>
           Your sample is ready.
         </p>
-        <p className="text-xs" style={{ color: 'var(--text-secondary, #999)' }}>
+        <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
           Bookmark this link — it&rsquo;s yours to share. We&rsquo;ll also email it to you shortly.
         </p>
       </div>
 
       <Link
         href={shareUrl}
-        className="block w-full py-2.5 rounded-md text-sm font-medium text-center transition"
-        style={{ background: '#fff', color: '#0a0a0a' }}
+        className="btn-primary block w-full py-2.5 rounded-lg text-sm font-medium text-center transition"
       >
         Open my sample →
       </Link>
@@ -297,7 +286,7 @@ function SuccessView({ shareUrl }: { shareUrl: string }): React.ReactElement {
       <Link
         href="/pricing"
         className="block text-xs text-center underline"
-        style={{ color: 'var(--text-tertiary, #888)' }}
+        style={{ color: 'var(--text-tertiary)' }}
       >
         See what the full report includes
       </Link>
