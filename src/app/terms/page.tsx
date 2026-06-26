@@ -1,9 +1,12 @@
 // ============================================================
 // /terms — Terms of Service
 //
-// Production copy. Owner must supply the {{FILL: …}} values
-// (legal entity name, business address, refund policy,
-// jurisdiction, support email, effective date) before launch.
+// Finalized 2026-06-26 for The Bergen Standard, LLC d/b/a Aivascan.
+// Refund policy: 14-day money-back on a customer's first
+// subscription charge; cancel-anytime thereafter; one-time
+// charges non-refundable once a report is generated. Governing
+// law: New Jersey. Re-review before any material change to
+// pricing, billing model, or feature set.
 // ============================================================
 
 import type { Metadata } from 'next';
@@ -17,16 +20,17 @@ export default function TermsPage(): React.ReactElement {
     <article className="max-w-3xl mx-auto px-4 py-12 sm:py-16">
       <h1 className="text-3xl font-bold mb-2" style={{ color: 'var(--text-primary)' }}>Terms of Service</h1>
       <p className="text-sm mb-8" style={{ color: 'var(--text-tertiary)' }}>
-        Last updated: {'{{FILL: effective date}}'}
+        Last updated: June 26, 2026
       </p>
 
       <div className="prose prose-sm max-w-none" style={{ color: 'var(--text-secondary)' }}>
         <h2>1. Acceptance of Terms</h2>
         <p>
           By accessing or using Aivascan (the &ldquo;Service&rdquo;), operated by
-          {' '}{'{{FILL: legal entity name}}'} (&ldquo;we,&rdquo; &ldquo;us&rdquo;),
-          located at {'{{FILL: business address}}'}, you agree to be bound by
-          these Terms of Service. If you do not agree, do not use the Service.
+          The Bergen Standard, LLC (&ldquo;we,&rdquo; &ldquo;us&rdquo;), a New
+          Jersey limited liability company located in Jersey City, New Jersey,
+          USA, you agree to be bound by these Terms of Service. If you do not
+          agree, do not use the Service.
         </p>
 
         <h2>2. The Service</h2>
@@ -54,8 +58,19 @@ export default function TermsPage(): React.ReactElement {
           cancel at any time from your{' '}
           <a href="/dashboard/account">Account page</a>; cancellation stops
           future renewals and takes effect at the end of the current billing
-          period. One-time audits are billed once at purchase. Prices are shown
-          in USD at checkout and may change with notice. Refunds: {'{{FILL: refund policy — e.g. "14-day refund on first subscription charge; one-time audits non-refundable once the report is generated"}}'}.
+          period (you retain access through the period you have already paid
+          for). One-time audits are billed once at purchase. Prices are shown
+          in USD at checkout and may change with notice.
+        </p>
+        <p>
+          <strong>Refunds.</strong> We offer a 14-day money-back guarantee on
+          your first subscription charge: if you request a refund within 14
+          days of that charge by emailing{' '}
+          <a href="mailto:team@aivascan.com">team@aivascan.com</a>, we will
+          refund it in full and cancel your subscription. After that period,
+          monthly charges are non-refundable, but you may cancel at any time
+          to stop future renewals. One-time charges (such as paid rescans)
+          are non-refundable once the corresponding report has been generated.
         </p>
 
         <h2>5. Acceptable Use</h2>
@@ -83,8 +98,9 @@ export default function TermsPage(): React.ReactElement {
         <h2>7. Intellectual Property</h2>
         <p>
           The Service and its content (excluding your inputs) are owned by
-          {' '}{'{{FILL: legal entity name}}'}. You retain ownership of data
-          you provide.
+          The Bergen Standard, LLC. You retain ownership of data you provide,
+          and you grant us a non-exclusive, worldwide, royalty-free license
+          to process that data solely to deliver and improve the Service.
         </p>
 
         <h2>8. Termination</h2>
@@ -112,7 +128,12 @@ export default function TermsPage(): React.ReactElement {
 
         <h2>11. Governing Law</h2>
         <p>
-          These terms are governed by the laws of {'{{FILL: jurisdiction — e.g. "the State of New Jersey, USA"}}'}.
+          These terms are governed by the laws of the State of New Jersey,
+          USA, without regard to its conflict-of-laws rules. Any dispute
+          arising under or relating to these terms or the Service shall be
+          resolved exclusively in the state or federal courts located in
+          New Jersey, and you consent to personal jurisdiction in those
+          courts.
         </p>
 
         <h2>12. Changes to These Terms</h2>
@@ -123,8 +144,10 @@ export default function TermsPage(): React.ReactElement {
 
         <h2>13. Contact</h2>
         <p>
-          Questions? Email {'{{FILL: support email}}'} or visit our
-          {' '}<a href="/contact">contact page</a>.
+          Questions? Email{' '}
+          <a href="mailto:team@aivascan.com">team@aivascan.com</a> or visit
+          our <a href="/contact">contact page</a>. Postal correspondence:
+          The Bergen Standard, LLC, Jersey City, New Jersey, USA.
         </p>
       </div>
     </article>

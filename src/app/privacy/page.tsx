@@ -1,9 +1,10 @@
 // ============================================================
 // /privacy — Privacy Policy
 //
-// Production copy. Owner must supply the {{FILL: …}} values
-// (effective date, support/privacy email, optional processor
-// policy links) before launch.
+// Finalized 2026-06-26 for The Bergen Standard, LLC d/b/a Aivascan.
+// Effective date, business entity, processor links, and contact
+// email are all baked in. Re-review before any material change to
+// data handling, processors, or pricing.
 // ============================================================
 
 import type { Metadata } from 'next';
@@ -17,14 +18,16 @@ export default function PrivacyPage(): React.ReactElement {
     <article className="max-w-3xl mx-auto px-4 py-12 sm:py-16">
       <h1 className="text-3xl font-bold mb-2" style={{ color: 'var(--text-primary)' }}>Privacy Policy</h1>
       <p className="text-sm mb-8" style={{ color: 'var(--text-tertiary)' }}>
-        Last updated: {'{{FILL: effective date}}'}
+        Last updated: June 26, 2026
       </p>
 
       <div className="prose prose-sm max-w-none" style={{ color: 'var(--text-secondary)' }}>
         <h2>1. Overview</h2>
         <p>
-          Aivascan (&ldquo;we,&rdquo; &ldquo;us&rdquo;) provides AI-visibility
-          audits. This policy explains what we collect, why, and your choices.
+          Aivascan (&ldquo;we,&rdquo; &ldquo;us&rdquo;) is a service of
+          The Bergen Standard, LLC, a New Jersey limited liability company.
+          We provide AI-visibility audits. This policy explains what we
+          collect, why, and your choices.
         </p>
 
         <h2>2. Information We Collect</h2>
@@ -65,13 +68,31 @@ export default function PrivacyPage(): React.ReactElement {
           Service:
         </p>
         <ul>
-          <li><strong>Supabase</strong> — database and authentication</li>
-          <li><strong>Stripe</strong> — payment processing and billing</li>
-          <li><strong>Resend</strong> — transactional email delivery</li>
-          <li><strong>Vercel</strong> — hosting and edge infrastructure</li>
-          <li><strong>Anthropic</strong> — generation of audit prompts and analysis</li>
+          <li>
+            <strong>Supabase</strong> — database and authentication
+            (<a href="https://supabase.com/privacy" target="_blank" rel="noopener noreferrer">privacy policy</a>)
+          </li>
+          <li>
+            <strong>Stripe</strong> — payment processing and billing
+            (<a href="https://stripe.com/privacy" target="_blank" rel="noopener noreferrer">privacy policy</a>)
+          </li>
+          <li>
+            <strong>Resend</strong> — transactional email delivery
+            (<a href="https://resend.com/legal/privacy-policy" target="_blank" rel="noopener noreferrer">privacy policy</a>)
+          </li>
+          <li>
+            <strong>Vercel</strong> — hosting and edge infrastructure
+            (<a href="https://vercel.com/legal/privacy-policy" target="_blank" rel="noopener noreferrer">privacy policy</a>)
+          </li>
+          <li>
+            <strong>Anthropic</strong> — generation of audit prompts and analysis
+            (<a href="https://www.anthropic.com/legal/privacy" target="_blank" rel="noopener noreferrer">privacy policy</a>)
+          </li>
+          <li>
+            <strong>Google</strong> — sign-in via Google OAuth (if you use it)
+            (<a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">privacy policy</a>)
+          </li>
         </ul>
-        <p>{'{{FILL: optional — add links to each processor\'s privacy policy}}'}</p>
 
         <h2>5. Cookies and Tracking</h2>
         <p>
@@ -83,9 +104,12 @@ export default function PrivacyPage(): React.ReactElement {
         <h2>6. Data Retention</h2>
         <p>
           Account data is retained while your account is active. You can
-          request deletion by emailing {'{{FILL: support/privacy email}}'}.
-          Audit results may be retained in anonymized form for service
-          improvement.
+          request deletion by emailing{' '}
+          <a href="mailto:team@aivascan.com">team@aivascan.com</a>.
+          After a deletion request, we remove personal data within 30 days,
+          subject to legal retention requirements and backups that age out
+          on a rolling basis. Audit results may be retained in anonymized
+          form for service improvement.
         </p>
 
         <h2>7. Security</h2>
@@ -98,8 +122,14 @@ export default function PrivacyPage(): React.ReactElement {
         <h2>8. Your Rights</h2>
         <p>
           Depending on your jurisdiction, you may have rights to access,
-          correct, export, or delete your personal data. Email
-          {' '}{'{{FILL: support/privacy email}}'} to exercise them.
+          correct, export, or delete your personal data. California
+          residents have additional rights under the CCPA/CPRA, including
+          the right to know what categories of personal information we
+          collect, to request deletion, and to opt out of any sale or
+          sharing of personal information. We do not sell personal
+          information. To exercise any of these rights, email{' '}
+          <a href="mailto:team@aivascan.com">team@aivascan.com</a>; we
+          will respond within the timeframe required by applicable law.
         </p>
 
         <h2>9. Children</h2>
@@ -123,8 +153,10 @@ export default function PrivacyPage(): React.ReactElement {
 
         <h2>12. Contact</h2>
         <p>
-          Questions? Email {'{{FILL: support/privacy email}}'} or visit our
-          {' '}<a href="/contact">contact page</a>.
+          Questions? Email{' '}
+          <a href="mailto:team@aivascan.com">team@aivascan.com</a> or visit
+          our <a href="/contact">contact page</a>. Postal correspondence:
+          The Bergen Standard, LLC, Jersey City, New Jersey, USA.
         </p>
       </div>
     </article>
