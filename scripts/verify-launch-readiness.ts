@@ -18,11 +18,23 @@ interface Check {
   run: (html: string, headers: Headers) => { pass: boolean; detail?: string };
 }
 
-const BASE =
-  process.argv.find((a) => a.startsWith('--base='))?.slice(7) ||
-  (process.argv[process.argv.indexOf('--base') + 1] && !process.argv[process.argv.indexOf('--base') + 1].startsWith('--')
-    ? process.argv[process.argv.indexOf('--base') + 1]
-    : 'https://aivascan.com');
+function resolveBaseUrl(): string {
+  const argv = process.argv;
+  // --base=https://...
+  const eqForm = argv.find((a) => a.startsWith('--base='));
+  if (eqForm) return eqForm.slice(7);
+  // --base https://...   (only honor when --base is actually present;
+  // indexOf returns -1 otherwise, and -1+1=0 would pick argv[0] —
+  // the node binary path — as the URL, which is the bug we're fixing.)
+  const flagIdx = argv.indexOf('--base');
+  if (flagIdx >= 0) {
+    const next = argv[flagIdx + 1];
+    if (next && !next.startsWith('--')) return next;
+  }
+  return 'https://aivascan.com';
+}
+
+const BASE = resolveBaseUrl();
 
 // ANSI colors for terminal output
 const C = {
