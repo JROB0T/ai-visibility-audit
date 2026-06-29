@@ -176,11 +176,11 @@ const termsChecks: Check[] = [
     },
   },
   {
-    name: 'terms has refund policy with concrete window',
-    description: '"14-day" appears in the refund section',
+    name: 'terms has explicit refund stance',
+    description: '"non-refundable" appears in the refund section',
     run: (html) => {
-      const has = /14[\s-]?day/i.test(html);
-      return { pass: has, detail: has ? undefined : 'no "14-day" refund language found' };
+      const has = /non[\s-]?refundable/i.test(html);
+      return { pass: has, detail: has ? undefined : 'no "non-refundable" language found in terms' };
     },
   },
   {

@@ -2,11 +2,11 @@
 // /terms — Terms of Service
 //
 // Finalized 2026-06-26 for The Bergen Standard, LLC d/b/a Aivascan.
-// Refund policy: 14-day money-back on a customer's first
-// subscription charge; cancel-anytime thereafter; one-time
-// charges non-refundable once a report is generated. Governing
-// law: New Jersey. Re-review before any material change to
-// pricing, billing model, or feature set.
+// Refund policy: no refunds; cancel-anytime to stop future renewals,
+// access retained through the paid period; one-time charges
+// non-refundable once a report is generated. Governing law: New
+// Jersey. Re-review before any material change to pricing, billing
+// model, or feature set.
 // ============================================================
 
 import type { Metadata } from 'next';
@@ -63,14 +63,13 @@ export default function TermsPage(): React.ReactElement {
           in USD at checkout and may change with notice.
         </p>
         <p>
-          <strong>Refunds.</strong> We offer a 14-day money-back guarantee on
-          your first subscription charge: if you request a refund within 14
-          days of that charge by emailing{' '}
-          <a href="mailto:team@aivascan.com">team@aivascan.com</a>, we will
-          refund it in full and cancel your subscription. After that period,
-          monthly charges are non-refundable, but you may cancel at any time
-          to stop future renewals. One-time charges (such as paid rescans)
-          are non-refundable once the corresponding report has been generated.
+          <strong>Refunds.</strong> All charges are non-refundable. You may
+          cancel at any time from your{' '}
+          <a href="/dashboard/account">Account page</a> to stop future
+          renewals; cancellation takes effect at the end of the current
+          billing period and you retain access through the period you have
+          already paid for. One-time charges (such as paid rescans) are
+          non-refundable once the corresponding report has been generated.
         </p>
 
         <h2>5. Acceptable Use</h2>
