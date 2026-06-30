@@ -13,8 +13,6 @@ import type { DashboardTabId } from '@/components/dashboard/TabNav';
 const VALID_TABS: ReadonlySet<DashboardTabId> = new Set<DashboardTabId>([
   'overview',
   'findings',
-  'priorities',
-  'competitors',
   'trends',
   'readiness',
 ]);

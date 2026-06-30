@@ -15,13 +15,13 @@ export const metadata: Metadata = {
 
 export default function PrivacyPage(): React.ReactElement {
   return (
-    <article className="max-w-3xl mx-auto px-4 py-12 sm:py-16">
-      <h1 className="text-3xl font-bold mb-2" style={{ color: 'var(--text-primary)' }}>Privacy Policy</h1>
-      <p className="text-sm mb-8" style={{ color: 'var(--text-tertiary)' }}>
+    <article className="max-w-2xl mx-auto px-4 py-12 sm:py-16">
+      <h1 className="text-3xl sm:text-4xl font-bold tracking-tight mb-3" style={{ color: 'var(--text-primary)' }}>Privacy Policy</h1>
+      <p className="text-sm mb-10" style={{ color: 'var(--text-tertiary)' }}>
         Last updated: June 26, 2026
       </p>
 
-      <div className="prose prose-sm max-w-none" style={{ color: 'var(--text-secondary)' }}>
+      <div className="legal-doc">
         <h2>1. Overview</h2>
         <p>
           Aivascan (&ldquo;we,&rdquo; &ldquo;us&rdquo;) is a service of

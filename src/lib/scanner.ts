@@ -13,6 +13,12 @@ import type {
 const USER_AGENT = 'AIVisibilityAudit/1.0 (+https://aivisibilityaudit.com)';
 const FETCH_TIMEOUT = 10000;
 const MAX_PAGES = 50;
+// Total time budget for the page-crawl phase. The Vercel function
+// timeout is 60s; we leave 10s of headroom for post-crawl work
+// (vertical classification, scoring, DB writes). When this budget is
+// hit, the scan stops accepting new batches and returns whatever it
+// has — better than crashing the whole request on big sites.
+const PAGE_CRAWL_BUDGET_MS = 50 * 1000;
 const CONCURRENT_SCANS = 5;
 
 // ============================================================
@@ -206,7 +212,22 @@ export async function scanSite(inputUrl: string): Promise<ScanResult> {
 
   const pageResults: PageScanResult[] = [homepageResult];
 
+  // Page-crawl phase: hard time budget. We've already paid for the
+  // homepage above; this budget covers the batched crawl of secondary
+  // pages. If we blow it, we stop scheduling new batches and mark the
+  // scan as truncated rather than letting Vercel kill the whole
+  // request at 60s.
+  const crawlStartedAt = Date.now();
+  let truncated = false;
+
   for (let i = 0; i < pagesToScan.length; i += CONCURRENT_SCANS) {
+    if (Date.now() - crawlStartedAt > PAGE_CRAWL_BUDGET_MS) {
+      truncated = true;
+      errors.push(
+        `Scan time budget reached; ${pagesToScan.length - i} additional page(s) were skipped.`,
+      );
+      break;
+    }
     const batch = pagesToScan.slice(i, i + CONCURRENT_SCANS);
     const batchResults = await Promise.allSettled(
       batch.map(({ url, type }) => scanPage(url, type))
@@ -322,7 +343,7 @@ export async function scanSite(inputUrl: string): Promise<ScanResult> {
     };
   }
 
-  return { robotsTxt, sitemap, llmsTxt, pages: pageResults, errors, crawlerStatuses, keyPagesStatus, siteWideChecks, detectedVertical, scannerSummary, napConsistency };
+  return { robotsTxt, sitemap, llmsTxt, pages: pageResults, errors, truncated, crawlerStatuses, keyPagesStatus, siteWideChecks, detectedVertical, scannerSummary, napConsistency };
 }
 
 // ============================================================

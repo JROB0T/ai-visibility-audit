@@ -3,8 +3,6 @@
 export type DashboardTabId =
   | 'overview'
   | 'findings'
-  | 'priorities'
-  | 'competitors'
   | 'trends'
   | 'readiness';
 
@@ -13,20 +11,20 @@ interface TabDef {
   label: string;
 }
 
+// Tab order is the rendering order in the nav.
+// Findings is the unified action list (AI Visibility + Site Readiness
+// issues, stack-ranked). Priorities and Competitors were retired in
+// the 2026-06-30 consolidation pass.
 const TABS: TabDef[] = [
-  { id: 'overview',    label: 'Overview' },
-  { id: 'findings',    label: 'Findings' },
-  { id: 'priorities',  label: 'Priorities' },
-  { id: 'competitors', label: 'Competitors' },
-  { id: 'trends',      label: 'Trends' },
-  { id: 'readiness',   label: 'Site Readiness' },
+  { id: 'overview',  label: 'Overview' },
+  { id: 'findings',  label: 'Findings' },
+  { id: 'trends',    label: 'Trends' },
+  { id: 'readiness', label: 'Site Readiness' },
 ];
 
 interface TabNavProps {
   active: DashboardTabId;
   onChange: (id: DashboardTabId) => void;
-  // Restrict which tabs are visible. Default: all tabs. Used to gate
-  // 'priorities' (the operational fix list) on tier_2.
   visibleTabs?: DashboardTabId[];
 }
 

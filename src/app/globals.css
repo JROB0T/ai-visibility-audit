@@ -386,3 +386,59 @@ body {
 /* Specific component fixes */
 [data-theme="dark"] .bg-amber-100.text-amber-700 { background: rgba(245,158,11,0.2) !important; color: #FCD34D !important; }
 [data-theme="dark"] .bg-emerald-100 { background: rgba(16,185,129,0.15) !important; }
+
+/* ============================================================
+ * Legal document styles — applied to <article class="legal-doc">
+ * on /privacy and /terms. Drop-in replacement for the Tailwind
+ * Typography plugin (which isn't installed), tuned specifically
+ * for these two pages. Goals: readable line length, clear heading
+ * hierarchy, proper spacing, and consistent link styling that
+ * works in both light and dark mode.
+ * ========================================================== */
+.legal-doc {
+  font-size: 0.95rem;
+  line-height: 1.7;
+  color: var(--text-secondary);
+}
+.legal-doc h2 {
+  font-size: 1.125rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
+  margin-top: 2.25rem;
+  margin-bottom: 0.75rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border);
+}
+.legal-doc h2:first-child {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}
+.legal-doc h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+}
+.legal-doc p { margin: 0 0 1rem 0; }
+.legal-doc p + p { margin-top: -0.25rem; }
+.legal-doc ul, .legal-doc ol {
+  margin: 0.75rem 0 1.25rem 1.5rem;
+  padding: 0;
+}
+.legal-doc ul { list-style: disc; }
+.legal-doc ol { list-style: decimal; }
+.legal-doc li { margin: 0.4rem 0; }
+.legal-doc li > strong { color: var(--text-primary); }
+.legal-doc a {
+  color: var(--accent, #6366F1);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+  transition: opacity 0.15s;
+}
+.legal-doc a:hover { opacity: 0.7; }
+.legal-doc strong { color: var(--text-primary); font-weight: 600; }
+.legal-doc em { font-style: italic; }
