@@ -33,11 +33,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Site not found' }, { status: 404 });
     }
 
-    // Map priceType to Stripe price ID and mode
-    const priceMap: Record<string, { envKey: string; mode: 'payment' | 'subscription' }> = {
-      initial_scan: { envKey: 'STRIPE_PRICE_INITIAL_SCAN', mode: 'payment' },
-      rescan: { envKey: 'STRIPE_PRICE_RESCAN', mode: 'payment' },
-      monthly: { envKey: 'STRIPE_PRICE_MONTHLY', mode: 'subscription' },
+    // Map priceType to Stripe price ID and mode. Each entry may have
+    // multiple env-key candidates — the first one defined wins. This
+    // lets the legacy STRIPE_PRICE_MONTHLY co-exist with the newer
+    // STRIPE_PRICE_TIER_1_MONTHLY name used by /api/checkout/tier, so
+    // operators only have to set one of them in Vercel.
+    const priceMap: Record<string, { envKeys: string[]; mode: 'payment' | 'subscription' }> = {
+      initial_scan: { envKeys: ['STRIPE_PRICE_INITIAL_SCAN'], mode: 'payment' },
+      rescan: { envKeys: ['STRIPE_PRICE_RESCAN'], mode: 'payment' },
+      monthly: { envKeys: ['STRIPE_PRICE_MONTHLY', 'STRIPE_PRICE_TIER_1_MONTHLY'], mode: 'subscription' },
     };
 
     const priceConfig = priceMap[priceType];
@@ -45,10 +49,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid priceType', detail: priceType }, { status: 400 });
     }
 
-    const priceId = process.env[priceConfig.envKey];
+    const resolvedKey = priceConfig.envKeys.find((k) => !!process.env[k]);
+    const priceId = resolvedKey ? process.env[resolvedKey] : undefined;
     if (!priceId) {
-      console.error(`Missing env var: ${priceConfig.envKey}`);
-      return NextResponse.json({ error: 'Checkout configuration error', detail: `Missing ${priceConfig.envKey} env var` }, { status: 500 });
+      console.error(`Missing env var: tried ${priceConfig.envKeys.join(', ')}`);
+      return NextResponse.json({ error: 'Checkout configuration error', detail: `Set one of: ${priceConfig.envKeys.join(', ')}` }, { status: 500 });
     }
 
     if (!process.env.STRIPE_SECRET_KEY) {

@@ -30,6 +30,7 @@ function SiteDashboardContent() {
   const [siteVertical, setSiteVertical] = useState<string | null>(null);
   const [showRescanModal, setShowRescanModal] = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [checkoutSuccess, setCheckoutSuccess] = useState(false);
   const [kickoffStatus, setKickoffStatus] = useState<'idle' | 'starting' | 'started' | 'failed'>('idle');
   const searchParams = useSearchParams();
@@ -91,16 +92,26 @@ function SiteDashboardContent() {
   async function handleCheckout(priceType: 'initial_scan' | 'rescan' | 'monthly') {
     if (!data) return;
     setCheckoutLoading(true);
+    setCheckoutError(null);
     try {
       const res = await fetch('/api/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ siteId: data.site.id, priceType }),
       });
-      const result = await res.json();
-      if (result.url) window.location.href = result.url;
+      const result = await res.json().catch(() => ({}));
+      if (res.ok && result.url) {
+        window.location.href = result.url;
+        return;
+      }
+      // Visible error — silent fail used to make "nothing happens"
+      // when an env var was missing on Vercel. Now the user sees
+      // something actionable instead.
+      console.error('Checkout error:', { status: res.status, result });
+      setCheckoutError(result.detail || result.error || 'Could not start checkout. Try again or contact support.');
     } catch (err) {
       console.error('Checkout error:', err);
+      setCheckoutError('Network error. Check your connection and try again.');
     } finally {
       setCheckoutLoading(false);
     }
@@ -181,6 +192,11 @@ function SiteDashboardContent() {
               <p className="text-xs text-right max-w-[16rem] leading-relaxed" style={{ color: 'var(--text-tertiary)' }}>
                 By subscribing you authorize Aivascan to charge your card {monthlyFormatted}/month automatically until you cancel. Cancel anytime from your Account page.
               </p>
+              {checkoutError && (
+                <p className="text-xs text-right max-w-[16rem] leading-relaxed mt-1" style={{ color: '#EF4444' }}>
+                  {checkoutError}
+                </p>
+              )}
             </div>
           )}
         </div>

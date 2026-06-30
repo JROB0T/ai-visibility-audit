@@ -207,7 +207,7 @@ function DashboardContent() {
             {[
               { n: '1', t: 'Enter a URL', d: 'Any business website you want to check.' },
               { n: '2', t: 'We scan AI answers', d: 'Across the major AI assistants.' },
-              { n: '3', t: 'Get your grade', d: 'Plus where competitors win instead.' },
+              { n: '3', t: 'Get your grade', d: 'Plus a clear plan to fix what AI is missing.' },
             ].map((step) => (
               <div
                 key={step.n}
