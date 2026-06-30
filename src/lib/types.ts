@@ -110,6 +110,14 @@ export interface ScanResult {
   llmsTxt?: LlmsTxtResult | null;
   pages: PageScanResult[];
   errors: string[];
+  /**
+   * True if the scan ran out of its time budget before finishing all
+   * eligible pages. When true, `pages` contains whatever was completed;
+   * the rest of the report (scores, recommendations) is based on partial
+   * data. UI should surface this so users know the result isn't from a
+   * complete scan.
+   */
+  truncated?: boolean;
   crawlerStatuses: CrawlerStatus[];
   keyPagesStatus: KeyPageStatus[];
   siteWideChecks: SiteWideChecks;

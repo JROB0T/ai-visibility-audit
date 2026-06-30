@@ -61,8 +61,14 @@ export function ThemeWrapper({ children }: { children: React.ReactNode }) {
               <>
                 <a href="/dashboard" className="text-sm px-3 py-1.5 rounded-lg transition-colors font-medium" style={{ color: '#6366F1' }}>Dashboard</a>
                 <span className="text-xs px-2 py-1 rounded-md hidden sm:inline" style={{ color: 'var(--text-tertiary)', background: 'var(--bg-tertiary)' }}>{userEmail}</span>
-                <button onClick={handleSignOut} className="text-sm px-2 py-1.5 rounded-lg transition-colors flex items-center gap-1" style={{ color: 'var(--text-tertiary)' }}>
+                <button
+                  onClick={handleSignOut}
+                  className="text-sm px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5"
+                  style={{ color: 'var(--text-secondary)' }}
+                  aria-label="Log out"
+                >
                   <LogOut className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Log out</span>
                 </button>
               </>
             ) : (

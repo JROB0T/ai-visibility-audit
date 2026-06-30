@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client';
 import { Search, Plus, AlertTriangle, ChevronRight, X, CheckCircle, Sparkles } from 'lucide-react';
 import { scoreToGrade, getScoreColor } from '@/components/ScoreRing';
 import { getVerticalLabel } from '@/lib/verticals';
-import { getRunTypeLabel } from '@/lib/entitlements';
+import { getRunTypeLabel, isAdminAccount } from '@/lib/entitlements';
 
 interface SiteWithLatest {
   id: string;
@@ -32,6 +32,11 @@ function DashboardContent() {
   const [scanning, setScanning] = useState(false);
   const [error, setError] = useState('');
   const [checkoutSuccess, setCheckoutSuccess] = useState(false);
+  // Admin features (Batch upload, API keys) are hidden from regular
+  // customers by default — they're operational tools, not product
+  // surface. Admin status is derived from the same ADMIN_EMAILS list
+  // the API uses, so the UI matches what the server allows.
+  const [isAdmin, setIsAdmin] = useState(false);
   const urlInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -50,6 +55,7 @@ function DashboardContent() {
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.push('/auth/login?redirect=/dashboard'); return; }
+      setIsAdmin(isAdminAccount(user.email ?? null));
 
       const { data: userSites } = await supabase
         .from('sites').select('id, domain, url, vertical, plan_status, has_monthly_monitoring, created_at')
@@ -87,10 +93,32 @@ function DashboardContent() {
     setScanning(true); setError('');
     try {
       const res = await fetch('/api/audit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: url.trim() }) });
-      const data = await res.json();
-      if (!res.ok) { setError(data.error || 'Scan failed'); return; }
+      // Some failure modes (gateway timeouts, server crashes) return
+      // HTML instead of JSON. Parsing defensively means we can show
+      // a useful message instead of "Could not connect".
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        if (res.status === 504 || res.status === 408) {
+          setError('The scan took too long to complete. This usually happens with very large sites or sites that block automated scanners. Try a smaller site or contact support.');
+        } else if (res.status >= 500) {
+          setError('Something went wrong on our side. Please try again in a moment.');
+        } else {
+          setError(data?.error || 'Scan failed');
+        }
+        return;
+      }
       router.push(`/audit/${data.auditId}`);
-    } catch { setError('Could not connect'); }
+    } catch (err) {
+      // fetch() itself threw — almost always a network drop or a
+      // gateway killing the request mid-flight. The latter is the
+      // most common cause in production, so we lead with that.
+      const message = err instanceof Error ? err.message : '';
+      if (/abort|timeout/i.test(message)) {
+        setError('The scan took too long to complete. Try a smaller site.');
+      } else {
+        setError('Could not reach the scanner. Check your internet connection and try again.');
+      }
+    }
     finally { setScanning(false); }
   }
 
@@ -117,20 +145,24 @@ function DashboardContent() {
           <p className="mt-1 text-sm" style={{ color: 'var(--text-tertiary)' }}>{sites.length} site{sites.length !== 1 ? 's' : ''} · {sites.reduce((sum, s) => sum + s.audit_count, 0)} total scans</p>
         </div>
         <div className="flex items-center gap-2 self-start sm:self-auto">
-          <a
-            href="/dashboard/batch-upload"
-            className="text-xs inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border transition"
-            style={{ borderColor: 'var(--border)', color: 'var(--text-secondary)' }}
-          >
-            Batch upload
-          </a>
-          <a
-            href="/dashboard/api-keys"
-            className="text-xs inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border transition"
-            style={{ borderColor: 'var(--border)', color: 'var(--text-secondary)' }}
-          >
-            API keys
-          </a>
+          {isAdmin && (
+            <>
+              <a
+                href="/dashboard/batch-upload"
+                className="text-xs inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border transition"
+                style={{ borderColor: 'var(--border)', color: 'var(--text-secondary)' }}
+              >
+                Batch upload
+              </a>
+              <a
+                href="/dashboard/api-keys"
+                className="text-xs inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border transition"
+                style={{ borderColor: 'var(--border)', color: 'var(--text-secondary)' }}
+              >
+                API keys
+              </a>
+            </>
+          )}
           <a
             href="/dashboard/account"
             className="text-xs inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border transition"

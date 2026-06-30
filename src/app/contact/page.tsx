@@ -1,10 +1,10 @@
 // ============================================================
 // /contact — Contact page
 //
-// Placeholder copy until real support address and form behavior
-// are set. Currently shows the support email and a couple of
-// quick links. No form submission yet — keep it simple and
-// honest about how to reach us.
+// Finalized 2026-06-30. Shows team@aivascan.com (Squarespace
+// forwarding rule, lands in the owner's Gmail) plus quick links.
+// No form yet — email-only contact keeps the page honest about
+// how the team actually responds.
 // ============================================================
 
 import type { Metadata } from 'next';
@@ -23,8 +23,13 @@ export default function ContactPage(): React.ReactElement {
 
       <div className="card p-6 mb-6">
         <p className="text-xs mb-1" style={{ color: 'var(--text-tertiary)' }}>Support and general inquiries</p>
-        <p className="text-base font-medium" style={{ color: 'var(--text-primary)' }}>
-          {'{{FILL: support email}}'}
+        <p className="text-base font-medium">
+          <a href="mailto:team@aivascan.com" style={{ color: 'var(--accent)' }}>
+            team@aivascan.com
+          </a>
+        </p>
+        <p className="text-xs mt-2" style={{ color: 'var(--text-tertiary)' }}>
+          We try to respond within one business day.
         </p>
       </div>
 

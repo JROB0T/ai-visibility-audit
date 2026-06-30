@@ -19,14 +19,53 @@ type Range = 'all' | '6m' | '3m';
 export default function TrendsTab(props: TrendsTabProps): React.ReactElement {
   const [range, setRange] = useState<Range>('all');
 
+  // ALL hooks must run on every render (Rules of Hooks). Compute the
+  // memoized values first, then short-circuit to the empty state when
+  // there aren't enough snapshots for the values to be meaningful.
   const filteredHistory = useMemo(() => filterByRange(props.history, range), [props.history, range]);
-
   const clusterDeltas = useMemo(() => computeClusterDeltas(props.history), [props.history]);
-
   const overallTrend = filteredHistory.map((s) => ({
     date: s.snapshot_date,
     score: s.overall_score,
   }));
+
+  // Trends need at least 2 snapshots to compute a delta. With 0 or 1,
+  // every "line" is a single point and every "change" reads zero —
+  // confusing rather than informative. The tab itself stays visible
+  // in the nav so users learn the feature exists; they just don't see
+  // broken charts.
+  if (props.history.length < 2) {
+    return (
+      <div className="max-w-3xl mx-auto px-4 sm:px-6 py-16">
+        <section
+          className="rounded-xl border p-10 text-center"
+          style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}
+        >
+          <div
+            className="w-12 h-12 rounded-full mx-auto flex items-center justify-center mb-4"
+            style={{ background: 'rgba(99,102,241,0.08)', color: '#6366F1' }}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="3 17 9 11 13 15 21 7" />
+              <polyline points="14 7 21 7 21 14" />
+            </svg>
+          </div>
+          <h2 className="text-lg font-semibold mb-2" style={{ color: 'var(--text-primary)' }}>
+            Trends appear after your second scan
+          </h2>
+          <p className="text-sm leading-relaxed max-w-md mx-auto" style={{ color: 'var(--text-secondary)' }}>
+            Right now you have {props.history.length} scan{props.history.length === 1 ? '' : 's'} on record.
+            Once your next monthly scan completes, this tab will fill in with score
+            movement, cluster-level changes, and a deltas summary so you can track
+            progress over time.
+          </p>
+          <p className="mt-4 text-xs" style={{ color: 'var(--text-tertiary)' }}>
+            Paid plans rescan automatically each month. You don&apos;t need to do anything.
+          </p>
+        </section>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-6">

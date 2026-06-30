@@ -13,8 +13,9 @@ const LegacyAuditPage = dynamic(() => import('./page.legacy'), { ssr: false });
 import PersistentHeader from '@/components/dashboard/PersistentHeader';
 import OverviewTab from '@/components/dashboard/tabs/OverviewTab';
 import FindingsTab from '@/components/dashboard/tabs/FindingsTab';
-import PrioritiesTab from '@/components/dashboard/tabs/PrioritiesTab';
-import CompetitorsTab from '@/components/dashboard/tabs/CompetitorsTab';
+// Note: PrioritiesTab and CompetitorsTab were retired in the
+// 2026-06-30 consolidation pass. The component files remain on disk
+// for easy revival; only the imports/wiring are removed here.
 import TrendsTab from '@/components/dashboard/tabs/TrendsTab';
 import SiteReadinessTab from '@/components/dashboard/tabs/SiteReadinessTab';
 import SidePanel from '@/components/dashboard/SidePanel';
@@ -33,14 +34,17 @@ import type {
   DiscoveryScoreSnapshot,
 } from '@/lib/types';
 
-// Tabs visible per audit tier. The 'priorities' tab (operational fix
-// list) is Tier 2 only — Tier 1 paying customers see the strategic
-// brief without the technical fix list. Free reports are served via
-// the public share-link path, never through this dashboard.
+// Tabs visible per audit tier. After the 2026-06-30 consolidation:
+//   - "competitors" was retired (data quality wasn't high enough yet)
+//   - "priorities" was folded into "findings" — Findings is now a
+//     unified stack-ranked list of every issue across AI Visibility
+//     and Site Readiness, sortable by importance, severity, or source.
+// Free reports are served via the public share-link path, never
+// through this dashboard.
 const TABS_BY_TIER: Record<AuditTier, DashboardTabId[]> = {
-  free:   ['overview', 'findings', 'competitors', 'trends', 'readiness'],
-  tier_1: ['overview', 'findings', 'competitors', 'trends', 'readiness'],
-  tier_2: ['overview', 'findings', 'priorities', 'competitors', 'trends', 'readiness'],
+  free:   ['overview', 'findings', 'trends', 'readiness'],
+  tier_1: ['overview', 'findings', 'trends', 'readiness'],
+  tier_2: ['overview', 'findings', 'trends', 'readiness'],
 };
 
 interface ShellAudit {
@@ -337,6 +341,7 @@ function AuditPageInner(): React.ReactElement {
             snapshot={snapshot}
             insights={insights}
             recommendations={recommendations}
+            siteReadinessScore={audit.overall_score ?? null}
             onTabChange={(t) => handleTabChange(t)}
           />
         )}
@@ -348,20 +353,11 @@ function AuditPageInner(): React.ReactElement {
             snapshot={snapshot}
             insights={insights}
             results={results}
+            readinessFindings={data.findings || []}
             onPromptDrilldown={(cluster) => setDrilldown({ kind: 'cluster', cluster })}
           />
         )}
         {safeActiveTab === 'findings' && !snapshot && <NoSnapshotState hasPaid={hasPaid} />}
-        {safeActiveTab === 'priorities' && tier === 'tier_2' && (
-          <PrioritiesTab
-            auditId={audit.id}
-            domain={audit.site?.domain}
-            businessName={audit.site?.domain}
-          />
-        )}
-        {safeActiveTab === 'competitors' && (
-          <CompetitorsTab siteId={audit.site_id} results={results} />
-        )}
         {safeActiveTab === 'trends' && (
           <TrendsTab currentSnapshot={snapshot} history={trendHistory} />
         )}
