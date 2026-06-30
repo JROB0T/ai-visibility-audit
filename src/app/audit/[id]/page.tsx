@@ -346,7 +346,9 @@ function AuditPageInner(): React.ReactElement {
           />
         )}
         {safeActiveTab === 'overview' && !snapshot && (
-          <NoSnapshotState hasPaid={hasPaid} />
+          audit.overall_score !== null && audit.overall_score !== undefined
+            ? <ReadinessOnlyOverview audit={audit} />
+            : <NoSnapshotState hasPaid={hasPaid} />
         )}
         {safeActiveTab === 'findings' && snapshot && (
           <FindingsTab
@@ -550,6 +552,101 @@ function NoSnapshotState({ hasPaid }: { hasPaid: boolean }): React.ReactElement 
       >
         See plans
       </a>
+    </div>
+  );
+}
+
+/**
+ * Overview content for audits that have a Site Readiness score but no
+ * AI Discovery snapshot (typical of free-tier dashboard scans, which
+ * run the technical scan but not the AI prompts). The full OverviewTab
+ * depends on snapshot fields (prompt_count, strong_count, etc.) so we
+ * can't render it here — instead we show a clear summary of what they
+ * have plus an unmistakable CTA to unlock the AI Visibility piece.
+ */
+function ReadinessOnlyOverview({ audit }: { audit: ShellAudit }): React.ReactElement {
+  const score = audit.overall_score ?? 0;
+  const grade = scoreToGrade(score);
+  const scoreColor = score >= 80 ? '#10B981' : score >= 50 ? '#F59E0B' : '#EF4444';
+
+  return (
+    <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+      <section
+        className="rounded-xl border p-6 sm:p-8"
+        style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}
+      >
+        <div className="grid grid-cols-1 md:grid-cols-[260px,1fr] gap-8 items-center">
+          <div className="flex justify-center">
+            <div className="relative w-44 h-44 flex items-center justify-center">
+              <svg width="176" height="176" viewBox="0 0 176 176" className="absolute inset-0">
+                <circle cx="88" cy="88" r="76" fill="none" stroke="var(--border)" strokeWidth="10" />
+                <circle
+                  cx="88"
+                  cy="88"
+                  r="76"
+                  fill="none"
+                  stroke={scoreColor}
+                  strokeWidth="10"
+                  strokeLinecap="round"
+                  strokeDasharray="477.5"
+                  strokeDashoffset={477.5 - (score / 100) * 477.5}
+                  transform="rotate(-90 88 88)"
+                />
+              </svg>
+              <div className="relative text-center">
+                <div className="text-4xl font-bold" style={{ color: 'var(--text-primary)' }}>{score}</div>
+                <div className="text-xs mt-1" style={{ color: 'var(--text-tertiary)' }}>Site Readiness</div>
+                <div className="text-sm font-semibold mt-0.5" style={{ color: scoreColor }}>{grade}</div>
+              </div>
+            </div>
+          </div>
+          <div className="space-y-4">
+            <div>
+              <h2 className="text-sm font-bold uppercase tracking-wider mb-2" style={{ color: 'var(--text-tertiary)' }}>
+                What you have
+              </h2>
+              <p className="text-base leading-relaxed" style={{ color: 'var(--text-primary)' }}>
+                We&rsquo;ve scanned your site for <strong>Site Readiness</strong>{' '}
+                — how legible your pages are to AI crawlers across Findability,
+                Explainability, Buyability, and Trustworthiness. Open the{' '}
+                <strong>Site Readiness</strong> tab to see the per-pillar
+                breakdown and every finding.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section
+        className="rounded-xl border p-6 sm:p-8"
+        style={{
+          background: 'var(--surface)',
+          borderColor: 'var(--accent)',
+          boxShadow: '0 0 0 1px var(--accent-glow), 0 8px 32px var(--accent-glow)',
+        }}
+      >
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wider mb-1" style={{ color: 'var(--accent)' }}>
+              Unlock AI Visibility
+            </p>
+            <h3 className="text-lg font-bold mb-1" style={{ color: 'var(--text-primary)' }}>
+              See how ChatGPT, Claude, Perplexity, and Gemini describe your business.
+            </h3>
+            <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+              The other half of your AIVA Score — buyer-intent prompts run
+              against real AI assistants, scored, and turned into a 30/60/90
+              plan refreshed monthly.
+            </p>
+          </div>
+          <a
+            href="/pricing"
+            className="btn-primary px-5 py-2.5 text-sm font-medium rounded-lg whitespace-nowrap"
+          >
+            See plans
+          </a>
+        </div>
+      </section>
     </div>
   );
 }

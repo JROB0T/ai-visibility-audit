@@ -360,6 +360,31 @@ function SiteDashboardContent() {
         </div>
       )}
 
+      {/* Shareable 2-page sample report. Dashboard scans don't run AI
+          Discovery — only Site Readiness — so the 2-page report can't
+          be generated directly from this scan. Routing to /free-scan
+          with the URL prefilled mints a real shareable sample using
+          the same flow that powers the cold-outreach pipeline. */}
+      {!site.has_monthly_monitoring && (
+        <div className="card p-5 mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>
+              Want a 2-page report you can share?
+            </p>
+            <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+              We&rsquo;ll run a short AI visibility scan and email you a sharable summary you can forward to your team.
+            </p>
+          </div>
+          <a
+            href={`/free-scan?url=${encodeURIComponent(site.domain)}`}
+            className="px-4 py-2 rounded-lg border text-sm font-medium inline-flex items-center gap-1.5 whitespace-nowrap"
+            style={{ color: 'var(--accent)', borderColor: 'var(--accent)' }}
+          >
+            Get my sample <ChevronRight className="w-4 h-4" />
+          </a>
+        </div>
+      )}
+
       {/* Trend chart (simple visual) */}
       {trendData.length > 1 && (
         <div className="card p-6 mb-6">

@@ -107,7 +107,12 @@ function DashboardContent() {
         }
         return;
       }
-      router.push(`/audit/${data.auditId}`);
+      // Land on the friendly site summary (Latest Score, Findability/
+      // Explainability/Buyability/Trustworthiness, scan history) rather
+      // than the tab view. Users get a "something was accomplished"
+      // moment immediately; the deeper tabs are still reachable from
+      // the View Full Report button there.
+      router.push(`/site/${data.siteId}`);
     } catch (err) {
       // fetch() itself threw — almost always a network drop or a
       // gateway killing the request mid-flight. The latter is the
