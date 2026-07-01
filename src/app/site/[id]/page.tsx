@@ -31,6 +31,35 @@ function SiteDashboardContent() {
   const [showRescanModal, setShowRescanModal] = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
+  // Free on-demand rescan for monthly subscribers — reuses the same
+  // `/api/audit` endpoint that the dashboard "Scan Site" form calls.
+  const [rescanRunning, setRescanRunning] = useState(false);
+  async function handleFreeRescan(): Promise<void> {
+    if (!data) return;
+    setShowRescanModal(false);
+    setRescanRunning(true);
+    setCheckoutError(null);
+    try {
+      const res = await fetch('/api/audit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: data.site.url || data.site.domain }),
+      });
+      const result = await res.json().catch(() => ({}));
+      if (res.ok && result.siteId) {
+        // Route back to /site/[id] so freshly-completed scan appears
+        // in Scan History and Latest Score.
+        router.push(`/site/${result.siteId}`);
+        router.refresh();
+        return;
+      }
+      setCheckoutError(result.error || 'Could not run rescan. Try again.');
+    } catch {
+      setCheckoutError('Network error. Check your connection and try again.');
+    } finally {
+      setRescanRunning(false);
+    }
+  }
   const [checkoutSuccess, setCheckoutSuccess] = useState(false);
   const [kickoffStatus, setKickoffStatus] = useState<'idle' | 'starting' | 'started' | 'failed'>('idle');
   const searchParams = useSearchParams();
@@ -154,7 +183,9 @@ function SiteDashboardContent() {
   // Single source of truth: prefer the env-driven price from the API.
   // Fallback string keeps the UI sane if the field is ever absent.
   const monthlyFormatted = data.monthlyPrice?.formatted ?? '$29.99';
-  const rescanFormatted = data.rescanPrice?.formatted ?? '$35';
+  // rescanPrice is still returned by the API for legacy/back-compat but
+  // the UI no longer surfaces a paid one-off rescan (retired 2026-07-01;
+  // subscribers get on-demand rescans free as part of Monthly).
   const latest = audits[0];
   const previous = audits.length > 1 ? audits[1] : null;
   const completedAudits = audits.filter(a => a.status === 'completed');
@@ -186,9 +217,21 @@ function SiteDashboardContent() {
           </div>
         </div>
         <div className="flex items-start gap-2">
-          <button onClick={() => setShowRescanModal(true)} className="btn-primary px-5 py-2.5 text-sm font-medium inline-flex items-center gap-2">
-            <RefreshCw className="w-4 h-4" />Rescan
-          </button>
+          {/* Rescan is a subscriber-only perk — Monthly customers can
+              trigger an on-demand refresh between their automatic monthly
+              runs. Non-subscribers see only the Subscribe CTA below;
+              they subscribe to unlock rescans + the ongoing monthly
+              refresh. This retires the paid one-off rescan flow. */}
+          {site.has_monthly_monitoring && (
+            <button
+              onClick={() => setShowRescanModal(true)}
+              disabled={rescanRunning}
+              className="btn-primary px-5 py-2.5 text-sm font-medium inline-flex items-center gap-2 disabled:opacity-60"
+            >
+              <RefreshCw className={`w-4 h-4 ${rescanRunning ? 'animate-spin' : ''}`} />
+              {rescanRunning ? 'Scanning…' : 'Rescan'}
+            </button>
+          )}
           {!site.has_monthly_monitoring && (
             <div className="flex flex-col items-end gap-1">
               <button onClick={() => handleCheckout('monthly')} disabled={checkoutLoading}
@@ -301,20 +344,25 @@ function SiteDashboardContent() {
         </div>
       )}
 
-      {/* Rescan confirmation modal */}
+      {/* Rescan confirmation modal — subscribers only. No payment;
+          part of the monthly plan. */}
       {showRescanModal && (
         <>
           <div className="fixed inset-0 z-40" style={{ background: 'rgba(0,0,0,0.4)' }} onClick={() => setShowRescanModal(false)} />
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div className="rounded-xl border p-6 max-w-sm w-full shadow-xl" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
-              <h3 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>Rescan This Site</h3>
+              <h3 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>Rescan this site?</h3>
               <p className="mt-2 text-sm" style={{ color: 'var(--text-secondary)' }}>
-                This is an on-demand rescan and costs {rescanFormatted}. Monthly plans include automatic monthly rescans at no extra charge.
+                We&rsquo;ll re-run the scan now (takes about 90 seconds). Included
+                in your monthly plan — no extra charge.
               </p>
               <div className="flex gap-3 mt-6">
-                <button onClick={() => { setShowRescanModal(false); handleCheckout('rescan'); }} disabled={checkoutLoading}
-                  className="btn-primary flex-1 py-2.5 text-sm font-medium">
-                  {checkoutLoading ? 'Redirecting…' : 'Confirm & Pay — $35'}
+                <button
+                  onClick={handleFreeRescan}
+                  disabled={rescanRunning}
+                  className="btn-primary flex-1 py-2.5 text-sm font-medium disabled:opacity-60"
+                >
+                  {rescanRunning ? 'Starting…' : 'Rescan now'}
                 </button>
                 <button onClick={() => setShowRescanModal(false)} className="flex-1 py-2.5 text-sm font-medium rounded-lg border" style={{ color: 'var(--text-secondary)', borderColor: 'var(--border)' }}>
                   Cancel
