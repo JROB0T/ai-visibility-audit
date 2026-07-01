@@ -88,12 +88,24 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   let browser: Awaited<ReturnType<typeof puppeteer.launch>> | null = null;
   try {
-    browser = await puppeteer.launch({
+    // Cold-start race: @sparticuz/chromium-min downloads the binary on
+    // first invocation per Lambda instance. First launch sometimes
+    // fails with "executable not found" or socket-timeout before the
+    // download settles. A single quick retry clears this reliably in
+    // production without adding meaningful latency on the happy path.
+    const launchBrowser = async () => puppeteer.launch({
       args: chromium.args,
       defaultViewport: chromium.defaultViewport,
       executablePath: await chromium.executablePath(CHROMIUM_REMOTE_URL),
       headless: true,
     });
+    try {
+      browser = await launchBrowser();
+    } catch (launchErr) {
+      console.warn('[PDF_GENERATION] chromium launch retry:', launchErr instanceof Error ? launchErr.message : launchErr);
+      await new Promise(r => setTimeout(r, 500));
+      browser = await launchBrowser();
+    }
 
     const page = await browser.newPage();
 
