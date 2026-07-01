@@ -104,11 +104,20 @@ function SiteDashboardContent() {
         window.location.href = result.url;
         return;
       }
-      // Visible error — silent fail used to make "nothing happens"
-      // when an env var was missing on Vercel. Now the user sees
-      // something actionable instead.
+      // Log the raw detail (env-var names, etc.) for us; show a
+      // sanitized message to the user. Previously we surfaced the raw
+      // `detail` field which leaked strings like "Set one of:
+      // STRIPE_PRICE_RESCAN" — confusing to customers.
       console.error('Checkout error:', { status: res.status, result });
-      setCheckoutError(result.detail || result.error || 'Could not start checkout. Try again or contact support.');
+      const rawDetail = String(result.detail || '');
+      const looksLikeInternal = /STRIPE_|env|configuration/i.test(rawDetail);
+      setCheckoutError(
+        looksLikeInternal || !rawDetail
+          ? (result.error === 'Stripe not configured'
+              ? 'Payments are temporarily unavailable. Please try again shortly or contact support.'
+              : 'This option isn’t available yet. Please try a different plan or contact support.')
+          : rawDetail
+      );
     } catch (err) {
       console.error('Checkout error:', err);
       setCheckoutError('Network error. Check your connection and try again.');
