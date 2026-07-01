@@ -206,6 +206,26 @@ export async function runFreeScan(params: RunFreeScanParams): Promise<RunFreeSca
     })
     .eq('id', auditId);
 
+  const { snapshotId, shareToken } = await enrichAsFreeSample(admin, siteId, auditId);
+
+  return { auditId, siteId, snapshotId, shareToken };
+}
+
+/**
+ * Steps 5–7 of the free-scan pipeline — extract-able so /api/audit
+ * (dashboard first-time scan) can reuse it. Assumes the caller has
+ * already inserted `sites`, run the technical scanner, and marked
+ * `audits.status='completed'`. Runs the 6-prompt AI Discovery scan,
+ * builds the 2-page HTML, persists it on the snapshot, and mints a
+ * share_token. Throws on discovery / persistence failure so the
+ * caller can react; on error we also set audits.status='failed' so
+ * an operator sees the state clearly.
+ */
+export async function enrichAsFreeSample(
+  admin: SupabaseClient,
+  siteId: string,
+  auditId: string,
+): Promise<{ snapshotId: string; shareToken: string; runId: string }> {
   // ----- 5. Discovery (lighter scan: 6 prompts via selectPromptsForTier) -----
   let runId: string;
   try {
@@ -216,8 +236,6 @@ export async function runFreeScan(params: RunFreeScanParams): Promise<RunFreeSca
     });
     runId = run.runId;
   } catch (err) {
-    // Mark the audit failed so any operator review can spot it. The caller
-    // marks the free_scan_requests row as failed too.
     await admin
       .from('audits')
       .update({ status: 'failed' })
@@ -235,7 +253,6 @@ export async function runFreeScan(params: RunFreeScanParams): Promise<RunFreeSca
     .update({
       report_html: html,
       report_generated_at: generatedAt,
-      // No narrative or model — free tier doesn't run the narrative generator.
     })
     .eq('site_id', siteId)
     .eq('run_id', runId)
@@ -255,7 +272,7 @@ export async function runFreeScan(params: RunFreeScanParams): Promise<RunFreeSca
     shareToken = await mintShareToken(admin, snapshotId);
   }
 
-  return { auditId, siteId, snapshotId, shareToken };
+  return { snapshotId, shareToken, runId };
 }
 
 // ------------------------------------------------------------

@@ -64,11 +64,25 @@ export async function GET(
     const monthlyDollars = getDisplayPricing().tier_1.monthly;
     const rescanDollars = getRescanPriceDollars();
 
+    // Latest snapshot's share_token — used to link the 2-page
+    // shareable free-sample report from /site/[id]. Null when the
+    // site has no discovery snapshot yet (e.g. tech-only scan).
+    let shareToken: string | null = null;
+    const { data: snap } = await supabase
+      .from('discovery_score_snapshots')
+      .select('share_token, snapshot_date')
+      .eq('site_id', id)
+      .order('snapshot_date', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (snap?.share_token) shareToken = snap.share_token as string;
+
     return NextResponse.json({
       site,
       audits: audits || [],
       latestFindings,
       trendData,
+      shareToken,
       monthlyPrice: {
         dollars: monthlyDollars,
         formatted: formatDollars(monthlyDollars),

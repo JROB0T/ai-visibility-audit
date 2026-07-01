@@ -1,11 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
 import { createServerSupabase } from '@/lib/supabase/server';
 import { scanSite } from '@/lib/scanner';
 import { calculateScores, generateRecommendations, enrichWithCodeSnippets } from '@/lib/scoring';
 import { classifyBusiness } from '@/lib/classify';
 import { isAdminAccount } from '@/lib/entitlements';
+import { enrichAsFreeSample } from '@/lib/freeScan';
 
-export const maxDuration = 60;
+// Bumped from 60s to 300s to accommodate the free-sample AI Discovery
+// enrichment on first-time signup scans. Tech scan ~30s + discovery
+// ~30s = ~60s worst case; the extra headroom protects us from cold-
+// start variance and Anthropic API latency spikes.
+export const maxDuration = 300;
 
 export async function POST(request: NextRequest) {
   try {
@@ -48,6 +54,11 @@ export async function POST(request: NextRequest) {
     // Re-scanning the SAME site the user already owns is always fine;
     // it reuses the existing site row and doesn't trigger the gate.
     const isAdminUser = isAdminAccount(user.email);
+    // Whether this scan should also produce a shareable 2-page free
+    // sample (AI Discovery enrichment). True only for a non-admin,
+    // non-subscriber user's very first site — matches the product
+    // model: one free sample per signup.
+    let isFirstTimeFreeSample = false;
     if (!isAdminUser) {
       const { data: existingSitesForUser } = await supabase
         .from('sites')
@@ -57,6 +68,7 @@ export async function POST(request: NextRequest) {
       const alreadyOnThisSite = (existingSitesForUser || []).some(s => s.domain === domain);
       const hasSubscription = (existingSitesForUser || []).some(s => s.has_monthly_monitoring === true);
       const siteCount = (existingSitesForUser || []).length;
+      isFirstTimeFreeSample = siteCount === 0 && !hasSubscription;
 
       if (!alreadyOnThisSite && siteCount >= 1) {
         if (hasSubscription) {
@@ -215,7 +227,42 @@ export async function POST(request: NextRequest) {
       scanner_summary: scanResult.scannerSummary || null,
     }).eq('id', audit.id);
 
-    return NextResponse.json({ auditId: audit.id, siteId: site.id, score: scores.overall, status: 'completed' });
+    // Free-sample enrichment: for a non-admin user's very first
+    // site, additionally run 6-prompt AI Discovery and build the
+    // 2-page shareable report. Best-effort — a failure here does
+    // NOT roll back the successful technical scan, since the user
+    // still has a working /site/[id] view either way.
+    let shareToken: string | null = null;
+    if (isFirstTimeFreeSample) {
+      try {
+        // enrichAsFreeSample uses the admin/service-role client
+        // internally (discovery bootstrap needs elevated perms), so
+        // build one here to match.
+        const admin = createClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.SUPABASE_SERVICE_ROLE_KEY!,
+        );
+        const result = await enrichAsFreeSample(admin, site.id, audit.id);
+        shareToken = result.shareToken;
+      } catch (err) {
+        // Log but don't fail the response — the tech scan is still
+        // valid. Owner sees any surfaced failure in audit.status if
+        // enrichAsFreeSample flipped it to 'failed'.
+        console.error('[FREE_SAMPLE_ENRICH_ERROR]', {
+          message: err instanceof Error ? err.message : String(err),
+          auditId: audit.id,
+          siteId: site.id,
+        });
+      }
+    }
+
+    return NextResponse.json({
+      auditId: audit.id,
+      siteId: site.id,
+      score: scores.overall,
+      status: 'completed',
+      shareToken,
+    });
   } catch (error) {
     console.error('Audit API error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
