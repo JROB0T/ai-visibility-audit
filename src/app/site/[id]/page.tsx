@@ -19,6 +19,7 @@ interface SiteData {
   trendData: Array<{ date: string; overall: number | null; crawlability: number | null; readability: number | null; commercial: number | null; trust: number | null }>;
   shareToken?: string | null;
   snapshotId?: string | null;
+  snapshots?: Array<{ id: string; snapshot_date: string; share_token: string | null }>;
   monthlyPrice?: { dollars: number; formatted: string };
   rescanPrice?: { dollars: number; formatted: string };
 }
@@ -36,24 +37,23 @@ function SiteDashboardContent() {
   // Free on-demand rescan for monthly subscribers — reuses the same
   // `/api/audit` endpoint that the dashboard "Scan Site" form calls.
   const [rescanRunning, setRescanRunning] = useState(false);
-  const [pdfDownloading, setPdfDownloading] = useState(false);
-  // Download the report PDF for the latest snapshot. Works for any
-  // signed-in owner of the site (auth checked server-side in
-  // /api/discovery/report/pdf). Failures show an inline alert rather
-  // than surfacing a raw error blob.
-  async function handleDownloadPdf(): Promise<void> {
-    if (!data?.snapshotId || pdfDownloading) return;
-    setPdfDownloading(true);
+  // Track which snapshot's download is in-flight so multiple buttons
+  // (latest + per-month in Scan History) can coexist and each shows
+  // its own loading state. `null` means nothing is downloading.
+  const [downloadingSnapshotId, setDownloadingSnapshotId] = useState<string | null>(null);
+  const pdfDownloading = downloadingSnapshotId !== null;
+  async function handleDownloadPdf(snapshotId?: string | null): Promise<void> {
+    const targetId = snapshotId ?? data?.snapshotId ?? null;
+    if (!targetId || pdfDownloading) return;
+    setDownloadingSnapshotId(targetId);
     try {
       const res = await fetch('/api/discovery/report/pdf', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ snapshotId: data.snapshotId }),
+        body: JSON.stringify({ snapshotId: targetId }),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        // Include `detail` (chromium error type/message) so field
-        // failures are diagnosable without needing Vercel logs.
         const msg = body.detail
           ? `${body.error || 'PDF failed'} — ${body.detail}`
           : (body.error || 'Could not generate PDF. Try again in a moment.');
@@ -75,7 +75,7 @@ function SiteDashboardContent() {
     } catch {
       alert('Network error while downloading. Check your connection and try again.');
     } finally {
-      setPdfDownloading(false);
+      setDownloadingSnapshotId(null);
     }
   }
   async function handleFreeRescan(): Promise<void> {
@@ -537,6 +537,59 @@ function SiteDashboardContent() {
                   <span className="text-xs font-bold" style={{ color: scoreColor(score), fontFamily: 'var(--font-mono)' }}>{score}</span>
                   <div className="w-full rounded-t" style={{ height: `${Math.max(score, 5)}%`, background: scoreColor(score), opacity: 0.8 }} />
                   <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>{new Date(t.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Downloadable reports — one row per persisted snapshot.
+          Sub subscribers will accumulate these month-over-month;
+          non-subscribers will typically have just one (their signup
+          sample). Always visible for anyone who owns the site — the
+          user's ask: "obvious after they run a scan that there is
+          also a report they can download at any time." */}
+      {data.snapshots && data.snapshots.length > 0 && (
+        <div className="mb-6">
+          <h2 className="text-lg font-bold mb-4" style={{ color: 'var(--text-primary)' }}>Downloadable Reports</h2>
+          <div className="space-y-2">
+            {data.snapshots.map((snap) => {
+              const dateLabel = new Date(snap.snapshot_date).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' });
+              const busy = downloadingSnapshotId === snap.id;
+              return (
+                <div key={snap.id}
+                  className="flex items-center justify-between p-4 rounded-xl border"
+                  style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
+                  <div className="flex items-center gap-3">
+                    <Download className="w-4 h-4" style={{ color: 'var(--text-tertiary)' }} />
+                    <div>
+                      <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{dateLabel}</p>
+                      <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>PDF report</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {snap.share_token && (
+                      <a
+                        href={`/r/${snap.share_token}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-xs px-3 py-1.5 rounded-lg border"
+                        style={{ color: 'var(--text-secondary)', borderColor: 'var(--border)' }}
+                      >
+                        View
+                      </a>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => void handleDownloadPdf(snap.id)}
+                      disabled={pdfDownloading}
+                      className="btn-primary text-xs px-3 py-1.5 rounded-lg inline-flex items-center gap-1.5 disabled:opacity-60"
+                    >
+                      <Download className={`w-3.5 h-3.5 ${busy ? 'animate-pulse' : ''}`} />
+                      {busy ? 'Preparing…' : 'Download PDF'}
+                    </button>
+                  </div>
                 </div>
               );
             })}

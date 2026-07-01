@@ -64,21 +64,27 @@ export async function GET(
     const monthlyDollars = getDisplayPricing().tier_1.monthly;
     const rescanDollars = getRescanPriceDollars();
 
-    // Latest snapshot's id + share_token — used to power the
-    // 2-page share link and the Download PDF button on /site/[id].
-    // Null when the site has no discovery snapshot yet (e.g. tech-
-    // only scan, or discovery failed / hasn't run).
-    let shareToken: string | null = null;
-    let snapshotId: string | null = null;
-    const { data: snap } = await supabase
+    // All snapshots for this site — powers per-month PDF downloads
+    // in Scan History. Only include snapshots that actually have
+    // report_html (empty ones can't produce a PDF and would give a
+    // "Report not found" error if the button were rendered).
+    const { data: snapRows } = await supabase
       .from('discovery_score_snapshots')
-      .select('id, share_token, snapshot_date')
+      .select('id, share_token, snapshot_date, report_html')
       .eq('site_id', id)
-      .order('snapshot_date', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    if (snap?.share_token) shareToken = snap.share_token as string;
-    if (snap?.id) snapshotId = snap.id as string;
+      .order('snapshot_date', { ascending: false });
+    const snapshots = (snapRows || [])
+      .filter(s => !!s.report_html)
+      .map(s => ({
+        id: s.id as string,
+        snapshot_date: s.snapshot_date as string,
+        share_token: (s.share_token as string | null) ?? null,
+      }));
+    // Latest snapshot's id + share_token — back-compat convenience
+    // fields for existing UI that only cares about the newest one.
+    const latest = snapshots[0];
+    const shareToken = latest?.share_token ?? null;
+    const snapshotId = latest?.id ?? null;
 
     return NextResponse.json({
       site,
@@ -87,6 +93,7 @@ export async function GET(
       trendData,
       shareToken,
       snapshotId,
+      snapshots,
       monthlyPrice: {
         dollars: monthlyDollars,
         formatted: formatDollars(monthlyDollars),

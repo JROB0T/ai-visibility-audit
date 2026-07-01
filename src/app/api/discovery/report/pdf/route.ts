@@ -78,13 +78,24 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: auth.error }, { status: auth.status });
   }
 
-  // Filename: <domain>-ai-visibility-<YYYY-MM-DD>.pdf
+  // Filename: AIVAScan-<Domain>-<YYYY-MM-DD>.pdf (e.g.
+  // AIVAScan-Grotelawfirm-2026-07-01.pdf). We take the domain stem
+  // (drop www + TLD), Capitalize first letter, strip anything
+  // non-alphanumeric. Safe fallback: "Report" if the domain is
+  // missing.
   const site = Array.isArray(snapshot.sites) ? snapshot.sites[0] : snapshot.sites;
-  const domain = ((site as { domain?: string } | null)?.domain as string) || 'report';
+  const rawDomain = ((site as { domain?: string } | null)?.domain as string) || '';
+  const stem = rawDomain
+    .replace(/^www\./i, '')
+    .split('.')[0]
+    .replace(/[^a-z0-9]/gi, '');
+  const brandLabel = stem
+    ? stem.charAt(0).toUpperCase() + stem.slice(1).toLowerCase()
+    : 'Report';
   const dateStr = snapshot.snapshot_date
     ? new Date(snapshot.snapshot_date as string).toISOString().slice(0, 10)
     : new Date().toISOString().slice(0, 10);
-  const filename = `${domain.replace(/[^a-z0-9.-]/gi, '-')}-ai-visibility-${dateStr}.pdf`;
+  const filename = `AIVAScan-${brandLabel}-${dateStr}.pdf`;
 
   let browser: Awaited<ReturnType<typeof puppeteer.launch>> | null = null;
   try {

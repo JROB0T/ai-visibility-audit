@@ -63,14 +63,21 @@ export async function GET(
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
 
-  // Build the download filename from domain + date so saved PDFs are
-  // self-describing in the recipient's downloads folder.
+  // Filename: AIVAScan-<Domain>-<YYYY-MM-DD>.pdf, matching the
+  // authenticated /api/discovery/report/pdf endpoint for consistency.
   const site = Array.isArray(snapshot.sites) ? snapshot.sites[0] : snapshot.sites;
-  const domain = ((site as { domain?: string } | null)?.domain as string) || 'report';
+  const rawDomain = ((site as { domain?: string } | null)?.domain as string) || '';
+  const stem = rawDomain
+    .replace(/^www\./i, '')
+    .split('.')[0]
+    .replace(/[^a-z0-9]/gi, '');
+  const brandLabel = stem
+    ? stem.charAt(0).toUpperCase() + stem.slice(1).toLowerCase()
+    : 'Report';
   const dateStr = snapshot.snapshot_date
     ? new Date(snapshot.snapshot_date as string).toISOString().slice(0, 10)
     : new Date().toISOString().slice(0, 10);
-  const filename = `${domain.replace(/[^a-z0-9.-]/gi, '-')}-ai-visibility-${dateStr}.pdf`;
+  const filename = `AIVAScan-${brandLabel}-${dateStr}.pdf`;
 
   let browser: Awaited<ReturnType<typeof puppeteer.launch>> | null = null;
   try {
