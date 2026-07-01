@@ -109,11 +109,20 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     const page = await browser.newPage();
 
-    // setContent with networkidle0 waits for fonts + images to settle.
+    // Use 'domcontentloaded' + a short manual settle instead of
+    // 'networkidle0'. The full paid-tier report_html links to Google
+    // Fonts which sometimes hangs Vercel Lambda's DNS/network for the
+    // full 30s timeout — causing chromium to spin the whole time and
+    // then error out. The DOM is what matters for the PDF layout;
+    // fonts are best-effort with system fallbacks in the CSS.
     await page.setContent(snapshot.report_html as string, {
-      waitUntil: 'networkidle0',
-      timeout: 30000,
+      waitUntil: 'domcontentloaded',
+      timeout: 20000,
     });
+    // Small settle so async CSS + inlined fonts have a chance to
+    // apply before we snapshot. Enough for the happy path, short
+    // enough not to matter when fonts don't resolve.
+    await new Promise(r => setTimeout(r, 1500));
 
     const pdfBuffer = await page.pdf({
       format: 'Letter',
