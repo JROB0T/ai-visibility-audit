@@ -38,13 +38,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
 
-    // ---- Free-scan quota gate (2026-07-01) --------------------------
-    // Product model: 1 free scan per signed-up account. Additional
-    // scans (any site) require a Monthly subscription. Admins bypass.
-    // Detection: user is a "subscriber" if any of their sites has
-    // has_monthly_monitoring=true. If not, and they already have >=1
-    // site row, block. Rescanning the SAME site is always fine — it
-    // reuses the existing site row and doesn't trigger the gate.
+    // ---- One-site-per-account gate (2026-07-01) --------------------
+    // Product model:
+    //   - Non-subscriber: 1 free sample scan on 1 site.
+    //   - Subscriber: 1 subscribed site (auto monthly rerun + on-
+    //     demand rescan). Additional sites need additional
+    //     subscriptions.
+    //   - Admin (ADMIN_EMAILS): unlimited.
+    // Re-scanning the SAME site the user already owns is always fine;
+    // it reuses the existing site row and doesn't trigger the gate.
     const isAdminUser = isAdminAccount(user.email);
     if (!isAdminUser) {
       const { data: existingSitesForUser } = await supabase
@@ -54,13 +56,23 @@ export async function POST(request: NextRequest) {
 
       const alreadyOnThisSite = (existingSitesForUser || []).some(s => s.domain === domain);
       const hasSubscription = (existingSitesForUser || []).some(s => s.has_monthly_monitoring === true);
-      const usedFreeScan = (existingSitesForUser || []).length >= 1;
+      const siteCount = (existingSitesForUser || []).length;
 
-      if (!alreadyOnThisSite && usedFreeScan && !hasSubscription) {
+      if (!alreadyOnThisSite && siteCount >= 1) {
+        if (hasSubscription) {
+          return NextResponse.json(
+            {
+              error: 'Your subscription covers one site',
+              detail: 'To monitor another site, subscribe again for that site.',
+              upgradeUrl: '/pricing',
+            },
+            { status: 402 },
+          );
+        }
         return NextResponse.json(
           {
-            error: 'Subscribe to scan another site',
-            detail: 'Your free scan has already been used. Subscribe to Monthly for automatic scans plus on-demand rescans on the sites you choose.',
+            error: 'Free scan already used',
+            detail: 'You get one free sample. Subscribe to Monthly for the full report and automatic monthly rescans.',
             upgradeUrl: '/pricing',
           },
           { status: 402 },

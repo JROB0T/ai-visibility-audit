@@ -133,14 +133,13 @@ function DashboardContent() {
 
   if (loading) return (<div className="max-w-5xl mx-auto px-4 py-20 text-center"><div className="animate-spin w-8 h-8 border-2 rounded-full mx-auto" style={{ borderColor: '#6366F1', borderTopColor: 'transparent' }} /><p className="mt-4" style={{ color: 'var(--text-tertiary)' }}>Loading your sites…</p></div>);
 
-  // Free-scan quota gate (mirrors the server-side check in /api/audit).
-  // Free tier: one site per account. Additional sites require a Monthly
-  // subscription. Subscribers and admins get the input; everyone else
-  // who has already used their free scan sees the upgrade CTA in its
-  // place.
+  // One-site-per-account gate (mirrors the server-side check in
+  // /api/audit). Admins bypass. Everyone else — subscriber or not —
+  // is capped at one site. Subscribers get monthly reruns + on-demand
+  // rescans on THAT site; adding a second site requires another
+  // subscription.
   const hasSubscription = sites.some(s => s.has_monthly_monitoring === true);
-  const usedFreeScan = sites.length >= 1;
-  const canScanNewSite = isAdmin || !usedFreeScan || hasSubscription;
+  const canScanNewSite = isAdmin || sites.length === 0;
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
@@ -202,22 +201,35 @@ function DashboardContent() {
           {error && <p className="mt-2 text-sm text-red-500">{error}</p>}
         </form>
       ) : (
-        // Free scan already used, no subscription. Replace the input
-        // with a clear upgrade CTA — the /api/audit endpoint would
-        // reject any new scan attempt anyway, so hiding the input
-        // avoids a "click, get error" dead end.
+        // Cap: 1 site per non-admin account. Copy differentiates
+        // subscribers (need another sub for a second site) from
+        // non-subscribers (free scan already used, subscribe to get
+        // the full report). Hiding the input avoids a "click, get
+        // error" dead end since /api/audit would reject anyway.
         <div
           className="mb-8 card p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
           style={{ borderColor: 'var(--accent)' }}
         >
           <div>
-            <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-              You&rsquo;ve used your free scan.
-            </p>
-            <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>
-              Subscribe to Monthly to scan more sites, get automatic monthly
-              rescans, and on-demand rescans anytime.
-            </p>
+            {hasSubscription ? (
+              <>
+                <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+                  Your subscription covers one site.
+                </p>
+                <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>
+                  Subscribe again to add and monitor another site.
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+                  You&rsquo;ve used your free scan.
+                </p>
+                <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>
+                  Subscribe to Monthly for the full report and automatic monthly rescans.
+                </p>
+              </>
+            )}
           </div>
           <a
             href="/pricing"
