@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import ScoreRing, { scoreToGrade } from '@/components/ScoreRing';
-import { ArrowLeft, Check, Clock, TrendingUp, ChevronRight, AlertTriangle, BarChart3, Building2, RefreshCw, CalendarCheck, X } from 'lucide-react';
+import { ArrowLeft, Check, Clock, TrendingUp, ChevronRight, AlertTriangle, BarChart3, Building2, RefreshCw, CalendarCheck, X, Download } from 'lucide-react';
 import { VERTICAL_OPTIONS } from '@/lib/verticals';
 import { getRunTypeLabel } from '@/lib/entitlements';
 
@@ -18,6 +18,7 @@ interface SiteData {
   latestFindings: { high: number; medium: number; low: number };
   trendData: Array<{ date: string; overall: number | null; crawlability: number | null; readability: number | null; commercial: number | null; trust: number | null }>;
   shareToken?: string | null;
+  snapshotId?: string | null;
   monthlyPrice?: { dollars: number; formatted: string };
   rescanPrice?: { dollars: number; formatted: string };
 }
@@ -35,6 +36,43 @@ function SiteDashboardContent() {
   // Free on-demand rescan for monthly subscribers — reuses the same
   // `/api/audit` endpoint that the dashboard "Scan Site" form calls.
   const [rescanRunning, setRescanRunning] = useState(false);
+  const [pdfDownloading, setPdfDownloading] = useState(false);
+  // Download the report PDF for the latest snapshot. Works for any
+  // signed-in owner of the site (auth checked server-side in
+  // /api/discovery/report/pdf). Failures show an inline alert rather
+  // than surfacing a raw error blob.
+  async function handleDownloadPdf(): Promise<void> {
+    if (!data?.snapshotId || pdfDownloading) return;
+    setPdfDownloading(true);
+    try {
+      const res = await fetch('/api/discovery/report/pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ snapshotId: data.snapshotId }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        alert(body.error || 'Could not generate PDF. Try again in a moment.');
+        return;
+      }
+      const cd = res.headers.get('Content-Disposition') || '';
+      const match = /filename="?([^"]+)"?/.exec(cd);
+      const filename = match?.[1] || 'ai-visibility-report.pdf';
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch {
+      alert('Network error while downloading. Check your connection and try again.');
+    } finally {
+      setPdfDownloading(false);
+    }
+  }
   async function handleFreeRescan(): Promise<void> {
     if (!data) return;
     setShowRescanModal(false);
@@ -412,9 +450,23 @@ function SiteDashboardContent() {
             {latestFindings.medium > 0 && <span className="px-2 py-0.5 rounded text-xs font-medium" style={{ background: 'rgba(245,158,11,0.1)', color: '#F59E0B' }}>{latestFindings.medium} medium</span>}
             {latestFindings.low > 0 && <span className="px-2 py-0.5 rounded text-xs font-medium" style={{ background: 'rgba(99,102,241,0.1)', color: '#6366F1' }}>{latestFindings.low} low</span>}
           </div>
-          <a href={`/audit/${latest.id}`} className="mt-4 btn-primary px-4 py-2 text-sm inline-flex items-center gap-2">
-            View Full Report <ChevronRight className="w-4 h-4" />
-          </a>
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <a href={`/audit/${latest.id}`} className="btn-primary px-4 py-2 text-sm inline-flex items-center gap-2">
+              View Full Report <ChevronRight className="w-4 h-4" />
+            </a>
+            {data.snapshotId && (
+              <button
+                type="button"
+                onClick={() => void handleDownloadPdf()}
+                disabled={pdfDownloading}
+                className="px-4 py-2 text-sm rounded-lg border inline-flex items-center gap-2 disabled:opacity-60"
+                style={{ color: 'var(--text-primary)', borderColor: 'var(--border)' }}
+              >
+                <Download className={`w-4 h-4 ${pdfDownloading ? 'animate-pulse' : ''}`} />
+                {pdfDownloading ? 'Preparing…' : 'Download PDF'}
+              </button>
+            )}
+          </div>
         </div>
       )}
 
