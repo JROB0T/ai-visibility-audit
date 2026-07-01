@@ -1,0 +1,84 @@
+{
+  "_comment": "Golden low-score fixture (WO2 Task 7). Mirrors the SEVIS defect shape: 19 prompts, 2 with presence, one rival-held answer, near-zero clusters, overall single digits. Prompt scores / cluster scores / overall are HYDRATED by the test through the real scoring functions (promptScore, clusterScore, overallDiscoveryScore) so the fixture can never drift from the engine.",
+  "meta": {
+    "business_name": "Sevis Systems",
+    "domain": "sevis.example",
+    "primary_category": "Enterprise caller-ID trust",
+    "service_area": "United States"
+  },
+  "prompts": [
+    { "text": "best enterprise caller ID verification vendor", "cluster": "core", "priority": "high", "status": "absent", "position": "not_present", "mentioned": false, "cited": false, "competitors": [], "directories": [] },
+    { "text": "how do I stop my business calls being marked spam", "cluster": "core", "priority": "high", "status": "absent", "position": "not_present", "mentioned": false, "cited": false, "competitors": [], "directories": [] },
+    { "text": "branded caller ID service for call centers", "cluster": "core", "priority": "high", "status": "absent", "position": "not_present", "mentioned": false, "cited": false, "competitors": [], "directories": [] },
+    { "text": "outbound call answer rate improvement service", "cluster": "core", "priority": "high", "status": "absent", "position": "not_present", "mentioned": false, "cited": false, "competitors": [], "directories": [] },
+    { "text": "verified business calling solution", "cluster": "core", "priority": "high", "status": "absent", "position": "not_present", "mentioned": false, "cited": false, "competitors": [], "directories": [] },
+    { "text": "why are my outbound calls getting blocked", "cluster": "problem", "priority": "medium", "status": "absent", "position": "not_present", "mentioned": false, "cited": false, "competitors": [], "directories": [] },
+    { "text": "customers not answering business calls fix", "cluster": "problem", "priority": "medium", "status": "absent", "position": "not_present", "mentioned": false, "cited": false, "competitors": [], "directories": [] },
+    { "text": "call labeled scam likely how to remove", "cluster": "problem", "priority": "medium", "status": "absent", "position": "not_present", "mentioned": false, "cited": false, "competitors": [], "directories": [] },
+    { "text": "Hiya vs Truecaller for business caller ID", "cluster": "comparison", "priority": "medium", "status": "competitor_dominant", "position": "not_present", "mentioned": false, "cited": false, "competitors": ["Hiya", "Truecaller"], "directories": [] },
+    { "text": "top caller ID reputation vendors compared", "cluster": "comparison", "priority": "medium", "status": "absent", "position": "not_present", "mentioned": false, "cited": false, "competitors": [], "directories": [] },
+    { "text": "best call branding platforms for enterprises", "cluster": "comparison", "priority": "medium", "status": "absent", "position": "not_present", "mentioned": false, "cited": false, "competitors": [], "directories": [] },
+    { "text": "trusted caller ID for financial services", "cluster": "long_tail", "priority": "high", "status": "indirect_presence", "position": "mentioned_without_preference", "mentioned": true, "cited": false, "competitors": [], "directories": [] },
+    { "text": "caller ID verification for healthcare providers", "cluster": "long_tail", "priority": "medium", "status": "absent", "position": "not_present", "mentioned": false, "cited": false, "competitors": [], "directories": [] },
+    { "text": "STIR SHAKEN attestation service for carriers", "cluster": "long_tail", "priority": "medium", "status": "absent", "position": "not_present", "mentioned": false, "cited": false, "competitors": [], "directories": [] },
+    { "text": "what is Sevis Systems", "cluster": "brand", "priority": "low", "status": "partial_presence", "position": "listed_among_options", "mentioned": true, "cited": true, "competitors": [], "directories": [] },
+    { "text": "Sevis Systems reviews", "cluster": "brand", "priority": "low", "status": "absent", "position": "not_present", "mentioned": false, "cited": false, "competitors": [], "directories": [] },
+    { "text": "Sevis eCallMe features", "cluster": "brand", "priority": "low", "status": "absent", "position": "not_present", "mentioned": false, "cited": false, "competitors": [], "directories": [] },
+    { "text": "fraud call prevention for banks", "cluster": "adjacent", "priority": "low", "status": "absent", "position": "not_present", "mentioned": false, "cited": false, "competitors": [], "directories": [] },
+    { "text": "customer trust tools for contact centers", "cluster": "adjacent", "priority": "low", "status": "absent", "position": "not_present", "mentioned": false, "cited": false, "competitors": [], "directories": [] }
+  ],
+  "competitors": [
+    { "name": "Hiya", "domain": "hiya.com", "appears_on": ["Hiya vs Truecaller for business caller ID"] },
+    { "name": "Truecaller", "domain": "truecaller.com", "appears_on": ["Hiya vs Truecaller for business caller ID"] }
+  ],
+  "narrative": {
+    "headline_primary": "Invisible where",
+    "headline_accent": "buyers are asking",
+    "verdict_paragraph": "AI assistants surfaced this business in <strong>2 of 19</strong> buyer-intent prompts this month. The rest returned rivals, aggregators, or generic guidance with <em>no mention at all</em>. The category is largely unclaimed: whoever publishes direct-answer content first inherits these queries, and that window is open right now.",
+    "strategic_posture": "Build & Claim",
+    "grade_subtitle": "NEEDS FOUNDATION",
+    "take_win": { "tag": "01 · The Win", "big": "2 / 19", "heading": "Prompts with any presence", "body": "The financial-services prompt and the brand query both returned a mention. Those two answers prove AI can find the business when the content is explicit enough." },
+    "take_watch": { "tag": "02 · The Watch", "big": "5 / 6", "heading": "High-priority queries without presence", "body": "Five of the six high-priority queries returned no mention at all; the sixth earned only partial credit. These are the questions closest to a purchase decision." },
+    "take_move": { "tag": "03 · The Move", "big": "Move 01", "heading": "Publish direct-answer pages", "body": "The fastest path to presence is publishing pages that answer the exact high-priority questions buyers ask, one page per question, in plain language." },
+    "performance_shape_heading": "Flat across every cluster.",
+    "performance_shape_body": "No cluster shows a working position. The small long-tail and brand bumps come from a single mention each, which means the shape reflects absence, not strength. Expect early movement in comparison and problem clusters first.",
+    "big_statement": "AI answers these buyer questions without naming this business.",
+    "big_statement_emphasis": "without naming",
+    "insights": [
+      { "number": "01", "title": "High-priority queries go unanswered", "body": "On the queries closest to a purchase decision, the business appeared once with partial credit. Buyers asking these questions are choosing from answers the business is not part of, which makes this the single largest gap in the data.", "proof_metric": "1 / 6", "proof_label": "high-priority prompts with presence" },
+      { "number": "02", "title": "The website is almost never cited", "body": "AI assistants cited the website in 1 of 19 answers. Citation is how an answer engine justifies naming a business, so a near-zero citation rate keeps the business out of answers even when the category matches exactly.", "proof_metric": "1 / 19", "proof_label": "answers citing the site" },
+      { "number": "03", "title": "One rival held one answer", "body": "Hiya and Truecaller filled the comparison prompt where the business was absent. That is 1 rival win across the set, which means the field is open rather than contested, but the comparison cluster is where rivals surface first.", "proof_metric": "1", "proof_label": "rival wins this run" },
+      { "number": "04", "title": "Directories have not intercepted yet", "body": "No directory appeared on a purchase-intent query this run. That is luck rather than defense: with no owned pages winning these answers, aggregators are the natural next citation if the gap stays unaddressed.", "proof_metric": "0", "proof_label": "directory appearances on purchase intent" }
+    ],
+    "money_quote_prompt": "trusted caller ID for financial services",
+    "money_quote_text": "For financial institutions, solutions in this space include enterprise caller-ID verification platforms; <span class=\"nm\">Sevis Systems</span> is referenced in industry material on call authentication.",
+    "money_quote_cite": "Recorded during this month's test run. This is what a customer researching the category sees.",
+    "page4_intro": "One comparison prompt returned named rivals. Everything else returned either generic guidance or nothing, which makes this an open field rather than a contested one.",
+    "rival_name": "Hiya",
+    "rival_quote": "Hiya and Truecaller are commonly named options for business caller identification and spam-label remediation.",
+    "rival_analysis": "Hiya filled a comparison answer the business was absent from. They are accumulating the mentions the business is not, and comparison queries are where buyers shortlist vendors. The comparison-page move targets this gap directly.",
+    "page5_intro": "This is the <em>baseline run</em>. There is no prior month to compare against, so this page records the starting position that future months will move against.",
+    "analyst_reading": "One snapshot exists, so there is no trend to read yet. Next month the things to watch are the comparison and problem clusters, which respond fastest to newly published direct-answer content, and whether the single rival-held answer hardens into a pattern.",
+    "page6_intro": "Every move below is aimed at the same outcome: <em>getting named</em> in answers that currently omit the business.",
+    "defense_moves": [
+      { "number": "01", "title": "Publish high-priority answer pages", "description": "Create one page per high-priority query, answering it directly in the first paragraph with the business named. These five queries returned no mention at all, and direct-answer content is the fastest input an answer engine can pick up.", "plan_summary": "Publish one direct-answer page for each high-priority query that returned no mention.", "evidence_line": "Prompt: \"best enterprise caller ID verification vendor\" · Cluster: Core · Current: 0/100", "expected_outcome": "First mentions on core queries", "impact": "High", "effort": "Medium", "owner": "Marketer" },
+      { "number": "02", "title": "Build a comparison page naming rivals", "description": "Publish an honest comparison of the business against Hiya and Truecaller. The one rival-held answer this run was a comparison prompt, and comparison content is what answer engines quote when buyers ask who to choose.", "plan_summary": "Publish an honest comparison page against Hiya and Truecaller.", "evidence_line": "Prompt: \"Hiya vs Truecaller for business caller ID\" · Cluster: Comparison · Current: 25/100", "expected_outcome": "Presence on comparison queries", "impact": "High", "effort": "Medium", "owner": "Marketer" },
+      { "number": "03", "title": "Rewrite the homepage positioning line", "description": "State plainly what the business does, for whom, and where, in the first hundred words. The financial-services prompt earned a mention because the category language matched; the rest of the site never says the words buyers use.", "plan_summary": "Rewrite the homepage to state the category and audience in plain buyer language.", "evidence_line": "Prompt: \"trusted caller ID for financial services\" · Cluster: Long-tail · Current: 50/100", "expected_outcome": "Clearer category match", "impact": "Medium", "effort": "Low", "owner": "Business Owner" }
+    ],
+    "expansion_moves": [
+      { "number": "04", "title": "Publish problem-framing pages", "description": "Write pages that open with the buyer's problem in their words, such as calls being labeled spam, then present the remedy. Problem queries returned generic guidance with no vendors named, which means the first business to answer them wins them.", "plan_summary": "Publish problem-framing pages that answer spam-label questions in buyer language.", "evidence_line": "Prompt: \"why are my outbound calls getting blocked\" · Cluster: Problem · Current: 0/100", "expected_outcome": "First mentions on problem queries", "impact": "High", "effort": "Medium", "owner": "Marketer" },
+      { "number": "05", "title": "Earn two industry citations", "description": "Pitch two industry publications for coverage of the financial-services use case, the one place the business already earns a mention. Third-party citations are the strongest input for getting named rather than merely referenced.", "plan_summary": "Earn two third-party industry citations for the financial-services use case.", "evidence_line": "Prompt: \"trusted caller ID for financial services\" · Cluster: Long-tail · Current: 50/100", "expected_outcome": "Stronger citation footprint", "impact": "Medium", "effort": "Medium", "owner": "Marketer" },
+      { "number": "06", "title": "Publish a plain-language FAQ", "description": "Answer the adjacent questions buyers ask, fraud prevention and contact-center trust, on a single FAQ page written in complete sentences. Adjacent queries are uncontested and cheap to claim while the category stays open.", "plan_summary": "Publish a plain-language FAQ covering fraud-prevention and trust questions.", "evidence_line": "Prompt: \"fraud call prevention for banks\" · Cluster: Adjacent · Current: 0/100", "expected_outcome": "Adjacent-cluster presence", "impact": "Medium", "effort": "Low", "owner": "Marketer" }
+    ],
+    "page7_intro": "Sequenced so the <em>highest-intent gaps close first</em>: answer pages, then the comparison, then the broader footprint.",
+    "roadmap": [
+      { "phase": "30", "move_number": "01", "title": "High-priority answer pages" },
+      { "phase": "30", "move_number": "03", "title": "Homepage positioning rewrite" },
+      { "phase": "60", "move_number": "02", "title": "Comparison page", "dependency_note": "after move 01" },
+      { "phase": "60", "move_number": "04", "title": "Problem-framing pages" },
+      { "phase": "90", "move_number": "05", "title": "Industry citations", "dependency_note": "after move 02" },
+      { "phase": "90", "move_number": "06", "title": "Plain-language FAQ" }
+    ],
+    "methodology_paragraph": "We ran 19 buyer-intent prompts through an AI engine with live web search, recorded each answer, and scored how the business appeared using a fixed rubric. The test measures how AI answer engines represent the business to buyers. It does not measure search rankings, advertising performance, or conversions, and AI answers vary between runs and change over time."
+  }
+}

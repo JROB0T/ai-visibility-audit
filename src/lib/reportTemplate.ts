@@ -22,15 +22,49 @@
 
 import type { ReportExportPayload, ReportNarrative, ClusterKey } from './reportNarrative';
 import { REPORT_STYLES } from './report/templateStyles';
+import {
+  computeReportFacts,
+  validateReportFacts,
+  validateNarrativeAgainstFacts,
+  validateRenderedHtml,
+  applyNarrativeHygiene,
+  firstSentence,
+  tidyPlanSummary,
+  PRESENCE_RUBRIC,
+  CLUSTER_WEIGHTS,
+  type ReportFacts,
+  type ScoreBand,
+} from './report/reportFacts';
 
 // ------------------------------------------------------------
 // Public entry point.
+//
+// Render-time invariants (WO2 Task 1): facts are computed once,
+// validated against the payload, the narrative is hygiene-repaired
+// and validated against the facts, and the final HTML gets a
+// leader-language gate. Any violation throws ReportInvariantError
+// BEFORE the HTML exists — the discovery job fails visibly instead
+// of persisting (and emailing / PDF-ing) a contradictory report.
 // ------------------------------------------------------------
 export function buildReportHtml(
   payload: ReportExportPayload,
-  narrative: ReportNarrative,
+  rawNarrative: ReportNarrative,
 ): string {
-  const ctx = buildContext(payload, narrative);
+  const facts = computeReportFacts(payload);
+  validateReportFacts(facts, payload);
+  const narrative = applyNarrativeHygiene(rawNarrative);
+  validateNarrativeAgainstFacts(narrative, facts);
+  const html = renderReportHtml(payload, narrative, facts);
+  validateRenderedHtml(html, facts);
+  return html;
+}
+
+function renderReportHtml(
+  payload: ReportExportPayload,
+  narrative: ReportNarrative,
+  facts: ReportFacts,
+): string {
+  const ctx = buildContext(payload, narrative, facts);
   return [
     '<!DOCTYPE html>',
     '<html lang="en">',
@@ -54,6 +88,24 @@ export function buildReportHtml(
     '  .score-hero .grade-chip.grade-amber { background: var(--amber); }',
     '  .score-hero .grade-chip.grade-red   { background: var(--neg); }',
     '  .score-hero .grade-chip.grade-ink   { background: var(--ink-2); }',
+    // Radar caption — replaces the absolutely-positioned .chart-center
+    // overlay, which collided with spoke labels at small cluster values.
+    '  .cluster-hero .chart-avg { text-align: center; margin-top: 6px; font-family: "JetBrains Mono", monospace; font-size: 9.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-4); }',
+    '  .cluster-hero .chart-avg strong { font-family: Inter, sans-serif; font-size: 15px; letter-spacing: 0; color: var(--ink); font-weight: 600; }',
+    // Directory-risk metric line: keep the verdict word readable and in
+    // normal flow (the 72px .big glyph overlapped the caption in PDF).
+    '  .field-stat .big.metric { font-size: 40px; line-height: 1.1; margin-bottom: 6px; }',
+    '  .field-stat .metric-line { font-family: "JetBrains Mono", monospace; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); margin-bottom: 12px; }',
+    // 30/60/90 timeline: dependency renders on its own line, never inline.
+    '  .roadmap .item .dep { font-family: "JetBrains Mono", monospace; font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-4); margin-top: 4px; }',
+    // "How to read the scores" definitions block (page 2 method footer).
+    '  .score-key { margin-top: 28px; padding: 16px 20px; background: var(--paper-2); border-radius: 3px; }',
+    '  .score-key .label { color: var(--ink-3); margin-bottom: 10px; }',
+    '  .score-key .cols { display: flex; gap: 24px; }',
+    '  .score-key .col { flex: 1; }',
+    '  .score-key p, .score-key li { font-size: 10.5px; line-height: 1.55; color: var(--ink-3); margin: 0 0 6px; }',
+    '  .score-key ul { margin: 0 0 6px; padding-left: 14px; }',
+    '  .score-key strong { color: var(--ink); font-weight: 600; }',
     '</style>',
     '</head>',
     '<body>',
@@ -76,6 +128,9 @@ export function buildReportHtml(
 interface Ctx {
   p: ReportExportPayload;
   n: ReportNarrative;
+  facts: ReportFacts;
+  band: ScoreBand;
+  presenceLabelById: Map<string, string>;
   businessName: string;
   businessNameShort: string;       // fits in footer
   monthLabel: string;              // "April 2026"
@@ -140,6 +195,7 @@ interface StrategyMoveWithGroup {
   number: string;
   title: string;
   description: string;
+  plan_summary?: string;   // ≤140-char timeline summary (newer narratives)
   evidence_line: string;
   expected_outcome: string;
   impact: 'High' | 'Medium' | 'Low';
@@ -157,7 +213,7 @@ const CLUSTER_LABELS: Record<ClusterKey, string> = {
   adjacent: 'Adjacent',
 };
 
-function buildContext(p: ReportExportPayload, n: ReportNarrative): Ctx {
+function buildContext(p: ReportExportPayload, n: ReportNarrative, facts: ReportFacts): Ctx {
   const snapshotDate = new Date(p.meta.snapshot_date);
   const monthLabel = snapshotDate.toLocaleString('en-US', { month: 'long', year: 'numeric' });
   const preparedDate = snapshotDate.toLocaleString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
@@ -184,13 +240,13 @@ function buildContext(p: ReportExportPayload, n: ReportNarrative): Ctx {
     radarValues[k] = typeof v === 'number' ? v : 0;
   }
 
-  // Visibility distribution — normalize to percents of prompt_count
-  const total = counts.prompt_count || 1;
+  // Visibility distribution — from ReportFacts (largest-remainder
+  // rounding, guaranteed to sum to 100).
   const visibilityPct = {
-    strong: Math.round((counts.strong_count / total) * 100),
-    partial: Math.round((counts.partial_count / total) * 100),
-    unclear: Math.round(((total - counts.strong_count - counts.partial_count - counts.absent_count) / total) * 100),
-    absent: Math.round((counts.absent_count / total) * 100),
+    strong: facts.distributionPct.strong,
+    partial: facts.distributionPct.partial,
+    unclear: facts.distributionPct.other,
+    absent: facts.distributionPct.absent,
   };
 
   // Money quote — resolve the narrative-chosen prompt to actual data
@@ -218,11 +274,15 @@ function buildContext(p: ReportExportPayload, n: ReportNarrative): Ctx {
     ...n.expansion_moves.map(m => ({ ...m, group: 'expansion' as const })),
   ];
 
-  // Directory risk — "High" if any non-brand/review prompt has directories
-  const dirRisk = assessDirectoryRisk(p);
+  // Directory risk + repeat rivals — from ReportFacts (single derivation).
+  const dirRisk = facts.directoryRisk;
+  const repeatRivalCount = facts.repeatRivalCount;
 
-  // Repeat rivals: competitors appearing in ≥ 2 prompts
-  const repeatRivalCount = p.competitors.filter(c => c.times_appeared >= 2).length;
+  // Presence label per prompt — the ONE vocabulary for "how you showed
+  // up", shared by the evidence table, vulnerability map, and narrative
+  // facts, so a score-50 row can never print "Absent" again.
+  const presenceLabelById = new Map<string, string>();
+  for (const f of facts.prompts) presenceLabelById.set(f.id, f.presenceLabel);
 
   const businessName = p.meta.business_name || p.meta.domain || 'Business';
   const businessNameShort = businessName.length > 24 ? businessName.slice(0, 22) + '…' : businessName;
@@ -230,6 +290,9 @@ function buildContext(p: ReportExportPayload, n: ReportNarrative): Ctx {
 
   return {
     p, n,
+    facts,
+    band: facts.band,
+    presenceLabelById,
     businessName, businessNameShort,
     monthLabel, preparedDate, nextRunDate: nextRun,
     issueNumber: issueNum,
@@ -286,9 +349,13 @@ function resolveRival(p: ReportExportPayload, n: ReportNarrative): Ctx['rival'] 
   const targetName = (n.rival_name || '').toLowerCase().trim();
   const comp = p.competitors.find(c => c.name.toLowerCase().trim() === targetName);
 
+  // Defined terms (see the page-2 score key): a rival "win" means they
+  // appeared where you did not — they hold that answer. "Also named"
+  // is a mention alongside you. We never say "ahead of you" for a
+  // prompt-level observation (QA invariant 10).
   let queryPrompt: string | null = null;
   let yourPosition = '—';
-  let theirPosition = 'Named first';
+  let theirPosition = 'Held the answer';
   let yourScore: number | null = null;
 
   if (comp) {
@@ -302,14 +369,14 @@ function resolveRival(p: ReportExportPayload, n: ReportNarrative): Ctx['rival'] 
         yourScore = ourResult.score;
       }
     } else if (comp.times_appeared > 0) {
-      // They appeared but didn't beat us — surface the appearance
+      // They appeared but never held an answer without us — surface the appearance
       const appearance = p.prompts_tested.find(pr =>
         pr.competitor_names_detected.some(x => x.toLowerCase() === targetName));
       if (appearance) {
         queryPrompt = appearance.prompt_text;
         yourPosition = positionLabel(appearance.business_position_type);
         yourScore = appearance.score;
-        theirPosition = 'Also listed';
+        theirPosition = 'Also named';
       }
     }
   }
@@ -353,9 +420,9 @@ function buildVulnerabilityMap(p: ReportExportPayload): Ctx['vulnerabilities'] {
       pr.priority === 'high' ? 'med' :
       'low';
     const riskSignal =
-      pr.visibility_status === 'competitor_dominant' ? 'Named rival outranked you' :
+      pr.visibility_status === 'competitor_dominant' ? 'Rivals hold this answer' :
       pr.visibility_status === 'absent' ? 'Not present in AI answer' :
-      pr.visibility_status === 'directory_dominant' ? 'Directory overtook the slot' :
+      pr.visibility_status === 'directory_dominant' ? 'Directories hold this answer' :
       pr.visibility_status === 'unclear' ? 'AI uncertain, brand-level leak' :
       pr.priority === 'high' ? 'High-priority cluster slip' :
       'Monitor — low priority';
@@ -426,21 +493,10 @@ function buildMomentum(p: ReportExportPayload): Ctx['momentum'] {
     .slice(0, 2)
     .map(c => ({
       title: c.name,
-      detail: `Outranked the business on ${c.times_beat_us} prompt${c.times_beat_us === 1 ? '' : 's'}. ${c.prompts_where_they_won[0] ? `First surfaced on "${c.prompts_where_they_won[0].prompt_text}".` : ''}`,
+      detail: `Held the answer on ${c.times_beat_us} prompt${c.times_beat_us === 1 ? '' : 's'} where you were absent. ${c.prompts_where_they_won[0] ? `First surfaced on "${c.prompts_where_they_won[0].prompt_text}".` : ''}`,
     }));
 
   return { gained, lost, newSignals };
-}
-
-function assessDirectoryRisk(p: ReportExportPayload): 'Low' | 'Medium' | 'High' {
-  // Directories on non-brand/non-review prompts = risk.
-  const purchaseIntent = p.prompts_tested.filter(pr =>
-    pr.cluster !== 'brand' && !pr.prompt_text.toLowerCase().includes('review'));
-  const dirHits = purchaseIntent.filter(pr => pr.directories_detected.length > 0);
-  const ratio = purchaseIntent.length ? dirHits.length / purchaseIntent.length : 0;
-  if (ratio >= 0.30) return 'High';
-  if (ratio >= 0.10) return 'Medium';
-  return 'Low';
 }
 
 // ============================================================
@@ -516,12 +572,10 @@ function buildRadarSvg(values: Record<ClusterKey, number>): string {
     return `<text x="${lp.x}" y="${y.toFixed(1)}" font-family="JetBrains Mono" font-size="9" letter-spacing="1" fill="#475569" text-anchor="${anchor}">${a.label}</text>`;
   }).join('\n        ');
 
-  // Average for center
-  const scoreValues = axes.map(a => values[a.key]).filter(v => v > 0);
-  const avg = scoreValues.length
-    ? Math.round(scoreValues.reduce((a, b) => a + b, 0) / scoreValues.length)
-    : 0;
-
+  // The average moved out of the chart center: the absolutely-positioned
+  // overlay collided with spoke labels when cluster values were small
+  // (everything crowds the center at low scores). The caller renders a
+  // .chart-avg caption below the SVG instead, labeled with its formula.
   return `
     <svg viewBox="-30 -10 300 270">
       <g fill="none" stroke="#E2E8F0" stroke-width="0.75">
@@ -534,10 +588,6 @@ function buildRadarSvg(values: Record<ClusterKey, number>): string {
       ${dots}
       ${labels}
     </svg>
-    <div class="chart-center">
-      <div class="big-num">${avg}</div>
-      <div class="sub">Average</div>
-    </div>
   `;
 }
 
@@ -732,6 +782,7 @@ function buildPage1(ctx: Ctx): string {
     <div class="cluster-hero">
       <div class="chart-wrap">
         ${buildRadarSvg(ctx.radarValues)}
+        <div class="chart-avg"><strong>${ctx.facts.radarAverage}</strong> · avg of ${ctx.facts.measuredClusterCount} cluster score${ctx.facts.measuredClusterCount === 1 ? '' : 's'}</div>
       </div>
       <div class="side">
         <div class="label">Performance shape</div>
@@ -799,8 +850,7 @@ function buildPage2(ctx: Ctx): string {
     </div>
   `).join('');
 
-  // Fourth bar: "other" bucket (prompt_count - strong - partial - absent)
-  const otherCount = ctx.counts.prompt_count - ctx.counts.strong_count - ctx.counts.partial_count - ctx.counts.absent_count;
+  const f = ctx.facts;
 
   return `
 <!-- PAGE 2 -->
@@ -817,12 +867,12 @@ function buildPage2(ctx: Ctx): string {
   </div>
 
   <div class="distribution" style="margin-top:36px;">
-    <div class="label" style="color:var(--ink-3);">Visibility Distribution · ${ctx.counts.prompt_count} prompts tested</div>
+    <div class="label" style="color:var(--ink-3);">Visibility Distribution · ${f.promptCount} prompts tested</div>
     <div class="distribution-bar">
-      ${ctx.counts.strong_count > 0 ? `<div class="seg seg-strong" style="flex:${ctx.counts.strong_count}"><span class="n">${ctx.counts.strong_count}</span>RECOMMENDED FIRST</div>` : ''}
-      ${ctx.counts.partial_count > 0 ? `<div class="seg seg-partial" style="flex:${ctx.counts.partial_count}"><span class="n">${ctx.counts.partial_count}</span>LISTED AS OPTION</div>` : ''}
-      ${otherCount > 0 ? `<div class="seg seg-unclear" style="flex:${otherCount}"><span class="n">${otherCount}</span>INCONSISTENT</div>` : ''}
-      ${ctx.counts.absent_count > 0 ? `<div class="seg seg-absent" style="flex:${ctx.counts.absent_count}"><span class="n">${ctx.counts.absent_count}</span>ABSENT</div>` : ''}
+      ${f.strongCount > 0 ? `<div class="seg seg-strong" style="flex:${f.strongCount}"><span class="n">${f.strongCount}</span>STRONG</div>` : ''}
+      ${f.partialCount > 0 ? `<div class="seg seg-partial" style="flex:${f.partialCount}"><span class="n">${f.partialCount}</span>PARTIAL</div>` : ''}
+      ${f.otherCount > 0 ? `<div class="seg seg-unclear" style="flex:${f.otherCount}"><span class="n">${f.otherCount}</span>INCONSISTENT</div>` : ''}
+      ${f.absentCount > 0 ? `<div class="seg seg-absent" style="flex:${f.absentCount}"><span class="n">${f.absentCount}</span>ABSENT</div>` : ''}
     </div>
     <div class="dist-legend">
       <span>${ctx.visibilityPct.strong}% Strong</span>
@@ -832,8 +882,55 @@ function buildPage2(ctx: Ctx): string {
     </div>
   </div>
 
+  ${buildScoreKey(ctx)}
+
   ${pageFooter(ctx, 'Your Position', '02')}
 </div>`;
+}
+
+// ------------------------------------------------------------
+// "How to read the scores" — the definitions legend (WO2 Task 2).
+// Every threshold and weight here is generated from the same
+// constants the scoring engine uses (PRESENCE_RUBRIC mirrors
+// promptScore(); CLUSTER_WEIGHTS mirrors the overall rollup), so
+// the box can't drift from the math it explains.
+// ------------------------------------------------------------
+function buildScoreKey(ctx: Ctx): string {
+  const f = ctx.facts;
+  const weightOrder: ClusterKey[] = ['core', 'problem', 'comparison', 'long_tail', 'brand', 'adjacent'];
+  const weightsLine = weightOrder
+    .map(c => `${CLUSTER_LABELS[c]} ${Math.round(CLUSTER_WEIGHTS[c] * 100)}%`)
+    .join(' · ');
+
+  const rubricItems = [
+    `<li><strong>Recommended first (100)</strong> — ${esc(PRESENCE_RUBRIC.recommended_first.definition)}</li>`,
+    `<li><strong>Listed as option (75–90)</strong> — named among recommended vendors; 90 when your site is also cited, 80 when cited without being named</li>`,
+    `<li><strong>Mentioned, no preference (50)</strong> — ${esc(PRESENCE_RUBRIC.mentioned.definition)}; unclassifiable answers also earn a neutral 50</li>`,
+    `<li><strong>Rivals or directories answered instead (25)</strong> — you were absent and others filled the answer</li>`,
+    `<li><strong>Absent (0)</strong> — ${esc(PRESENCE_RUBRIC.absent.definition)}</li>`,
+  ].join('\n      ');
+
+  const hpSentence = f.highPriorityTotal > 0
+    ? `<p><strong>High-priority prompts</strong> are the ${f.highPriorityTotal} queries closest to a purchase decision; summary counts that say "of ${f.highPriorityTotal}" refer to this subset.</p>`
+    : '';
+
+  return `
+  <div class="score-key">
+    <div class="label">How to read the scores</div>
+    <div class="cols">
+      <div class="col">
+        <p>Each prompt is scored 0–100 for how you appeared:</p>
+        <ul>
+      ${rubricItems}
+        </ul>
+      </div>
+      <div class="col">
+        <p>A <strong>cluster score</strong> is the average of its prompts' scores. The <strong>overall AI Positioning Score</strong> is the weighted average of the cluster scores (${weightsLine}; weights renormalize when a cluster has no prompts). The radar caption is the simple, unweighted average of the measured clusters, which is why it can differ from the overall score.</p>
+        ${hpSentence}
+        <p>A competitor <strong>win</strong> is a prompt where a named rival appeared and you did not — they hold that answer. A competitor <strong>mention</strong> is any rival appearance, win or not. This run: ${f.rivalWins} rival win${f.rivalWins === 1 ? '' : 's'}, ${f.rivalMentions} prompt${f.rivalMentions === 1 ? '' : 's'} with rival mentions.</p>
+      </div>
+    </div>
+  </div>`;
 }
 
 function buildPage3(ctx: Ctx): string {
@@ -849,7 +946,10 @@ function buildPage3(ctx: Ctx): string {
   });
   const rows = sorted.slice(0, 15).map(pr => {
     const statusClass = visibilityToStatusClass(pr.visibility_status);
-    const statusLabel = positionLabel(pr.business_position_type);
+    // Label comes from the shared presence rubric (ReportFacts), NOT from
+    // position_type alone — an `unclear` row (neutral 50) used to print
+    // "Absent" here while the narrative called it partial credit.
+    const statusLabel = ctx.presenceLabelById.get(pr.id) || positionLabel(pr.business_position_type);
     return `
       <tr>
         <td class="q">${esc(pr.prompt_text)}</td>
@@ -888,7 +988,7 @@ function buildPage3(ctx: Ctx): string {
   </table>
 
   <div class="prompt-footnote">
-    ${Math.min(sorted.length, 15)} of ${ctx.counts.prompt_count} prompts shown · Full prompt library available on request · ● Directly recommended &nbsp;&nbsp;● Listed among options &nbsp;&nbsp;○ Mentioned without clear preference &nbsp;&nbsp;— Not present
+    ${Math.min(sorted.length, 15)} of ${ctx.facts.promptCount} prompts shown · Full prompt library available on request · ● Recommended first &nbsp;&nbsp;● Listed as option &nbsp;&nbsp;○ Mentioned, no preference &nbsp;&nbsp;— Absent · Scoring legend on page 2
   </div>
 
   ${pageFooter(ctx, 'Evidence of Position', '03')}
@@ -929,7 +1029,13 @@ function buildPage4(ctx: Ctx): string {
   ${masthead('The Playing Field', 'IV', '04')}
 
   <div class="kicker">Section Four · The Competitive Landscape</div>
-  <h2 style="font-size:32px;margin-bottom:24px;margin-top:6px;color:var(--ink);">${esc(ctx.rival.name ? 'The one rival that mattered this month.' : 'A fragmented field, no sustained threats.')}</h2>
+  <h2 style="font-size:32px;margin-bottom:24px;margin-top:6px;color:var(--ink);">${esc(
+    ctx.rival.name
+      ? 'The one rival that mattered this month.'
+      : ctx.band === 'needs_foundation' || ctx.band === 'building'
+        ? 'An open field. No one owns these answers yet.'
+        : 'A fragmented field, no sustained threats.',
+  )}</h2>
 
   <p class="page-intro">${sanitizeNarrativeHtml(n.page4_intro)}</p>
 
@@ -967,22 +1073,16 @@ function buildPage4(ctx: Ctx): string {
   <div class="field-duo">
     <div class="field-stat">
       <div class="label">Repeat Rivals Detected</div>
-      <div class="big">${ctx.repeatRivalCount}</div>
+      <div class="big metric">${ctx.repeatRivalCount}</div>
       <div class="caption">Competitors appearing in ≥ 2 prompts</div>
-      <p>${ctx.repeatRivalCount === 0
-        ? 'No single company was named alongside you in more than one answer. Single-mention shops, no repeat challengers. Signature of a category leader, not a contested market.'
-        : `${ctx.repeatRivalCount} competitor${ctx.repeatRivalCount === 1 ? '' : 's'} appeared in multiple answers. Track closely next month to see if this pattern hardens.`}</p>
+      <p>${esc(repeatRivalsCopy(ctx))}</p>
     </div>
 
     <div class="field-stat">
       <div class="label">Directory &amp; Middleman Risk</div>
-      <div class="big">${ctx.directoryRisk}</div>
-      <div class="caption">Yelp/BBB/Angi appearance on purchase-intent queries</div>
-      <p>${ctx.directoryRisk === 'Low'
-        ? 'Directories appeared only where expected — on review queries. None surfaced on purchase-intent prompts. Tracked monthly.'
-        : ctx.directoryRisk === 'Medium'
-        ? 'Directories surfaced on some purchase-intent queries. Not yet dominant, but a watch condition. Tracked monthly.'
-        : 'Directories are intercepting purchase-intent queries. This is the highest-value defensive priority. Review the vulnerability map below.'}</p>
+      <div class="big metric">${ctx.directoryRisk}</div>
+      <div class="metric-line">${ctx.facts.directoryOnPurchaseIntent} directory appearance${ctx.facts.directoryOnPurchaseIntent === 1 ? '' : 's'} on purchase-intent queries</div>
+      <p>${esc(directoryRiskCopy(ctx))}</p>
     </div>
   </div>
 
@@ -1020,6 +1120,50 @@ function buildPage4(ctx: Ctx): string {
 
   ${pageFooter(ctx, 'The Playing Field', '04')}
 </div>`;
+}
+
+// ------------------------------------------------------------
+// Score-banded interpretive copy (WO2 Task 3). The rule: below the
+// Leading band, an empty competitive field is an OPEN CATEGORY —
+// opportunity plus urgency — never evidence the client leads.
+// Leader framing renders only at band === 'leading'.
+// ------------------------------------------------------------
+
+function repeatRivalsCopy(ctx: Ctx): string {
+  const f = ctx.facts;
+  if (f.repeatRivalCount === 0) {
+    switch (ctx.band) {
+      case 'needs_foundation':
+        return 'No single company was named alongside you in more than one answer — but neither were you. The category is unclaimed, not led. Whoever publishes direct-answer content first inherits these queries.';
+      case 'building':
+        return 'No repeat challengers yet. The category is still forming — your early appearances put you in position to consolidate it before a rival does.';
+      case 'contending':
+        return 'No competitor appeared in more than one answer while you appeared in several. The field is fragmented beneath you — press the advantage.';
+      case 'leading':
+        return 'Single-mention shops, no repeat challengers. Signature of a category leader, not a contested market.';
+    }
+  }
+  const top = f.topRepeatRival;
+  const lead = top
+    ? `${top.name} appeared alongside these queries ${top.timesAppeared} times — the closest thing to a repeat challenger this run.`
+    : `${f.repeatRivalCount} competitor${f.repeatRivalCount === 1 ? '' : 's'} appeared in multiple answers.`;
+  const bandClause =
+    ctx.band === 'needs_foundation'
+      ? 'They are accumulating the mentions you are not; every month unaddressed compounds their head start.'
+      : ctx.band === 'leading'
+        ? 'Monitor — no positional loss recorded, but repeat mentions are how challenges start.'
+        : 'Track them monthly; the comparison-page move targets this gap directly.';
+  return `${lead} ${bandClause}`;
+}
+
+function directoryRiskCopy(ctx: Ctx): string {
+  if (ctx.directoryRisk !== 'Low') {
+    return 'Aggregators are answering purchase-intent questions in your category. Until owned pages displace them, your positioning is whatever your directory profiles say. Claim and enrich them (see the fix plan).';
+  }
+  if (ctx.band === 'needs_foundation' || ctx.band === 'building') {
+    return 'Directories appeared only on review-intent queries so far. That is luck, not defense — with no owned pages winning these answers, aggregators are the natural next citation. Tracked monthly.';
+  }
+  return 'Directories appeared only where expected — on review queries. None surfaced on purchase-intent prompts. Tracked monthly.';
 }
 
 function buildPage5(ctx: Ctx): string {
@@ -1079,7 +1223,11 @@ function buildPage5(ctx: Ctx): string {
       <div class="mom-lab">Named rivals in the field</div>
       <div class="mom-count">${ctx.momentum.newSignals.length}</div>
       <div class="mom-body">
-        ${ctx.momentum.newSignals.length === 0 ? '<div class="mom-item"><div class="mi-detail" style="font-style:italic;">No competitor outranked you this month.</div></div>' :
+        ${ctx.momentum.newSignals.length === 0 ? `<div class="mom-item"><div class="mi-detail" style="font-style:italic;">${
+          ctx.band === 'needs_foundation' || ctx.band === 'building'
+            ? 'No rival held an answer you contested this month — on most prompts, neither you nor a repeat rival appeared. The field is open, not defended.'
+            : 'No rival held an answer without you this month.'
+        }</div></div>` :
           ctx.momentum.newSignals.map(m => `
         <div class="mom-item">
           <div class="mi-title">${esc(m.title)}</div>
@@ -1196,10 +1344,25 @@ function buildPage7(ctx: Ctx): string {
       const effortWord = move ? `${move.effort} effort` : '';
       const ownerWord = move ? `Owner: ${move.owner}` : '';
       const tagBits = [`Move ${r.move_number}`, effortWord, ownerWord].filter(Boolean);
+      // Timeline summary: prefer the narrative's dedicated plan_summary
+      // (written for this view, ≤140 chars, complete sentence). Older
+      // persisted narratives predate the field — fall back to a
+      // sentence-aware first sentence, never a naive split('.') that
+      // clipped on abbreviations ("surfaced G2. after move 01").
+      const summary = move
+        ? (move.plan_summary && move.plan_summary.trim().length > 0
+            ? tidyPlanSummary(move.plan_summary)
+            : firstSentence(move.description))
+        : '';
+      // Dependency renders on its own styled line, never inline.
+      const depLine = r.dependency_note
+        ? `<div class="dep">${esc(formatDependency(r.dependency_note))}</div>`
+        : '';
       return `
         <div class="item">
           <h4>${esc(r.title)}</h4>
-          <p>${move ? esc(move.description.split('.')[0] + '.') : ''}${r.dependency_note ? ` <em>${esc(r.dependency_note)}</em>` : ''}</p>
+          <p>${esc(summary)}</p>
+          ${depLine}
           <div class="tagline">${esc(tagBits.join(' · '))}</div>
         </div>`;
     }).join('');
@@ -1304,6 +1467,14 @@ function sanitizeNarrativeHtml(s: string | null | undefined): string {
     }
   }
   return out.join('');
+}
+
+/** "after move 03" → "After Move 03" for the timeline dependency line. */
+function formatDependency(note: string): string {
+  const trimmed = note.trim().replace(/[.\s]+$/, '');
+  return trimmed
+    .replace(/^after\b/i, 'After')
+    .replace(/\bmove\b/gi, 'Move');
 }
 
 function formatDelta(d: number | null): string {
@@ -1602,6 +1773,11 @@ export function buildFreeSampleHtml(
   payload: ReportExportPayload,
   options: BuildFreeSampleOptions = {},
 ): string {
+  // Same data invariants as the full report (WO2 Task 1): a free sample
+  // is the sales artifact — a self-contradictory one is worse than a
+  // failed job.
+  validateReportFacts(computeReportFacts(payload), payload);
+
   const score = payload.scores.overall_score ?? 0;
   const counts = payload.scores.counts;
   const businessName = payload.meta.business_name || payload.meta.domain || 'this site';

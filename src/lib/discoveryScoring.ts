@@ -3,14 +3,14 @@
 // No DB access, no API calls. Deterministic functions only.
 // ============================================================
 
-import { DEFAULT_DISCOVERY_CLUSTER_WEIGHTS } from '@/lib/discovery';
+import { DEFAULT_DISCOVERY_CLUSTER_WEIGHTS } from './discovery';
 import type {
   DiscoveryCluster,
   DiscoveryClusterWeights,
   DiscoveryPositionType,
   DiscoveryResult,
   DiscoveryVisibilityStatus,
-} from '@/lib/types';
+} from './types';
 
 const ALL_CLUSTERS: DiscoveryCluster[] = [
   'core',

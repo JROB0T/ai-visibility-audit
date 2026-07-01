@@ -1,4 +1,4 @@
-import type { Entitlement, PlanStatus } from '@/lib/types';
+import type { Entitlement, PlanStatus } from './types';
 
 export const ADMIN_EMAILS = ['demo@aivisibility.test'];
 

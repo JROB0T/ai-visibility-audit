@@ -6,7 +6,7 @@
 > architectural decision, or surfaced a pending item). Treat the file as
 > living — out-of-date entries are worse than missing ones.
 
-Last updated: 2026-07-01 (site-audit work order: canonicals, per-page meta, claim accuracy, terms §5(d))
+Last updated: 2026-07-01 (WO1 site-audit + WO2 report-engine consistency work orders)
 
 ---
 
@@ -38,6 +38,57 @@ and works on `main` directly. Deploys are continuous via Vercel.
 ## Active work and recent history
 
 ### Recently shipped (most recent first)
+
+- **Report-engine work order (2026-07-01, branch `work-order-report-engine`,
+  built on top of `work-order-site-audit`):** fixes the SEVIS-class report
+  contradictions at the engine level. Core idea: `src/lib/report/reportFacts.ts`
+  computes every derived number ONCE (presence levels, rollups, high-priority
+  counts, rival wins vs mentions, distribution percentages via
+  largest-remainder rounding) and `buildReportHtml` now VALIDATES —
+  data invariants, narrative-vs-facts count claims ("X of N" must match a
+  real fact pair), banded-tone rules, and a leader-language gate on the
+  final HTML. Violations throw `ReportInvariantError` BEFORE report_html
+  persists, so a contradictory report can't be emailed/PDF'd; run-and-report
+  retries the narrative once, then fails the job visibly. Root cause of the
+  SEVIS "Absent but score 50" row: the evidence table labeled rows by
+  position_type while scores come from visibility_status (`unclear` = 50
+  neutral credit) — the table now uses the shared presence rubric. Other
+  changes: "How to read the scores" legend on page 2 (generated from the
+  real rubric + cluster weights, test-asserted in sync with promptScore /
+  DEFAULT_DISCOVERY_CLUSTER_WEIGHTS); radar average moved out of the chart
+  center to a labeled caption ("13 · avg of 6 cluster scores" — it's the
+  UNWEIGHTED mean; overall is weighted, which is why 6 vs 13 was never a
+  bug, just unexplained); score-banded copy (Needs Foundation 0-20 /
+  Building 21-45 / Contending 46-70 / Leading 71-100; postures Build &
+  Claim / Publish & Contest / Consolidate & Extend / Defend & Expand,
+  posture set deterministically from the band) — "signature of a category
+  leader" now renders ONLY at Leading; rival vocabulary standardized (a
+  "win" = rival appeared where you didn't; never "outranked/ahead of you");
+  30/60/90 timeline gets a dedicated `plan_summary` narrative field
+  (no migration — report_narrative is JSONB) with sentence-aware fallback,
+  dependency on its own line; narrative hygiene pass (digit–digit dashes →
+  "2 to 3", paren-balance repair, terminal punctuation); Directory-risk
+  panel rebuilt with a metric line ("Low · 0 directory appearances on
+  purchase-intent queries"). **Task 5:** paid runs now select EXACTLY 18
+  prompts (`SCAN_PROMPT_COUNT` + per-cluster quota in
+  `src/lib/productConstants.ts`, quota sums asserted = 18); pricing page,
+  homepage, and JSON-LD render from the constant (llms.txt manual-sync
+  noted in the constants file). SEVIS's 19 was the old test-whole-library
+  behavior. **Task 6:** homepage hero mock rebuilt to the real report
+  taxonomy (AI Positioning Score, grade, Core/Problem/Comparison/Long-tail
+  bars) — Findability/Explainability/etc. remain the SITE-READINESS
+  taxonomy in-product, not retired. **Task 7:** golden fixtures
+  (`fixtures/low-score.json` SEVIS-shape, `fixtures/high-score.json`
+  Leading) hydrated through the real scoring functions; `npm run
+  test:report` (tsx, new devDep) runs 25 checks incl. corruption tests and
+  is wired into `npm run build`, so Vercel deploys are gated. Scoring-graph
+  imports (`discoveryScoring`/`discovery`/`entitlements`) switched from
+  `@/lib` aliases to same-dir relative so the harness runs outside Next.
+  **Task 0 (pending, Jon):** run `npx tsx --env-file=.env.local
+  scripts/repair-sevis-report.ts --domain <sevis-domain>` (dry-run first;
+  `--apply` fixes the disputed prompt row from ground truth, recomputes the
+  snapshot, re-renders through the validated pipeline). Requires prod env
+  vars; no local .env.local exists on this machine.
 
 - **Site-audit work order (2026-07-01, branch `work-order-site-audit`):**
   external SEO/claims audit applied. (1) **Canonical fix** — root layout's
@@ -226,6 +277,13 @@ and works on `main` directly. Deploys are continuous via Vercel.
 
 ### Open / pending
 
+- **SEVIS report repair (WO2 Task 0)** — data + re-render must run against
+  prod with env vars. Dry-run first:
+  `npx tsx --env-file=.env.local scripts/repair-sevis-report.ts --domain <sevis-domain>`
+  then re-run with `--apply`. Do this AFTER deploying the
+  `work-order-report-engine` branch so the re-render uses the validated
+  template. Then read the regenerated PDF end to end against
+  the WO2 QA invariants.
 - **Stripe checkout button works in sandbox** (resolved 2026-05-21).
   Was a confusion not a bug — clicking Subscribe lands on Stripe's
   sandbox/test-mode Checkout page, which is correct. Switch to live

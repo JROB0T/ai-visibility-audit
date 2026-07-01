@@ -1,0 +1,82 @@
+{
+  "_comment": "Golden high-score fixture (WO2 Task 7): 18 prompts, majority strong presence, one repeat rival with mentions but zero wins, overall ~86 (Leading band). Leader/defense language is PERMITTED here and the test asserts it renders.",
+  "meta": {
+    "business_name": "C&C Air",
+    "domain": "ccair.example",
+    "primary_category": "HVAC services",
+    "service_area": "Monmouth County, NJ"
+  },
+  "prompts": [
+    { "text": "best HVAC company in Monmouth County", "cluster": "core", "priority": "high", "status": "strong_presence", "position": "directly_recommended", "mentioned": true, "cited": true, "competitors": [], "directories": [] },
+    { "text": "AC repair near Freehold NJ", "cluster": "core", "priority": "high", "status": "strong_presence", "position": "directly_recommended", "mentioned": true, "cited": true, "competitors": ["Truehold Mechanical"], "directories": [] },
+    { "text": "furnace replacement Monmouth County", "cluster": "core", "priority": "high", "status": "strong_presence", "position": "directly_recommended", "mentioned": true, "cited": true, "competitors": [], "directories": [] },
+    { "text": "emergency heating repair near me NJ", "cluster": "core", "priority": "high", "status": "strong_presence", "position": "directly_recommended", "mentioned": true, "cited": true, "competitors": [], "directories": [] },
+    { "text": "ductless mini split installers central NJ", "cluster": "core", "priority": "high", "status": "strong_presence", "position": "listed_among_options", "mentioned": true, "cited": true, "competitors": ["Truehold Mechanical"], "directories": [] },
+    { "text": "why is my AC blowing warm air", "cluster": "problem", "priority": "high", "status": "strong_presence", "position": "directly_recommended", "mentioned": true, "cited": true, "competitors": [], "directories": [] },
+    { "text": "furnace making banging noise who to call", "cluster": "problem", "priority": "medium", "status": "strong_presence", "position": "directly_recommended", "mentioned": true, "cited": true, "competitors": [], "directories": [] },
+    { "text": "high humidity in house HVAC fix", "cluster": "problem", "priority": "medium", "status": "partial_presence", "position": "listed_among_options", "mentioned": true, "cited": true, "competitors": [], "directories": [] },
+    { "text": "best rated HVAC companies New Jersey", "cluster": "comparison", "priority": "medium", "status": "strong_presence", "position": "directly_recommended", "mentioned": true, "cited": true, "competitors": [], "directories": [] },
+    { "text": "compare HVAC maintenance plans NJ", "cluster": "comparison", "priority": "medium", "status": "strong_presence", "position": "directly_recommended", "mentioned": true, "cited": true, "competitors": [], "directories": [] },
+    { "text": "top AC installation companies Monmouth", "cluster": "comparison", "priority": "medium", "status": "partial_presence", "position": "listed_among_options", "mentioned": true, "cited": true, "competitors": [], "directories": [] },
+    { "text": "HVAC financing options for homeowners NJ", "cluster": "long_tail", "priority": "medium", "status": "strong_presence", "position": "directly_recommended", "mentioned": true, "cited": true, "competitors": [], "directories": [] },
+    { "text": "heat pump rebates New Jersey installer", "cluster": "long_tail", "priority": "medium", "status": "indirect_presence", "position": "mentioned_without_preference", "mentioned": true, "cited": false, "competitors": [], "directories": [] },
+    { "text": "commercial rooftop unit service shore area", "cluster": "long_tail", "priority": "medium", "status": "absent", "position": "not_present", "mentioned": false, "cited": false, "competitors": [], "directories": [] },
+    { "text": "C&C Air reviews", "cluster": "brand", "priority": "low", "status": "strong_presence", "position": "directly_recommended", "mentioned": true, "cited": true, "competitors": [], "directories": ["Yelp"] },
+    { "text": "C&C Air service area", "cluster": "brand", "priority": "low", "status": "strong_presence", "position": "directly_recommended", "mentioned": true, "cited": true, "competitors": [], "directories": [] },
+    { "text": "indoor air quality testing NJ", "cluster": "adjacent", "priority": "low", "status": "strong_presence", "position": "directly_recommended", "mentioned": true, "cited": true, "competitors": [], "directories": [] },
+    { "text": "duct cleaning services central NJ", "cluster": "adjacent", "priority": "low", "status": "absent", "position": "not_present", "mentioned": false, "cited": false, "competitors": [], "directories": [] }
+  ],
+  "competitors": [
+    { "name": "Truehold Mechanical", "domain": "truehold.example", "appears_on": ["AC repair near Freehold NJ", "ductless mini split installers central NJ"] }
+  ],
+  "narrative": {
+    "headline_primary": "Holding the",
+    "headline_accent": "top position",
+    "verdict_paragraph": "AI assistants returned a strong presence in <strong>13 of 18</strong> buyer-intent prompts, most of them as the <em>first recommendation</em>. No rival held an answer without you this month. The position is real and worth defending: the two absences and the repeat challenger below are where erosion would start.",
+    "strategic_posture": "Defend & Expand",
+    "grade_subtitle": "CATEGORY LEADER",
+    "take_win": { "tag": "01 · The Win", "big": "6 / 6", "heading": "High-priority queries with presence", "body": "Every high-priority query returned the business, most as the first recommendation. The queries closest to a purchase decision are the ones already won." },
+    "take_watch": { "tag": "02 · The Watch", "big": "1<span class=\"unit\"> rival</span>", "heading": "One repeat challenger", "body": "Truehold Mechanical appeared alongside two answers. No positional loss recorded, but repeat mentions are how challenges start, so it stays on the watch list." },
+    "take_move": { "tag": "03 · The Move", "big": "Move 01", "heading": "Close the two absences", "body": "Commercial rooftop service and duct cleaning returned no mention. Both are winnable with a single direct-answer page each, and both defend the flanks of the lead." },
+    "performance_shape_heading": "Strong core, one soft long-tail edge.",
+    "performance_shape_body": "Core, comparison, problem, and brand clusters all hold. The long-tail and adjacent clusters carry the two absences, which is where a challenger would establish a first foothold if left open.",
+    "big_statement": "You are the default answer for HVAC in Monmouth County.",
+    "big_statement_emphasis": "default answer",
+    "insights": [
+      { "number": "01", "title": "High-priority queries are won", "body": "All six high-priority queries returned the business, five as the first recommendation. When a buyer in the service area asks the highest-intent questions, the AI answer already names the business, which is the position every other cluster should be pulled up to.", "proof_metric": "6 / 6", "proof_label": "high-priority prompts with presence" },
+      { "number": "02", "title": "The website is consistently cited", "body": "The website was cited in 15 of 18 answers. Citation is how an answer engine justifies naming a business, and a citation rate this high is what keeps the recommendations stable between runs rather than incidental.", "proof_metric": "15 / 18", "proof_label": "answers citing the site" },
+      { "number": "03", "title": "One repeat challenger, zero wins", "body": "Truehold Mechanical appeared alongside two answers but never held an answer without you. That is the signature of a category leader being tracked by a challenger: no positional loss yet, but the mentions are accumulating and worth watching monthly.", "proof_metric": "0", "proof_label": "rival wins this run" },
+      { "number": "04", "title": "Directories stay on review queries", "body": "Directories appeared only where expected, on review-intent queries, and never displaced the business on a purchase-intent answer. With owned pages winning the answers directly, aggregators have no gap to fill.", "proof_metric": "0", "proof_label": "directory appearances on purchase intent" }
+    ],
+    "money_quote_prompt": "best HVAC company in Monmouth County",
+    "money_quote_text": "For HVAC service in Monmouth County, <span class=\"nm\">C&amp;C Air</span> is a standout choice, frequently recommended for responsive service and transparent pricing across the county.",
+    "money_quote_cite": "Recorded during this month's test run. This is what a customer researching the category sees.",
+    "page4_intro": "The field beneath the lead is fragmented. One challenger repeats; nobody else appeared more than once, and no rival held an answer without the business present.",
+    "rival_name": "Truehold Mechanical",
+    "rival_quote": "Truehold Mechanical also serves central New Jersey and is sometimes listed for ductless installations alongside larger county providers.",
+    "rival_analysis": "Truehold appeared twice, both times alongside the business rather than in place of it. That is a mention pattern, not a win pattern. Watch the ductless and repair queries monthly; if their mentions turn into first recommendations, the comparison-page move answers it.",
+    "page5_intro": "This is the <em>baseline run</em>. The score establishes the starting line, and future months will measure erosion or consolidation against it.",
+    "analyst_reading": "One snapshot exists, so there is no trend to read yet. From a defended position the useful watch items are erosion signals: the clusters where challengers logged first mentions, the two absent prompts, and whether the repeat challenger's mentions harden into recommendations next month.",
+    "page6_intro": "The posture is <em>defense first</em>: close the two open answers, then extend into the adjacent ground a challenger would otherwise take.",
+    "defense_moves": [
+      { "number": "01", "title": "Publish the two missing answer pages", "description": "Commercial rooftop service and duct cleaning returned no mention. One direct-answer page each closes the only fully open answers in the set and denies a challenger the easiest first foothold available.", "plan_summary": "Publish direct-answer pages for the two prompts that returned no mention.", "evidence_line": "Prompt: \"commercial rooftop unit service shore area\" · Cluster: Long-tail · Current: 0/100", "expected_outcome": "Presence on both absent prompts", "impact": "High", "effort": "Low", "owner": "Marketer" },
+      { "number": "02", "title": "Strengthen the heat pump rebate page", "description": "The rebate query earned only a mention without citation. Expanding the page with current program numbers and plain-language eligibility turns a soft mention into a cited recommendation on a growing query.", "plan_summary": "Expand the heat pump rebate page so the mention becomes a cited recommendation.", "evidence_line": "Prompt: \"heat pump rebates New Jersey installer\" · Cluster: Long-tail · Current: 50/100", "expected_outcome": "Citation on the rebate query", "impact": "Medium", "effort": "Low", "owner": "Marketer" },
+      { "number": "03", "title": "Track the repeat challenger monthly", "description": "Truehold Mechanical is the only repeat name in the field. A short comparison page that answers the ductless question directly keeps their mentions from converting into recommendations while the field stays fragmented.", "plan_summary": "Publish a ductless comparison page to contain the one repeat challenger.", "evidence_line": "Prompt: \"ductless mini split installers central NJ\" · Cluster: Core · Current: 90/100", "expected_outcome": "Hold first position on ductless", "impact": "Medium", "effort": "Medium", "owner": "Marketer" }
+    ],
+    "expansion_moves": [
+      { "number": "04", "title": "Extend into adjacent service queries", "description": "Indoor air quality already wins; duct cleaning does not. Packaging the two as a single service line with one page each extends the lead into ground that is currently unclaimed by anyone.", "plan_summary": "Extend the adjacent cluster with a duct cleaning service page.", "evidence_line": "Prompt: \"duct cleaning services central NJ\" · Cluster: Adjacent · Current: 0/100", "expected_outcome": "Adjacent-cluster sweep", "impact": "Medium", "effort": "Low", "owner": "Marketer" },
+      { "number": "05", "title": "Earn a county-press citation", "description": "A local-press feature on the service area's heat pump transition adds the kind of third-party citation that stabilizes first-position recommendations, which currently rest mostly on owned pages and review platforms.", "plan_summary": "Earn one local-press citation on the heat pump transition story.", "evidence_line": "Prompt: \"heat pump rebates New Jersey installer\" · Cluster: Long-tail · Current: 50/100", "expected_outcome": "Stronger citation mix", "impact": "Medium", "effort": "Medium", "owner": "Business Owner" },
+      { "number": "06", "title": "Publish a maintenance plan comparison", "description": "The maintenance plan query already recommends the business first. A transparent comparison of plan tiers in plain language consolidates that answer and gives the AI a richer page to keep quoting.", "plan_summary": "Publish a transparent maintenance plan comparison to consolidate the answer.", "evidence_line": "Prompt: \"compare HVAC maintenance plans NJ\" · Cluster: Comparison · Current: 100/100", "expected_outcome": "Consolidated comparison answers", "impact": "Low", "effort": "Low", "owner": "Marketer" }
+    ],
+    "page7_intro": "Defense first, then extension: the sequence closes the <em>open answers</em> before spending effort on new ground.",
+    "roadmap": [
+      { "phase": "30", "move_number": "01", "title": "Two missing answer pages" },
+      { "phase": "30", "move_number": "02", "title": "Rebate page upgrade" },
+      { "phase": "60", "move_number": "03", "title": "Ductless comparison page", "dependency_note": "after move 01" },
+      { "phase": "60", "move_number": "04", "title": "Duct cleaning service page" },
+      { "phase": "90", "move_number": "05", "title": "County-press citation" },
+      { "phase": "90", "move_number": "06", "title": "Maintenance plan comparison" }
+    ],
+    "methodology_paragraph": "We ran 18 buyer-intent prompts through an AI engine with live web search, recorded each answer, and scored how the business appeared using a fixed rubric. The test measures how AI answer engines represent the business to buyers. It does not measure search rankings, advertising performance, or conversions, and AI answers vary between runs and change over time."
+  }
+}

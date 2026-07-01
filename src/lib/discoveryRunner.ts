@@ -32,12 +32,11 @@ import type {
   DiscoveryTier,
   DiscoveryVisibilityStatus,
 } from '@/lib/types';
+import { SCAN_PROMPT_COUNT, SCAN_CLUSTER_QUOTA, FREE_SCAN_PROMPT_COUNT } from '@/lib/productConstants';
 
 const CLAUDE_MODEL = 'claude-haiku-4-5-20251001';
 const WEB_SEARCH_TOOL_TYPE = 'web_search_20250305';
 const CONCURRENCY = 4;
-const MAX_PROMPTS_PER_RUN = 40;
-const FREE_TIER_PROMPT_COUNT = 6; // one per cluster
 const ALL_CLUSTERS: DiscoveryCluster[] = ['core', 'problem', 'comparison', 'long_tail', 'brand', 'adjacent'];
 const PRIORITY_ORDER: Record<string, number> = { high: 0, medium: 1, low: 2 };
 
@@ -62,7 +61,13 @@ export type RunDiscoveryTestsInput = {
 // (one per cluster). Falls back to fewer than 6 when a cluster has no
 // active prompts — caller still gets a meaningful but cheaper scan.
 //
-// Tier 1 / Tier 2: full scan, capped at MAX_PROMPTS_PER_RUN.
+// Tier 1 / Tier 2: EXACTLY SCAN_PROMPT_COUNT prompts, composed per
+// SCAN_CLUSTER_QUOTA (WO2 Task 5 — marketing sells an
+// "{SCAN_PROMPT_COUNT}-prompt scan"; before this, paid runs tested the
+// whole generated library, which varies 20-28, so real runs drifted
+// from the advertised count). When a cluster has fewer prompts than
+// its quota, the shortfall backfills from the highest-priority
+// remaining prompts in other clusters, keeping the total constant.
 //
 // Input is assumed pre-sorted by (priority asc, created_at asc) so taking
 // the first match per cluster yields the highest-signal prompt.
@@ -80,11 +85,31 @@ export function selectPromptsForTier(
       if (seen.has(cluster)) continue;
       seen.add(cluster);
       picks.push(prompt);
-      if (picks.length >= FREE_TIER_PROMPT_COUNT) break;
+      if (picks.length >= FREE_SCAN_PROMPT_COUNT) break;
     }
     return picks;
   }
-  return sortedPrompts.slice(0, MAX_PROMPTS_PER_RUN);
+
+  // Paid: fill each cluster's quota from the pre-sorted list…
+  const quotaLeft: Record<DiscoveryCluster, number> = { ...SCAN_CLUSTER_QUOTA };
+  const picks: DiscoveryPrompt[] = [];
+  const remaining: DiscoveryPrompt[] = [];
+  for (const prompt of sortedPrompts) {
+    const cluster = prompt.cluster as DiscoveryCluster;
+    if (!ALL_CLUSTERS.includes(cluster)) continue;
+    if (quotaLeft[cluster] > 0 && picks.length < SCAN_PROMPT_COUNT) {
+      quotaLeft[cluster]--;
+      picks.push(prompt);
+    } else {
+      remaining.push(prompt);
+    }
+  }
+  // …then backfill any shortfall by priority, regardless of cluster.
+  for (const prompt of remaining) {
+    if (picks.length >= SCAN_PROMPT_COUNT) break;
+    picks.push(prompt);
+  }
+  return picks;
 }
 
 export type RunDiscoveryTestsResult = {

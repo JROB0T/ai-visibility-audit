@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import { ThemeWrapper } from '@/components/ThemeWrapper';
+import { SCAN_PROMPT_COUNT, FREE_SCAN_PROMPT_COUNT } from '@/lib/productConstants';
 
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://aivascan.com';
 
@@ -80,14 +81,14 @@ const STRUCTURED_DATA = {
           name: 'Free Sample',
           price: '0',
           priceCurrency: 'USD',
-          description: '6-prompt AI visibility scan with a 2-page summary report — no account or credit card required.',
+          description: `${FREE_SCAN_PROMPT_COUNT}-prompt AI visibility scan with a 2-page summary report — no account or credit card required.`,
         },
         {
           '@type': 'Offer',
           name: 'Monthly',
           price: '29.99',
           priceCurrency: 'USD',
-          description: '18-prompt scan, full strategic report, competitor analysis, 30/60/90 plan, refreshed monthly.',
+          description: `${SCAN_PROMPT_COUNT}-prompt scan, full strategic report, competitor analysis, 30/60/90 plan, refreshed monthly.`,
         },
       ],
     },

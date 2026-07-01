@@ -21,6 +21,7 @@ import { useRouter } from 'next/navigation';
 import { Search, CheckCircle, ArrowRight, Shield, FileText, Sparkles, Eye, BarChart3, RefreshCw, TrendingDown, MessageSquare, MousePointerClick } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import RevenueAtRiskCalculator from '@/components/RevenueAtRiskCalculator';
+import { SCAN_PROMPT_COUNT, FREE_SCAN_PROMPT_COUNT } from '@/lib/productConstants';
 
 // FAQ content lives in one place so the visible section and the
 // FAQPage JSON-LD can never drift apart.
@@ -43,7 +44,7 @@ const FAQS: Array<{ q: string; a: string }> = [
   },
   {
     q: 'Is the free scan really free?',
-    a: 'Yes. The free sample runs a 6-prompt scan and produces a 2-page summary report. It needs only your email — no account, no credit card. One free sample per email and per website.',
+    a: `Yes. The free sample runs a ${FREE_SCAN_PROMPT_COUNT}-prompt scan and produces a 2-page summary report. It needs only your email — no account, no credit card. One free sample per email and per website.`,
   },
   {
     q: 'Who is Aivascan for?',
@@ -142,18 +143,22 @@ export default function HomeClient() {
                 </button>
               </form>
               <p className="mt-3 text-xs" style={{ color: '#64748B' }}>
-                Free 6-prompt sample · No account · No credit card · ~60 seconds
+                Free {FREE_SCAN_PROMPT_COUNT}-prompt sample · No account · No credit card · ~60 seconds
               </p>
             </div>
 
-            {/* Demo score card */}
+            {/* Demo score card — mirrors the real paid report (WO2 Task 6):
+                "AI Positioning Score" dial with letter grade, and cluster
+                bars using the report's own cluster labels (Core / Problem /
+                Comparison / Long-tail). Every label a prospect sees here
+                appears verbatim in the deliverable. */}
             <div className="flex-shrink-0 hidden lg:block anim-float">
               <div className="card-dark p-8 w-[300px]" style={{ boxShadow: '0 0 60px -10px rgba(99,102,241,0.15)' }}>
                 <div className="flex items-center justify-between mb-6">
-                  <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: '#64748B' }}>Sample Report</p>
+                  <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: '#64748B' }}>AI Positioning Score</p>
                   <span className="text-xs font-mono px-2 py-0.5 rounded" style={{ color: '#818CF8', background: 'rgba(99,102,241,0.1)' }}>Live</span>
                 </div>
-                <div className="flex justify-center mb-6">
+                <div className="flex justify-center mb-2">
                   <svg width="140" height="140" viewBox="0 0 140 140">
                     <circle cx="70" cy="70" r="58" fill="none" stroke="#1E293B" strokeWidth="8"/>
                     <circle cx="70" cy="70" r="58" fill="none" stroke={scoreColor} strokeWidth="8" strokeLinecap="round"
@@ -165,12 +170,15 @@ export default function HomeClient() {
                     <text x="70" y="82" textAnchor="middle" fontSize="12" fill="#64748B" fontFamily="var(--font-sans)">/ 100</text>
                   </svg>
                 </div>
+                <p className="text-center text-xs font-mono mb-5" style={{ color: '#64748B' }}>
+                  Grade C- · {SCAN_PROMPT_COUNT} prompts tested
+                </p>
                 <div className="space-y-3">
                   {[
-                    { label: 'Findability', score: 92, color: '#10B981' },
-                    { label: 'Explainability', score: 68, color: '#F59E0B' },
-                    { label: 'Buyability', score: 45, color: '#EF4444' },
-                    { label: 'Trustworthiness', score: 78, color: '#10B981' },
+                    { label: 'Core', score: 84, color: '#10B981' },
+                    { label: 'Problem', score: 71, color: '#10B981' },
+                    { label: 'Comparison', score: 48, color: '#EF4444' },
+                    { label: 'Long-tail', score: 66, color: '#F59E0B' },
                   ].map((cat) => (
                     <div key={cat.label} className="flex items-center gap-3">
                       <span className="text-xs w-24" style={{ color: '#64748B', fontFamily: 'var(--font-sans)' }}>{cat.label}</span>
@@ -349,7 +357,7 @@ export default function HomeClient() {
                 </div>
               </div>
               <ul className="space-y-3 mb-6 flex-1">
-                {['6-prompt AI visibility scan', '2-page summary report', 'Cluster heatmap', 'One example weak prompt', 'One free per email + site'].map((item) => (
+                {[`${FREE_SCAN_PROMPT_COUNT}-prompt AI visibility scan`, '2-page summary report', 'Cluster heatmap', 'One example weak prompt', 'One free per email + site'].map((item) => (
                   <li key={item} className="flex items-start gap-2.5 text-sm" style={{ color: 'var(--text-secondary)' }}>
                     <CheckCircle className="w-4 h-4 mt-0.5 shrink-0" style={{ color: '#10B981' }} />
                     <span>{item}</span>
@@ -374,7 +382,7 @@ export default function HomeClient() {
                 </div>
               </div>
               <ul className="space-y-3 mb-6 flex-1">
-                {['18-prompt AI visibility scan', 'Full strategic report', 'Competitor analysis', '30/60/90 plan', 'Refreshed monthly', 'Cancel anytime'].map((item, i) => (
+                {[`${SCAN_PROMPT_COUNT}-prompt AI visibility scan`, 'Full strategic report', 'Competitor analysis', '30/60/90 plan', 'Refreshed monthly', 'Cancel anytime'].map((item, i) => (
                   <li key={item} className="flex items-start gap-2.5 text-sm" style={{ color: i === 0 ? 'var(--text-tertiary)' : 'var(--text-secondary)' }}>
                     <CheckCircle className="w-4 h-4 mt-0.5 shrink-0" style={{ color: '#6366F1' }} />
                     <span>{item}</span>

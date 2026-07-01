@@ -21,6 +21,7 @@
 
 import { claudeFetchWithRetry } from './claudeRetry';
 import type { AuditTier } from './types';
+import { computeReportFacts, BAND_INFO, type ReportFacts } from './report/reportFacts';
 
 // Narrative-tier maps audit-tier to a system prompt.
 //   'tier_1' — strategic only; technical recommendations are forbidden
@@ -203,6 +204,7 @@ export interface StrategyMove {
   number: string;           // "01"
   title: string;
   description: string;      // ~60 words
+  plan_summary: string;     // ≤140 chars, ONE complete sentence — the 30/60/90 timeline view
   evidence_line: string;    // "Prompt: 'X' · Cluster: Y · Score: Z"
   expected_outcome: string; // "+4 pts brand cluster"
   impact: 'High' | 'Medium' | 'Low';
@@ -261,7 +263,7 @@ const NARRATIVE_TOOL = {
       },
       grade_subtitle: {
         type: 'string',
-        description: 'Short descriptor shown after the letter grade. Uppercase. Examples: "CATEGORY LEADER", "STRONG CHALLENGER", "BUILDING PRESENCE", "NEEDS FOUNDATION".',
+        description: 'Short descriptor shown after the letter grade. Uppercase. Must match the score band given in the input: "CATEGORY LEADER" only for the Leading band; otherwise use descriptors like "STRONG CHALLENGER", "BUILDING PRESENCE", "NEEDS FOUNDATION".',
       },
       take_win: { $ref: '#/$defs/take_card' },
       take_watch: { $ref: '#/$defs/take_card' },
@@ -379,11 +381,12 @@ const NARRATIVE_TOOL = {
       },
       strategy_move: {
         type: 'object',
-        required: ['number', 'title', 'description', 'evidence_line', 'expected_outcome', 'impact', 'effort', 'owner'],
+        required: ['number', 'title', 'description', 'plan_summary', 'evidence_line', 'expected_outcome', 'impact', 'effort', 'owner'],
         properties: {
           number: { type: 'string', description: '"01" through "06".' },
           title: { type: 'string', description: '4-8 word title in sentence case.' },
           description: { type: 'string', description: '45-75 words describing what to do and why.' },
+          plan_summary: { type: 'string', description: 'ONE complete sentence, max 140 characters, ending in a period — a standalone summary of this move written for the 30/60/90 timeline view. Never truncated mid-thought.' },
           evidence_line: { type: 'string', description: 'Format: "Prompt: \\"...\\" · Cluster: X · Current: Y/100"' },
           expected_outcome: { type: 'string', description: 'Projected improvement, e.g. "+5 pts adjacent cluster".' },
           impact: { type: 'string', enum: ['High', 'Medium', 'Low'] },
@@ -420,8 +423,11 @@ export async function generateReportNarrative(
   }
 
   const tier: NarrativeTier = options.tier ?? 'tier_1';
+  // Compute the report facts ONCE, before generation — the narrative
+  // receives them as the only numbers it may print (WO2 Task 1.2).
+  const facts = computeReportFacts(payload);
   const systemPrompt = buildSystemPrompt(tier);
-  const userPrompt = buildUserPrompt(payload);
+  const userPrompt = buildUserPrompt(payload, facts);
 
   const body = {
     model: NARRATIVE_MODEL,
@@ -484,6 +490,11 @@ export async function generateReportNarrative(
     throw new Error(`Expected 6 roadmap items, got ${narrative.roadmap?.length ?? 0}`);
   }
 
+  // Strategic posture is banded copy, not editorial judgment — set it
+  // deterministically from the score band so it can never contradict
+  // the rest of the banded copy (QA invariant 12).
+  narrative.strategic_posture = facts.postureLabel;
+
   return { narrative, model: NARRATIVE_MODEL };
 }
 
@@ -507,6 +518,17 @@ function buildSystemPrompt(tier: NarrativeTier): string {
     '- If the data shows one snapshot, do NOT invent a trend. Say "this is the baseline".',
     '- If no competitor beat the business on any prompt, the rival spotlight becomes "the closest challenger" — do not invent a bigger threat than the data shows.',
     '- If a cluster has no prompts in the data, do not write as if it does.',
+    '',
+    'Number discipline (hard requirement — the render REJECTS reports that violate it):',
+    '- Every number you print must appear verbatim in the REPORT FACTS section of the input. Never recount from the prompt list, never re-derive, never round differently.',
+    '- Any "X of N" or "X / N" claim must use a numerator/denominator pair exactly as given in REPORT FACTS (e.g. high-priority claims use the stated high-priority counts and denominator).',
+    '- take_watch must be built from the high-priority counts as given.',
+    '- A rival "win" means the rival appeared where the business did not (they hold that answer). A rival "mention" is any appearance. Never say a rival "beat", "outranked", or was "ahead of" the business unless REPORT FACTS shows rival wins > 0 — and even then describe it as holding answers the business is absent from.',
+    '- Do not use dashes inside numeric ranges; write "2 to 3", never "2-3" or "2–3".',
+    '- Every parenthesis you open must close within the same field.',
+    '',
+    'Tone banding (hard requirement):',
+    '- Follow the TONE CONSTRAINTS FOR THIS BAND section of the input exactly. Below the Leading band, leader/defense/dominance language about the client is rejected by the renderer.',
     '',
     'Format:',
     '- Output ONLY via the emit_report_narrative tool. Do not write anything else.',
@@ -543,7 +565,7 @@ function buildSystemPrompt(tier: NarrativeTier): string {
   ].join('\n');
 }
 
-function buildUserPrompt(payload: ReportExportPayload): string {
+function buildUserPrompt(payload: ReportExportPayload, facts: ReportFacts): string {
   // Summarise the payload for the model rather than dumping raw JSON —
   // easier for it to reason about, cheaper on tokens, and forces the
   // model to work from facts we've surfaced (reduces hallucination).
@@ -551,6 +573,41 @@ function buildUserPrompt(payload: ReportExportPayload): string {
   const s = p.scores;
 
   const parts: string[] = [];
+
+  // ----- Report facts: the ONLY numbers the narrative may print -----
+  const band = BAND_INFO[facts.band];
+  parts.push('=== REPORT FACTS — every number in your output MUST come from this list ===');
+  parts.push('Do not recount, re-derive, or estimate any figure. If a number is not listed here, do not print it.');
+  parts.push(`Overall score: ${facts.overallScore}/100 (grade ${facts.overallGrade})`);
+  parts.push(`Score band: ${band.label} (${band.min}-${band.max})`);
+  parts.push(`Prompts tested: ${facts.promptCount}`);
+  parts.push(`Appeared at all (named or cited): ${facts.presenceCount} of ${facts.promptCount}`);
+  parts.push(`Strong presence (recommended first / listed with citation): ${facts.strongCount} of ${facts.promptCount}`);
+  parts.push(`Partial presence (listed, cited, or mentioned): ${facts.partialCount} of ${facts.promptCount}`);
+  parts.push(`Fully absent: ${facts.absentCount} of ${facts.promptCount}`);
+  parts.push(`Website cited: ${facts.promptsWithCitation} of ${facts.promptCount}`);
+  parts.push(`High-priority prompts: ${facts.highPriorityTotal} total — ${facts.highPriorityWithPresence} with presence, ${facts.highPriorityAbsent} without. When citing high-priority performance, use exactly these numbers with denominator ${facts.highPriorityTotal}.`);
+  parts.push(`Rival wins (a named rival appeared where you did not): ${facts.rivalWins}`);
+  parts.push(`Prompts with any rival mention: ${facts.rivalMentions}`);
+  parts.push(`Repeat rivals (appeared in 2+ prompts): ${facts.repeatRivalCount}`);
+  parts.push(`Directory appearances on purchase-intent queries: ${facts.directoryOnPurchaseIntent} (risk: ${facts.directoryRisk})`);
+  parts.push('');
+  parts.push('=== TONE CONSTRAINTS FOR THIS BAND ===');
+  parts.push(`The client scored ${facts.overallScore}/100 (${band.label}).`);
+  if (facts.band === 'leading') {
+    parts.push('Leadership language is permitted. Emphasize defense of the position and erosion risk.');
+  } else {
+    parts.push('Do NOT describe the client as a leader, dominant, or defending a position. Forbidden phrases: "category leader", "signature of a leader", "defend your position", "dominant", "dominance".');
+    parts.push('An empty competitive field means the category is OPEN and unclaimed — an opportunity with urgency — never evidence the client leads.');
+    if (facts.band === 'needs_foundation') {
+      parts.push('Framing: the client is largely invisible to AI answers. The verdict MUST include one sentence naming the open-window opportunity (the category is unclaimed; whoever publishes direct-answer content first inherits these queries).');
+    } else if (facts.band === 'building') {
+      parts.push('Framing: early footholds, category still forming. No leadership claims.');
+    } else {
+      parts.push('Framing: a genuine contender. Leadership may be described only as a goal, not a current state.');
+    }
+  }
+  parts.push('');
 
   parts.push('=== BUSINESS ===');
   parts.push(`Name: ${p.meta.business_name || '(unknown)'}`);

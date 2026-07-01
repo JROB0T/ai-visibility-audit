@@ -7,8 +7,8 @@ import type {
   DiscoveryClusterWeights,
   DiscoveryPrompt,
   DiscoveryVisibilityStatus,
-} from '@/lib/types';
-import { ADMIN_EMAILS } from '@/lib/entitlements';
+} from './types';
+import { ADMIN_EMAILS } from './entitlements';
 
 export const DEFAULT_DISCOVERY_CLUSTER_WEIGHTS: DiscoveryClusterWeights = {
   core: 0.30,

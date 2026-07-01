@@ -14,6 +14,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { CheckCircle2 } from 'lucide-react';
 import { getDisplayPricing, formatDollars } from '@/lib/pricing';
+import { SCAN_PROMPT_COUNT, FREE_SCAN_PROMPT_COUNT } from '@/lib/productConstants';
 import BuyButton from './_BuyButton';
 
 // Title has no "— Aivascan": the root layout's `%s · Aivascan`
@@ -67,7 +68,7 @@ export default function PricingPage(): React.ReactElement {
           priceLine="$0"
           priceSub="One free per email + per site"
           features={[
-            '6-prompt AI visibility scan',
+            `${FREE_SCAN_PROMPT_COUNT}-prompt AI visibility scan`,
             '2-page summary report',
             'Cluster heatmap',
             'One example weak prompt',
@@ -94,7 +95,7 @@ export default function PricingPage(): React.ReactElement {
           priceLine={formatDollars(pricing.tier_1.monthly)}
           priceSub="per month"
           features={[
-            '18-prompt AI visibility scan',
+            `${SCAN_PROMPT_COUNT}-prompt AI visibility scan`,
             'Full strategic report',
             'Competitor analysis',
             '30/60/90 plan',

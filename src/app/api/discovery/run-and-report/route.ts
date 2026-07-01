@@ -305,14 +305,34 @@ async function doRunAndReport(params: {
       .maybeSingle();
     const snapshotTier: AuditTier = (snap?.tier as AuditTier | undefined) ?? 'tier_1';
     const narrativeTier: NarrativeTier = snapshotTier === 'tier_2' ? 'tier_2' : 'tier_1';
-    const { narrative, model } = await generateReportNarrative(payload, { tier: narrativeTier });
+    let { narrative, model } = await generateReportNarrative(payload, { tier: narrativeTier });
 
     // Narrative is the slow part (~30s). Once it's back, update the message
     // before the fast HTML build + persistence steps so the UI doesn't sit
     // on "Generating your strategic narrative…" through the tail.
     void updateJob(admin, jobId, { progress_message: 'Building your report…' });
 
-    const html = buildReportHtml(payload, narrative);
+    // buildReportHtml enforces the render invariants (WO2 Task 1) and
+    // throws ReportInvariantError on any data/narrative contradiction.
+    // Narrative generation is stochastic, so one violation gets one
+    // fresh regeneration before the job fails — a failed job beats a
+    // contradictory report, but a retried narrative beats both.
+    let html: string;
+    try {
+      html = buildReportHtml(payload, narrative);
+    } catch (invariantErr) {
+      if ((invariantErr as Error).name !== 'ReportInvariantError') throw invariantErr;
+      console.error('[RUN_AND_REPORT_ERROR]', {
+        phase: 'report_invariants_retry',
+        errorMessage: (invariantErr as Error).message,
+        jobId,
+        siteId,
+        runId,
+      });
+      void updateJob(admin, jobId, { progress_message: 'Rechecking the numbers…' });
+      ({ narrative, model } = await generateReportNarrative(payload, { tier: narrativeTier }));
+      html = buildReportHtml(payload, narrative); // second violation fails the job
+    }
 
     void updateJob(admin, jobId, { progress_message: 'Saving your dashboard…' });
 
