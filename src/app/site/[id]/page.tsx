@@ -52,7 +52,12 @@ function SiteDashboardContent() {
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        alert(body.error || 'Could not generate PDF. Try again in a moment.');
+        // Include `detail` (chromium error type/message) so field
+        // failures are diagnosable without needing Vercel logs.
+        const msg = body.detail
+          ? `${body.error || 'PDF failed'} — ${body.detail}`
+          : (body.error || 'Could not generate PDF. Try again in a moment.');
+        alert(msg);
         return;
       }
       const cd = res.headers.get('Content-Disposition') || '';

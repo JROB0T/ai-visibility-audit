@@ -149,13 +149,24 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       },
     });
   } catch (err) {
+    const errorName = err instanceof Error ? err.name : 'UnknownError';
+    const errorMessage = err instanceof Error ? err.message : String(err);
     console.error('[PDF_GENERATION_ERROR]', {
-      errorName: err instanceof Error ? err.name : 'UnknownError',
-      errorMessage: err instanceof Error ? err.message : String(err),
+      errorName,
+      errorMessage,
       errorStack: err instanceof Error ? err.stack : undefined,
       snapshotId: body.snapshotId,
     });
-    return NextResponse.json({ error: 'PDF generation failed' }, { status: 500 });
+    // Surface the specific error to help debug in the field. This
+    // route is auth-gated (site owner only) so we're not leaking
+    // anything sensitive to strangers.
+    return NextResponse.json(
+      {
+        error: 'PDF generation failed',
+        detail: `${errorName}: ${errorMessage.slice(0, 300)}`,
+      },
+      { status: 500 },
+    );
   } finally {
     if (browser) {
       try {
