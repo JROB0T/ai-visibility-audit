@@ -133,6 +133,15 @@ function DashboardContent() {
 
   if (loading) return (<div className="max-w-5xl mx-auto px-4 py-20 text-center"><div className="animate-spin w-8 h-8 border-2 rounded-full mx-auto" style={{ borderColor: '#6366F1', borderTopColor: 'transparent' }} /><p className="mt-4" style={{ color: 'var(--text-tertiary)' }}>Loading your sites…</p></div>);
 
+  // Free-scan quota gate (mirrors the server-side check in /api/audit).
+  // Free tier: one site per account. Additional sites require a Monthly
+  // subscription. Subscribers and admins get the input; everyone else
+  // who has already used their free scan sees the upgrade CTA in its
+  // place.
+  const hasSubscription = sites.some(s => s.has_monthly_monitoring === true);
+  const usedFreeScan = sites.length >= 1;
+  const canScanNewSite = isAdmin || !usedFreeScan || hasSubscription;
+
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
       {checkoutSuccess && (
@@ -178,19 +187,46 @@ function DashboardContent() {
         </div>
       </div>
 
-      <form onSubmit={handleNewAudit} className="mb-8">
-        <div className="flex gap-3">
-          <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--text-tertiary)' }} />
-            <input ref={urlInputRef} type="text" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="Enter a website URL to scan…"
-              className="w-full pl-10 pr-4 py-2.5 rounded-lg text-sm" style={{ background: 'var(--surface)', color: 'var(--text-primary)', border: '1px solid var(--border)' }} />
+      {canScanNewSite ? (
+        <form onSubmit={handleNewAudit} className="mb-8">
+          <div className="flex gap-3">
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--text-tertiary)' }} />
+              <input ref={urlInputRef} type="text" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="Enter a website URL to scan…"
+                className="w-full pl-10 pr-4 py-2.5 rounded-lg text-sm" style={{ background: 'var(--surface)', color: 'var(--text-primary)', border: '1px solid var(--border)' }} />
+            </div>
+            <button type="submit" disabled={scanning || !url.trim()} className="btn-primary px-5 py-2.5 text-sm font-medium inline-flex items-center gap-2" style={{ opacity: scanning ? 0.7 : 1 }}>
+              {scanning ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Scanning…</> : <><Plus className="w-4 h-4" />Scan Site</>}
+            </button>
           </div>
-          <button type="submit" disabled={scanning || !url.trim()} className="btn-primary px-5 py-2.5 text-sm font-medium inline-flex items-center gap-2" style={{ opacity: scanning ? 0.7 : 1 }}>
-            {scanning ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Scanning…</> : <><Plus className="w-4 h-4" />Scan Site</>}
-          </button>
+          {error && <p className="mt-2 text-sm text-red-500">{error}</p>}
+        </form>
+      ) : (
+        // Free scan already used, no subscription. Replace the input
+        // with a clear upgrade CTA — the /api/audit endpoint would
+        // reject any new scan attempt anyway, so hiding the input
+        // avoids a "click, get error" dead end.
+        <div
+          className="mb-8 card p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
+          style={{ borderColor: 'var(--accent)' }}
+        >
+          <div>
+            <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+              You&rsquo;ve used your free scan.
+            </p>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>
+              Subscribe to Monthly to scan more sites, get automatic monthly
+              rescans, and on-demand rescans anytime.
+            </p>
+          </div>
+          <a
+            href="/pricing"
+            className="btn-primary px-4 py-2 text-sm font-medium rounded-lg whitespace-nowrap"
+          >
+            See plans
+          </a>
         </div>
-        {error && <p className="mt-2 text-sm text-red-500">{error}</p>}
-      </form>
+      )}
 
       {sites.length === 0 ? (
         <div className="card p-10 sm:p-12 text-center">

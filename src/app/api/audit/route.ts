@@ -38,6 +38,36 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
 
+    // ---- Free-scan quota gate (2026-07-01) --------------------------
+    // Product model: 1 free scan per signed-up account. Additional
+    // scans (any site) require a Monthly subscription. Admins bypass.
+    // Detection: user is a "subscriber" if any of their sites has
+    // has_monthly_monitoring=true. If not, and they already have >=1
+    // site row, block. Rescanning the SAME site is always fine — it
+    // reuses the existing site row and doesn't trigger the gate.
+    const isAdminUser = isAdminAccount(user.email);
+    if (!isAdminUser) {
+      const { data: existingSitesForUser } = await supabase
+        .from('sites')
+        .select('id, domain, has_monthly_monitoring')
+        .eq('user_id', user.id);
+
+      const alreadyOnThisSite = (existingSitesForUser || []).some(s => s.domain === domain);
+      const hasSubscription = (existingSitesForUser || []).some(s => s.has_monthly_monitoring === true);
+      const usedFreeScan = (existingSitesForUser || []).length >= 1;
+
+      if (!alreadyOnThisSite && usedFreeScan && !hasSubscription) {
+        return NextResponse.json(
+          {
+            error: 'Subscribe to scan another site',
+            detail: 'Your free scan has already been used. Subscribe to Monthly for automatic scans plus on-demand rescans on the sites you choose.',
+            upgradeUrl: '/pricing',
+          },
+          { status: 402 },
+        );
+      }
+    }
+
     // Reuse existing site record for the same domain + user
     let site;
     const { data: existingSite } = await supabase

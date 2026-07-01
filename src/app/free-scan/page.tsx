@@ -16,6 +16,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import { createClient } from '@/lib/supabase/client';
 
 type FormState =
   | { kind: 'idle' }
@@ -43,6 +44,16 @@ export default function FreeScanPage(): React.ReactElement {
   useEffect(() => {
     const prefill = new URLSearchParams(window.location.search).get('url');
     if (prefill) setUrl(prefill);
+  }, []);
+
+  // Pre-fill the email field from the signed-in session so logged-in
+  // users don't have to retype the address they already authenticated
+  // with. If they're anonymous, the field stays empty as before.
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data }) => {
+      if (data?.user?.email) setEmail(data.user.email);
+    });
   }, []);
 
   // Cycling progress copy during submitting state.
