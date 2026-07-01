@@ -4,12 +4,10 @@ import { Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 
-// Flip to true once Google completes OAuth verification for
-// aivascan.com (currently pending — submitted, 48-hr review queue).
-// Until then we hide the Google sign-in button so users don't see
-// the "unverified app" warning. Magic-link and email/password are
-// the active sign-in paths in the interim.
-const GOOGLE_SIGN_IN_ENABLED = false;
+// Google sign-in is available once Google completes OAuth
+// verification for aivascan.com. Flip back to false if verification
+// is ever revoked or a policy warning reappears.
+const GOOGLE_SIGN_IN_ENABLED = true;
 
 function GoogleIcon() {
   return (

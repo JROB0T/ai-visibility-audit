@@ -4,9 +4,9 @@ import { Suspense, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 
-// See /auth/login for context. Flip to true once Google completes
-// OAuth verification — flip both files together.
-const GOOGLE_SIGN_IN_ENABLED = false;
+// See /auth/login for context. Flip both files together if
+// verification status changes.
+const GOOGLE_SIGN_IN_ENABLED = true;
 
 function GoogleIcon() {
   return (
