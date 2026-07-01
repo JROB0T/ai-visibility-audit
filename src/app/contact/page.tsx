@@ -10,7 +10,24 @@
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Contact — Aivascan',
+  title: 'Contact',
+  description:
+    'Reach the Aivascan team. Support and general inquiries answered within one business day.',
+  alternates: { canonical: '/contact' },
+  openGraph: {
+    title: 'Contact · Aivascan',
+    description:
+      'Reach the Aivascan team. Support and general inquiries answered within one business day.',
+    type: 'website',
+    siteName: 'Aivascan',
+    url: '/contact',
+  },
+  twitter: {
+    card: 'summary',
+    title: 'Contact · Aivascan',
+    description:
+      'Reach the Aivascan team. Support and general inquiries answered within one business day.',
+  },
 };
 
 export default function ContactPage(): React.ReactElement {

@@ -11,15 +11,23 @@
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Free AI Visibility Sample — Aivascan',
+  title: 'Free AI Visibility Sample',
   description:
-    'Get a free sample report showing how AI assistants (ChatGPT, Claude, Perplexity, Gemini) describe your business — and what to fix first.',
+    'Enter your email and website — we run a 6-prompt scan and email you a 2-page report showing where AI recommends you, where it doesn’t, and who it names instead. No account, no card.',
+  alternates: { canonical: '/free-scan' },
   openGraph: {
-    title: 'Free AI Visibility Sample — Aivascan',
+    title: 'Free AI Visibility Sample · Aivascan',
     description:
-      'See how AI assistants answer buyer-intent questions about your business. Free 2-page sample report.',
+      'See how AI assistants answer buyer-intent questions about your business. Free 2-page sample report — no account, no card.',
     type: 'website',
     siteName: 'Aivascan',
+    url: '/free-scan',
+  },
+  twitter: {
+    card: 'summary',
+    title: 'Free AI Visibility Sample · Aivascan',
+    description:
+      'See how AI assistants answer buyer-intent questions about your business. Free 2-page sample report — no account, no card.',
   },
 };
 

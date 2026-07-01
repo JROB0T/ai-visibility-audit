@@ -4,6 +4,9 @@ import { ThemeWrapper } from '@/components/ThemeWrapper';
 
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://aivascan.com';
 
+// NOTE: no `alternates.canonical` here — a canonical in the root layout
+// is inherited by every page, which marks all subpages as duplicates of
+// the homepage. Each public page declares its own self-canonical.
 export const metadata: Metadata = {
   metadataBase: new URL(BASE_URL),
   title: {
@@ -11,18 +14,7 @@ export const metadata: Metadata = {
     template: '%s · Aivascan',
   },
   description:
-    'Aivascan scans how AI assistants (ChatGPT, Claude, Perplexity, Gemini) answer buyer-intent questions about your business — and tells you what to fix.',
-  keywords: [
-    'AI visibility',
-    'AI search optimization',
-    'answer engine optimization',
-    'AEO',
-    'generative engine optimization',
-    'GEO',
-    'ChatGPT visibility',
-    'AI SEO audit',
-  ],
-  alternates: { canonical: '/' },
+    'Aivascan scans how AI assistants answer buyer-intent questions about your business — and gives you a scored report with a prioritized fix plan.',
   openGraph: {
     title: 'Aivascan — AI Visibility Audit',
     description: 'See how AI assistants describe your business — and what to fix first.',
@@ -52,8 +44,18 @@ const STRUCTURED_DATA = {
       '@id': `${BASE_URL}/#organization`,
       name: 'Aivascan',
       url: BASE_URL,
+      email: 'team@aivascan.com',
+      parentOrganization: {
+        '@type': 'Organization',
+        name: 'The Bergen Standard, LLC',
+        address: {
+          '@type': 'PostalAddress',
+          addressRegion: 'NJ',
+          addressCountry: 'US',
+        },
+      },
       description:
-        'Aivascan (AI Visibility Audit) scores how well businesses appear in AI-assistant search results and provides prioritized fix plans.',
+        'Aivascan audits how AI assistants describe and recommend businesses, and delivers scored reports with prioritized fix plans.',
     },
     {
       '@type': 'WebSite',
@@ -69,13 +71,25 @@ const STRUCTURED_DATA = {
       operatingSystem: 'Web',
       url: BASE_URL,
       description:
-        'Audits whether AI assistants like ChatGPT, Claude, Perplexity, and Gemini recommend your business when buyers ask — with an AI Visibility Score, Site Readiness Score, competitor comparison, and a 30/60/90-day fix plan.',
-      offers: {
-        '@type': 'Offer',
-        price: '0',
-        priceCurrency: 'USD',
-        description: 'Free 6-prompt sample report — no account or credit card required.',
-      },
+        'Audits whether AI assistants recommend your business when buyers ask — with an AI Visibility Score, Site Readiness Score, competitor comparison, and a 30/60/90-day fix plan.',
+      // Prices here are hardcoded like the homepage pricing section —
+      // if PRICE_TIER_1_MONTHLY_DOLLARS changes, update this too.
+      offers: [
+        {
+          '@type': 'Offer',
+          name: 'Free Sample',
+          price: '0',
+          priceCurrency: 'USD',
+          description: '6-prompt AI visibility scan with a 2-page summary report — no account or credit card required.',
+        },
+        {
+          '@type': 'Offer',
+          name: 'Monthly',
+          price: '29.99',
+          priceCurrency: 'USD',
+          description: '18-prompt scan, full strategic report, competitor analysis, 30/60/90 plan, refreshed monthly.',
+        },
+      ],
     },
   ],
 };

@@ -252,8 +252,8 @@ function DashboardContent() {
             Run your first AI visibility audit
           </h2>
           <p className="mt-2 text-sm max-w-md mx-auto" style={{ color: 'var(--text-secondary)' }}>
-            See how ChatGPT, Claude, Perplexity, and Gemini describe a business
-            when buyers ask for recommendations — and where you&rsquo;re missing.
+            See how AI assistants describe a business when buyers ask for
+            recommendations — and where you&rsquo;re missing.
           </p>
 
           <div className="mt-7 grid gap-3 sm:grid-cols-3 max-w-xl mx-auto text-left">

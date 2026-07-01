@@ -126,7 +126,7 @@ export default async function OgImage({ params }: { params: Promise<{ token: str
           <div style={{ display: 'flex', fontSize: 30, color: '#94A3B8', marginTop: 28, lineHeight: 1.4 }}>
             {snap
               ? `Recommended by AI in ${snap.strong} of ${snap.total} buyer questions${snap.dateLabel ? ` · ${snap.dateLabel}` : ''}`
-              : 'How ChatGPT, Claude, Perplexity & Gemini answer buyer questions about you'}
+              : 'How AI assistants answer buyer questions about you'}
           </div>
           <div
             style={{

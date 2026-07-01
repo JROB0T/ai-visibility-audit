@@ -631,12 +631,12 @@ function ReadinessOnlyOverview({ audit }: { audit: ShellAudit }): React.ReactEle
               Unlock AI Visibility
             </p>
             <h3 className="text-lg font-bold mb-1" style={{ color: 'var(--text-primary)' }}>
-              See how ChatGPT, Claude, Perplexity, and Gemini describe your business.
+              See how AI assistants describe your business.
             </h3>
             <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-              The other half of your AIVA Score — buyer-intent prompts run
-              against real AI assistants, scored, and turned into a 30/60/90
-              plan refreshed monthly.
+              The other half of your Aivascan score — buyer-intent prompts run
+              through an AI engine with live web search, scored, and turned
+              into a 30/60/90 plan refreshed monthly.
             </p>
           </div>
           <a

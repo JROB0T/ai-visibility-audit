@@ -6,7 +6,7 @@
 > architectural decision, or surfaced a pending item). Treat the file as
 > living — out-of-date entries are worse than missing ones.
 
-Last updated: 2026-06-22 (Aivascan rebrand + Mike entitlement grant)
+Last updated: 2026-07-01 (site-audit work order: canonicals, per-page meta, claim accuracy, terms §5(d))
 
 ---
 
@@ -38,6 +38,36 @@ and works on `main` directly. Deploys are continuous via Vercel.
 ## Active work and recent history
 
 ### Recently shipped (most recent first)
+
+- **Site-audit work order (2026-07-01, branch `work-order-site-audit`):**
+  external SEO/claims audit applied. (1) **Canonical fix** — root layout's
+  `alternates.canonical: '/'` was inherited by every page, marking all
+  subpages as homepage duplicates; removed from the root, each public page
+  now self-canonicals. Homepage split into server `page.tsx` (metadata) +
+  `_HomeClient.tsx` (the old client component) because a 'use client' page
+  can't export metadata. (2) **Per-page meta** — unique titles (template
+  `%s · Aivascan`, pages no longer double-brand), unique descriptions,
+  per-page og:url + twitter mirrors, meta-keywords removed. (3) **Engine
+  claim accuracy** — backend calls only api.anthropic.com, so all copy
+  claiming to test/query ChatGPT/Perplexity/Gemini directly was reworded
+  to "AI engine with live web search (Claude)" framing; engine names kept
+  only as context. Touched homepage feature card + FAQ, free-scan meta,
+  dashboard/audit upsells, share layout/OG image, llms.txt. (4) **Terms**
+  — added §5(d) (no misrepresenting AI systems / disparagement); KEPT
+  §5(c) CAN-SPAM export clause (the work order called it vestigial but the
+  batch CSV export really ships prospect emails + outreach copy) and kept
+  §4 one-time/rescan language (both SKUs live in checkout). Date bumped
+  2026-07-01. (5) **JSON-LD** — Organization now names The Bergen
+  Standard, LLC (NJ) as parentOrganization + team@aivascan.com;
+  SoftwareApplication offers now include Monthly $29.99 (hardcoded, sync
+  with env price). (6) **Polish** — hero mock "Trust" → "Trustworthiness"
+  (matches report taxonomy), −58% stat now sourced to the Ahrefs 300k-
+  keyword AI Overviews CTR study (Dec 2025 update — the number checks
+  out), agency/multi-site line added under the /pricing Monthly card.
+  NOT done from the work order: `public/robots.txt` (would conflict with
+  the existing, more complete `src/app/robots.ts`). Honeypot was already
+  compliant. Verified: `npm run build` clean; canonicals/titles/og:url/
+  descriptions checked in prerendered HTML; both JSON-LD blocks parse.
 
 - **Aivascan rebrand (2026-06-22, branch `rebrand-aivascan`):** renamed
   the product wordmark "AIVA" → "Aivascan" across every user-facing

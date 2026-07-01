@@ -2403,7 +2403,7 @@ export default function LegacyAuditPage() {
       {isAuthenticated && activeTab === 'ai-perception' && !hasPaid && (
         <LockedSection
           title="AI Perception Check"
-          description="See how AI assistants would answer questions about your business. Find out if ChatGPT, Claude, and Perplexity can accurately describe what you offer."
+          description="See how AI assistants would answer questions about your business. Find out if AI can accurately describe what you offer."
           onCheckout={() => handleCheckout('initial_scan')}
           loading={checkoutLoading}
         />

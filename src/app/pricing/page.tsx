@@ -16,16 +16,27 @@ import { CheckCircle2 } from 'lucide-react';
 import { getDisplayPricing, formatDollars } from '@/lib/pricing';
 import BuyButton from './_BuyButton';
 
+// Title has no "— Aivascan": the root layout's `%s · Aivascan`
+// template supplies the brand suffix. Description avoids a dollar
+// amount so env-driven price changes can't make it stale.
 export const metadata: Metadata = {
-  title: 'Pricing — Aivascan',
+  title: 'Pricing',
   description:
-    'Simple pricing for AI-visibility audits. Start with a free sample report, or get the full strategic report with a monthly plan that re-scans automatically.',
+    'Start with a free 2-page sample report. Upgrade to the full strategic report with competitor analysis and a 30/60/90 fix plan, refreshed monthly. Cancel anytime.',
+  alternates: { canonical: '/pricing' },
   openGraph: {
-    title: 'Aivascan Pricing — AI Visibility Audits',
+    title: 'Pricing · Aivascan',
     description:
-      'Free sample report, or a full strategic report refreshed monthly. See how AI assistants describe your business.',
+      'Free sample report, or a full strategic report with competitor analysis and a 30/60/90 fix plan, refreshed monthly. Cancel anytime.',
     type: 'website',
     siteName: 'Aivascan',
+    url: '/pricing',
+  },
+  twitter: {
+    card: 'summary',
+    title: 'Pricing · Aivascan',
+    description:
+      'Free sample report, or a full strategic report with competitor analysis and a 30/60/90 fix plan, refreshed monthly. Cancel anytime.',
   },
 };
 
@@ -99,6 +110,11 @@ export default function PricingPage(): React.ReactElement {
             By subscribing you authorize Aivascan to charge your card{' '}
             {formatDollars(pricing.tier_1.monthly)}/month automatically until
             you cancel. Cancel anytime from your Account page.
+          </p>
+          <p className="mt-2 text-xs leading-relaxed" style={{ color: 'var(--text-tertiary)' }}>
+            Agency or multi-site? Email{' '}
+            <a href="mailto:team@aivascan.com" className="underline">team@aivascan.com</a>
+            {' '}— multi-site plans available.
           </p>
         </PlanCard>
       </div>

@@ -14,15 +14,23 @@ import { ArrowRight, Search, Sparkles, CheckCircle } from 'lucide-react';
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://aivascan.com';
 
 export const metadata: Metadata = {
-  title: 'AI Visibility vs SEO — what\u2019s the difference, and why you need both',
+  title: 'AI Visibility vs SEO — Why You Need Both',
   description:
     'SEO determines where you rank in search results. AI visibility determines whether ChatGPT, Claude, Perplexity, and Gemini recommend you at all. Here\u2019s how the two differ, where they overlap, and how to manage both.',
   alternates: { canonical: '/ai-visibility-vs-seo' },
   openGraph: {
-    title: 'AI Visibility vs SEO — why you need both',
+    title: 'AI Visibility vs SEO — Why You Need Both',
     description:
       'Ranking #1 doesn\u2019t guarantee AI mentions you. How AI-assistant visibility differs from search rankings, and what to do about it.',
     type: 'article',
+    siteName: 'Aivascan',
+    url: '/ai-visibility-vs-seo',
+  },
+  twitter: {
+    card: 'summary',
+    title: 'AI Visibility vs SEO — Why You Need Both',
+    description:
+      'Ranking #1 doesn\u2019t guarantee AI mentions you. How AI-assistant visibility differs from search rankings, and what to do about it.',
   },
 };
 

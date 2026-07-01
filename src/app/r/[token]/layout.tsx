@@ -20,7 +20,7 @@ export async function generateMetadata({
   const fallback: Metadata = {
     title: 'AI Visibility Report',
     description:
-      'See how AI assistants like ChatGPT, Claude, and Perplexity answer buyer questions about this business — scored and explained by Aivascan.',
+      'See how AI assistants answer buyer questions about this business — scored and explained by Aivascan.',
     robots: { index: false, follow: false },
   };
 

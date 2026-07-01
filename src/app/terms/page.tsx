@@ -7,12 +7,36 @@
 // non-refundable once a report is generated. Governing law: New
 // Jersey. Re-review before any material change to pricing, billing
 // model, or feature set.
+//
+// §5(c) (exported data / CAN-SPAM) is intentional, not vestigial:
+// the batch CSV export includes prospect emails and pre-written
+// outreach copy, so customers CAN misuse exported data. §4's
+// one-time / paid-rescan language matches live SKUs (the one-time
+// tier is hidden from the UI but still valid; rescan is a real
+// checkout mode). §5(d) added 2026-07-01.
 // ============================================================
 
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Terms of Service — Aivascan',
+  title: 'Terms of Service',
+  description:
+    'Terms of Service for Aivascan, an AI visibility audit service operated by The Bergen Standard, LLC.',
+  alternates: { canonical: '/terms' },
+  openGraph: {
+    title: 'Terms of Service · Aivascan',
+    description:
+      'Terms of Service for Aivascan, an AI visibility audit service operated by The Bergen Standard, LLC.',
+    type: 'website',
+    siteName: 'Aivascan',
+    url: '/terms',
+  },
+  twitter: {
+    card: 'summary',
+    title: 'Terms of Service · Aivascan',
+    description:
+      'Terms of Service for Aivascan, an AI visibility audit service operated by The Bergen Standard, LLC.',
+  },
 };
 
 export default function TermsPage(): React.ReactElement {
@@ -20,7 +44,7 @@ export default function TermsPage(): React.ReactElement {
     <article className="max-w-2xl mx-auto px-4 py-12 sm:py-16">
       <h1 className="text-3xl sm:text-4xl font-bold tracking-tight mb-3" style={{ color: 'var(--text-primary)' }}>Terms of Service</h1>
       <p className="text-sm mb-10" style={{ color: 'var(--text-tertiary)' }}>
-        Last updated: June 26, 2026
+        Last updated: July 1, 2026
       </p>
 
       <div className="legal-doc">
@@ -77,7 +101,10 @@ export default function TermsPage(): React.ReactElement {
           You agree not to: (a) scan domains you do not own or lack
           authorization to test; (b) reverse-engineer, disrupt, or overload
           the Service; (c) use exported data in violation of applicable
-          email-marketing or privacy laws (CAN-SPAM, GDPR, CASL).
+          email-marketing or privacy laws (CAN-SPAM, GDPR, CASL); or
+          (d) use the Service or its reports to misrepresent third-party AI
+          systems, or to harass, defame, or unfairly disparage any business
+          or individual.
         </p>
 
         <h2>6. AI-Generated Content &amp; No Guarantee of Results</h2>

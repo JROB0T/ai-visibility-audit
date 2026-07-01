@@ -1,42 +1,36 @@
-# Aivascan — AI Visibility Audit
+# Aivascan
 
-> Aivascan scores how well a business shows up when buyers ask AI assistants
-> (ChatGPT, Claude, Perplexity, Gemini) for recommendations — and tells the
-> business exactly what to fix. Think of it as the AI-search counterpart to
-> an SEO audit: SEO gets you ranked, Aivascan tells you whether you get
-> *recommended*.
+> Aivascan is an AI visibility audit service. It runs real buyer-intent
+> prompts through an AI engine with live web search, records how AI
+> assistants describe a business, scores the results (0–100), and delivers a
+> prioritized fix plan. Operated by The Bergen Standard, LLC (New Jersey,
+> USA).
 
-Aivascan is a self-serve SaaS for small and medium businesses, marketing leads,
-and agencies. It runs real buyer-intent prompts against AI assistants,
-records how each one answers, and produces two scores:
+Aivascan measures whether AI assistants (such as ChatGPT, Claude, Perplexity,
+and Gemini) mention and recommend a business when buyers ask purchase-intent
+questions — the AI-era counterpart to SEO rank tracking.
 
-- **AI Visibility Score** — whether AI assistants surface and recommend the
-  business when buyers ask the questions that lead to a purchase.
-- **Site Readiness Score** — whether the business's website is technically
-  legible to AI crawlers (robots.txt access, structured data, llms.txt,
-  content clarity).
+## What it does
 
-Each paid report includes a competitor comparison, a plain-English
-"AI Positioning Brief," and a prioritized 30/60/90-day fix plan with
-copy-paste code snippets. Reports refresh monthly so businesses can track
-movement over time.
+- Free sample: 6-prompt AI visibility scan with a 2-page summary report.
+  No account or credit card required. One per email and per website.
+- Monthly plan ($29.99/mo): 18-prompt scan, full strategic report, competitor
+  analysis, 30/60/90-day fix plan, refreshed monthly. Cancel anytime.
+- Reports include an AI Visibility Score, a Site Readiness Score, the
+  recorded AI answers, a competitor comparison, and copy-paste technical
+  fixes (robots.txt, structured data, llms.txt, content clarity).
 
-## Pages
+## Key pages
 
-- [Home](/): What Aivascan does and how the two-score model works
-- [Free scan](/free-scan): A free 6-prompt sample report — requires only an
-  email address, no account and no credit card
-- [Pricing](/pricing): Free sample and monthly subscription tiers
-- [AI visibility vs SEO](/ai-visibility-vs-seo): How AI-assistant visibility
-  differs from (and complements) traditional search engine optimization
-- [Contact](/contact): How to reach the team
+- [Homepage](https://aivascan.com/): product overview, scoring, FAQ
+- [Free scan](https://aivascan.com/free-scan): run a free sample report
+- [Pricing](https://aivascan.com/pricing): plans and billing terms
+- [AI visibility vs SEO](https://aivascan.com/ai-visibility-vs-seo): guide to
+  how AI-assistant visibility differs from search rankings
+- [Contact](https://aivascan.com/contact): team@aivascan.com
 
-## Facts
+## Who it's for
 
-- Product name: Aivascan (AI Visibility Audit)
-- Category: AI visibility / answer-engine optimization (AEO) auditing
-- Audience: small and medium businesses, marketing teams, agencies
-- Free tier: one free sample per email and per website
-- Paid tier: monthly subscription with full report, competitor analysis,
-  and monthly automated rescans
-- Assistants tested: ChatGPT, Claude, Perplexity, Gemini
+Small and medium businesses, marketing leads, and agencies whose customers
+research purchases through AI assistants — local services, professional
+services, SaaS, e-commerce, healthcare, law firms, consulting.

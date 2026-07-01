@@ -10,7 +10,21 @@
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Privacy Policy — Aivascan',
+  title: 'Privacy Policy',
+  description: 'How Aivascan collects, uses, and protects your data.',
+  alternates: { canonical: '/privacy' },
+  openGraph: {
+    title: 'Privacy Policy · Aivascan',
+    description: 'How Aivascan collects, uses, and protects your data.',
+    type: 'website',
+    siteName: 'Aivascan',
+    url: '/privacy',
+  },
+  twitter: {
+    card: 'summary',
+    title: 'Privacy Policy · Aivascan',
+    description: 'How Aivascan collects, uses, and protects your data.',
+  },
 };
 
 export default function PrivacyPage(): React.ReactElement {
