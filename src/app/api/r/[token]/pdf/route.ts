@@ -39,7 +39,7 @@ function getAdminClient(): SupabaseClient {
 // pinned in package.json — mismatch causes "executable not found"
 // errors at runtime.
 const CHROMIUM_REMOTE_URL =
-  'https://github.com/Sparticuz/chromium/releases/download/v131.0.0/chromium-v131.0.0-pack.tar';
+  'https://github.com/Sparticuz/chromium/releases/download/v133.0.0/chromium-v133.0.0-pack.tar';
 
 export async function GET(
   _request: NextRequest,

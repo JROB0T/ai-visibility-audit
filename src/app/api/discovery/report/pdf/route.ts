@@ -47,7 +47,7 @@ interface PdfRequest {
 // Pinned to match @sparticuz/chromium-min ^131.0.0 in package.json.
 // Update both together.
 const CHROMIUM_REMOTE_URL =
-  'https://github.com/Sparticuz/chromium/releases/download/v131.0.0/chromium-v131.0.0-pack.tar';
+  'https://github.com/Sparticuz/chromium/releases/download/v133.0.0/chromium-v133.0.0-pack.tar';
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   let body: PdfRequest;
