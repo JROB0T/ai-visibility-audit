@@ -29,7 +29,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import { requireApiKeyOrSession } from '@/lib/apiAuth';
+import { requireApiKeyOrOperatorSession } from '@/lib/apiAuth';
 import { isValidDomain, normalizeDomain } from '@/lib/normalize';
 import type { AuditTier } from '@/lib/types';
 
@@ -67,7 +67,7 @@ function appBaseUrl(request: NextRequest): string {
 }
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
-  const auth = await requireApiKeyOrSession(request);
+  const auth = await requireApiKeyOrOperatorSession(request);
   if (!auth.ok) {
     return NextResponse.json({ error: auth.error }, { status: auth.status });
   }

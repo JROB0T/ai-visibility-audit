@@ -9,11 +9,16 @@
 // Both routes require a signed-in browser session (cookie auth) —
 // the dashboard UI is the only intended caller. Programmatic
 // callers shouldn't be minting their own keys.
+//
+// Operator-only (2026-07-12): API keys are cold-outreach machinery,
+// not product surface. Admin-tier accounts (cross-account viewers
+// like Mike) get 403 here; only OPERATOR_EMAILS may mint/list keys.
 // ============================================================
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabase } from '@/lib/supabase/server';
 import { createApiKey, listApiKeys } from '@/lib/apiKeys';
+import { isOperatorAccount } from '@/lib/entitlements';
 
 export const maxDuration = 10;
 
@@ -29,6 +34,9 @@ async function requireUser(): Promise<
   const { data, error } = await supabase.auth.getUser();
   if (error || !data.user) {
     return { ok: false, status: 401, error: 'Authentication required' };
+  }
+  if (!isOperatorAccount(data.user.email)) {
+    return { ok: false, status: 403, error: 'API keys are not enabled for this account' };
   }
   return { ok: true, userId: data.user.id };
 }

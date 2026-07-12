@@ -22,11 +22,15 @@
 import type { NextRequest } from 'next/server';
 import { verifyApiKey } from '@/lib/apiKeys';
 import { createServerSupabase } from '@/lib/supabase/server';
+import { isOperatorAccount } from '@/lib/entitlements';
 
 export type ApiAuthSuccess = {
   ok: true;
   userId: string;
   source: 'api_key' | 'session';
+  // Session auth only — api_key callers resolve to null (key ownership
+  // is already restricted to operators at mint time via /api/keys).
+  email: string | null;
 };
 
 export type ApiAuthFailure = {
@@ -52,7 +56,7 @@ export async function requireApiKey(request: NextRequest): Promise<ApiAuthResult
   if (!result) {
     return { ok: false, error: 'Invalid or revoked API key', status: 401 };
   }
-  return { ok: true, userId: result.userId, source: 'api_key' };
+  return { ok: true, userId: result.userId, source: 'api_key', email: null };
 }
 
 export async function requireApiKeyOrSession(request: NextRequest): Promise<ApiAuthResult> {
@@ -61,7 +65,7 @@ export async function requireApiKeyOrSession(request: NextRequest): Promise<ApiA
   const raw = extractBearer(request.headers.get('authorization'));
   if (raw) {
     const result = await verifyApiKey(raw);
-    if (result) return { ok: true, userId: result.userId, source: 'api_key' };
+    if (result) return { ok: true, userId: result.userId, source: 'api_key', email: null };
     // Bearer header was present but invalid: surface clearly rather
     // than silently falling back to session — the caller almost
     // certainly meant to use the key.
@@ -75,9 +79,24 @@ export async function requireApiKeyOrSession(request: NextRequest): Promise<ApiA
     if (error || !data.user) {
       return { ok: false, error: 'Authentication required', status: 401 };
     }
-    return { ok: true, userId: data.user.id, source: 'session' };
+    return { ok: true, userId: data.user.id, source: 'session', email: data.user.email ?? null };
   } catch (err) {
     console.error('[API_AUTH_ERROR]', { phase: 'session_lookup', message: err instanceof Error ? err.message : String(err) });
     return { ok: false, error: 'Authentication required', status: 401 };
   }
+}
+
+/**
+ * Batch/export surfaces (the cold-outreach machinery): accepts an API
+ * key as before, but browser sessions must belong to an operator
+ * account. Admin-tier viewers (cross-account read access) get 403 —
+ * these endpoints are deliberately not part of their profile.
+ */
+export async function requireApiKeyOrOperatorSession(request: NextRequest): Promise<ApiAuthResult> {
+  const auth = await requireApiKeyOrSession(request);
+  if (!auth.ok) return auth;
+  if (auth.source === 'session' && !isOperatorAccount(auth.email)) {
+    return { ok: false, error: 'This feature is not enabled for this account', status: 403 };
+  }
+  return auth;
 }

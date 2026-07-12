@@ -34,7 +34,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import { requireApiKeyOrSession } from '@/lib/apiAuth';
+import { requireApiKeyOrOperatorSession } from '@/lib/apiAuth';
 import type { AuditTier } from '@/lib/types';
 import { getDisplayPricing, formatDollars } from '@/lib/pricing';
 import { buildOutreachEmail } from '@/lib/outreachEmail';
@@ -88,7 +88,7 @@ export interface ExportRow {
 }
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
-  const auth = await requireApiKeyOrSession(request);
+  const auth = await requireApiKeyOrOperatorSession(request);
   if (!auth.ok) {
     return NextResponse.json({ error: auth.error }, { status: auth.status });
   }

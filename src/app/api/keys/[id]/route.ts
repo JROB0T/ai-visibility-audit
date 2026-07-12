@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabase } from '@/lib/supabase/server';
 import { revokeApiKey } from '@/lib/apiKeys';
+import { isOperatorAccount } from '@/lib/entitlements';
 
 export const maxDuration = 10;
 
@@ -22,6 +23,9 @@ export async function DELETE(
   const { data, error } = await supabase.auth.getUser();
   if (error || !data.user) {
     return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+  }
+  if (!isOperatorAccount(data.user.email)) {
+    return NextResponse.json({ error: 'API keys are not enabled for this account' }, { status: 403 });
   }
 
   if (!id || typeof id !== 'string') {

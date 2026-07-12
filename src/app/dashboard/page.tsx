@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client';
 import { Search, Plus, AlertTriangle, ChevronRight, X, CheckCircle, Sparkles } from 'lucide-react';
 import { scoreToGrade, getScoreColor } from '@/components/ScoreRing';
 import { getVerticalLabel } from '@/lib/verticals';
-import { getRunTypeLabel, isAdminAccount } from '@/lib/entitlements';
+import { getRunTypeLabel, isAdminAccount, isOperatorAccount } from '@/lib/entitlements';
 
 interface SiteWithLatest {
   id: string;
@@ -32,11 +32,13 @@ function DashboardContent() {
   const [scanning, setScanning] = useState(false);
   const [error, setError] = useState('');
   const [checkoutSuccess, setCheckoutSuccess] = useState(false);
-  // Admin features (Batch upload, API keys) are hidden from regular
-  // customers by default — they're operational tools, not product
-  // surface. Admin status is derived from the same ADMIN_EMAILS list
-  // the API uses, so the UI matches what the server allows.
+  // Admin (cross-account view, site-cap bypass) and operator (Batch
+  // upload, API keys — the cold-outreach tools) are separate tiers:
+  // an admin viewer like Mike sees everything but does NOT get the
+  // operational tools. Both flags derive from the same lists the API
+  // enforces, so the UI matches what the server allows.
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isOperator, setIsOperator] = useState(false);
   const urlInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -56,6 +58,7 @@ function DashboardContent() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.push('/auth/login?redirect=/dashboard'); return; }
       setIsAdmin(isAdminAccount(user.email ?? null));
+      setIsOperator(isOperatorAccount(user.email ?? null));
 
       const { data: userSites } = await supabase
         .from('sites').select('id, domain, url, vertical, plan_status, has_monthly_monitoring, created_at')
@@ -158,7 +161,7 @@ function DashboardContent() {
           <p className="mt-1 text-sm" style={{ color: 'var(--text-tertiary)' }}>{sites.length} site{sites.length !== 1 ? 's' : ''} · {sites.reduce((sum, s) => sum + s.audit_count, 0)} total scans</p>
         </div>
         <div className="flex items-center gap-2 self-start sm:self-auto">
-          {isAdmin && (
+          {isOperator && (
             <>
               <a
                 href="/dashboard/batch-upload"

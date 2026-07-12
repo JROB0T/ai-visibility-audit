@@ -5,8 +5,9 @@
 // keys, mint new ones, revoke. Newly minted keys are displayed ONCE
 // (server returns the raw key in the create response, never again).
 //
-// Auth: relies on the page-level Supabase session check. The
-// underlying /api/keys routes also require a session — defense in
+// Auth: operator-only (2026-07-12) — non-operator accounts (including
+// admin-tier viewers) are redirected to /dashboard, and the underlying
+// /api/keys routes independently return 403 for them — defense in
 // depth.
 // ============================================================
 
@@ -14,7 +15,10 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { ArrowLeft, Copy, Key, Plus, Trash2 } from 'lucide-react';
+import { createClient } from '@/lib/supabase/client';
+import { isOperatorAccount } from '@/lib/entitlements';
 
 interface StoredKey {
   id: string;
@@ -34,9 +38,21 @@ interface NewlyMintedKey {
 }
 
 export default function ApiKeysPage(): React.ReactElement {
+  const router = useRouter();
   const [keys, setKeys] = useState<StoredKey[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Operator gate — API keys are operational tooling, not product
+  // surface. Anyone else (signed out, customer, admin viewer) is
+  // bounced to the appropriate page.
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) router.push('/auth/login?redirect=/dashboard/api-keys');
+      else if (!isOperatorAccount(user.email ?? null)) router.push('/dashboard');
+    });
+  }, [router]);
 
   const [newKeyName, setNewKeyName] = useState('');
   const [creating, setCreating] = useState(false);

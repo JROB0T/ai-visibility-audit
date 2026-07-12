@@ -18,6 +18,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Upload, AlertTriangle, CheckCircle2, Download, ExternalLink, Loader2 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { isOperatorAccount } from '@/lib/entitlements';
 
 type Tier = 'free' | 'tier_1' | 'tier_2';
 type JobStatus = 'queued' | 'processing' | 'completed' | 'failed';
@@ -143,11 +144,16 @@ export default function BatchUploadPage(): React.ReactElement {
   const router = useRouter();
 
   // ----- Auth gate -----
+  // Operator-only (2026-07-12): batch upload is cold-outreach
+  // machinery. Non-operator accounts (including admin-tier viewers)
+  // are bounced to /dashboard; the batch API routes independently
+  // 403 them.
   const [authChecked, setAuthChecked] = useState(false);
   useEffect(() => {
     const supabase = createClient();
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!user) router.push('/auth/login?redirect=/dashboard/batch-upload');
+      else if (!isOperatorAccount(user.email ?? null)) router.push('/dashboard');
       else setAuthChecked(true);
     });
   }, [router]);
