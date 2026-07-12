@@ -1,6 +1,6 @@
 import type { Entitlement, PlanStatus } from '@/lib/types';
 
-export const ADMIN_EMAILS = ['demo@aivisibility.test'];
+export const ADMIN_EMAILS = ['demo@aivisibility.test', 'mikedaman@sawyer.com'];
 
 export function isAdminAccount(email: string | null | undefined): boolean {
   if (!email) return false;
